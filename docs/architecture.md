@@ -71,7 +71,7 @@ See [authorization.md](authorization.md).
 
 ## Services
 
-| Service                | Responsibility (Phase 01)                                              |
+| Service                | Responsibility                                                         |
 | ---------------------- | ---------------------------------------------------------------------- |
 | `authorizationService` | permission checks, organization guard                                  |
 | `auditService`         | append-only audit trail (`log`, `logForContext`, `listPage`)           |
@@ -89,9 +89,21 @@ See [authorization.md](authorization.md).
 | `invitationService`    | hashed single-use invitations, acceptance                              |
 | `rateLimitService`     | PostgreSQL-backed limits for sensitive operations                      |
 | `emailService`         | invitation email (Resend)                                              |
+| `internService`        | Phase 03: directory, profiles, create/update, manager/mentor assignment, HR figures |
+| `internLifecycleService` | Phase 03: status transitions, ending-soon and overdue-onboarding jobs |
+| `onboardingService` / `onboardingTemplateService` | Phase 03: templates, checklist snapshots, completion, acknowledgements |
+| `documentService`      | Phase 03: private intern documents with visibility levels              |
 
 Each later phase adds `create / update / delete / workflow` methods to these services (or new services) following the
 same pattern, and wraps mutations with `defineAction()` (`src/server/actions/define-action.ts`).
+
+## Domain events
+
+`src/server/events/domain-events.ts` is a small typed in-process bus (`intern.created`, `onboarding.completed`,
+`document.uploaded`, …). Services emit after their transaction commits; handlers run in order and a failing handler is
+logged without affecting the caller or other handlers. Later phases subscribe for notifications and email. Anything
+that must survive a restart is persisted separately (audit log, `intern_lifecycle_events`). Scheduled work
+(`POST /api/jobs/daily`) is idempotent. See [intern-management.md](intern-management.md#domain-events).
 
 ## Global search
 

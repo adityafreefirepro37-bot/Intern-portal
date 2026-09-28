@@ -49,7 +49,12 @@ export const dashboardService = {
 
     return {
       // The programme section shows intern figures in more detail; don't repeat them.
-      stats: { activeInterns: internship.programme ? null : activeInterns, openTasks, pendingReviews, upcomingDeadlines: upcomingDeadlineCount },
+      stats: {
+        activeInterns: internship.programme ? null : activeInterns,
+        openTasks,
+        pendingReviews,
+        upcomingDeadlines: upcomingDeadlineCount,
+      },
       internship,
       upcomingTasks,
       taskStatus,
@@ -82,7 +87,13 @@ export const dashboardService = {
       ownId ? this.getOwnInternship(ctx, ownId) : null,
     ])
     return {
-      programme: programme ? { ...programme, onboardingOverdue: onboarding?.overdue ?? null, onboardingCompletion: onboarding?.completionRate ?? null } : null,
+      programme: programme
+        ? {
+            ...programme,
+            onboardingOverdue: onboarding?.overdue ?? null,
+            onboardingCompletion: onboarding?.completionRate ?? null,
+          }
+        : null,
       managed,
       mentored,
       self,
@@ -91,7 +102,10 @@ export const dashboardService = {
 
   async getOwnInternship(ctx: RequestContext, internId: string) {
     const profile = await internService.getProfile(ctx, internId)
-    const checklist = profile.can.viewOnboarding && profile.internship?.onboarding ? await onboardingService.getChecklist(ctx, internId) : null
+    const checklist =
+      profile.can.viewOnboarding && profile.internship?.onboarding
+        ? await onboardingService.getChecklist(ctx, internId)
+        : null
     return {
       id: profile.id,
       status: profile.status,

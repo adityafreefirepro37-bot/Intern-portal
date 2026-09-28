@@ -43,13 +43,28 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
   }
 
   const raw = await searchParams
-  const [{ query, page, stats }, options] = await Promise.all([internService.directory(ctx, raw), internService.formOptions(ctx)])
+  const [{ query, page, stats }, options] = await Promise.all([
+    internService.directory(ctx, raw),
+    internService.formOptions(ctx),
+  ])
   type Row = (typeof page.items)[number]
   const canCreate = authorizationService.can(ctx, 'intern.create')
   const params = Object.fromEntries(
     Object.entries(raw).flatMap(([key, value]) => (typeof value === 'string' && key !== 'page' ? [[key, value]] : [])),
   )
-  const filtered = Boolean(query.q || query.status || query.department || query.team || query.position || query.manager || query.mentor || query.joinedFrom || query.joinedTo || query.endFrom || query.endTo)
+  const filtered = Boolean(
+    query.q ||
+    query.status ||
+    query.department ||
+    query.team ||
+    query.position ||
+    query.manager ||
+    query.mentor ||
+    query.joinedFrom ||
+    query.joinedTo ||
+    query.endFrom ||
+    query.endTo,
+  )
 
   return (
     <>
@@ -80,7 +95,13 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
           href="/interns?status=ENDING_SOON"
           tone={stats.endingSoon > 0 ? 'attention' : 'default'}
         />
-        <StatCard label="Completed" value={stats.completed} icon={GraduationCap} href="/interns?status=COMPLETED" className="col-span-2 lg:col-span-1" />
+        <StatCard
+          label="Completed"
+          value={stats.completed}
+          icon={GraduationCap}
+          href="/interns?status=COMPLETED"
+          className="col-span-2 lg:col-span-1"
+        />
       </section>
 
       <DirectoryControls
@@ -96,7 +117,11 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
         <EmptyState
           icon={UsersRound}
           title={filtered ? 'No interns match' : 'No interns yet'}
-          description={filtered ? 'Try a different search or clear the filters.' : 'Interns appear here once they’re added to the programme.'}
+          description={
+            filtered
+              ? 'Try a different search or clear the filters.'
+              : 'Interns appear here once they’re added to the programme.'
+          }
           action={
             !filtered &&
             canCreate && (
@@ -116,7 +141,10 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
                   <div className="flex items-start gap-3">
                     <UserAvatar person={intern.user} className="size-10" />
                     <div className="min-w-0 flex-1">
-                      <Link href={`/interns/${intern.id}`} className="block truncate font-medium after:absolute after:inset-0">
+                      <Link
+                        href={`/interns/${intern.id}`}
+                        className="block truncate font-medium after:absolute after:inset-0"
+                      >
                         {fullName(intern.user)}
                       </Link>
                       <p className="truncate text-caption text-muted-foreground">
@@ -184,7 +212,13 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
                 hideBelow: 'lg',
                 cell: (intern) => (
                   <div className="text-caption">
-                    <p>{intern.manager ? fullName(intern.manager) : <span className="text-muted-foreground">No manager</span>}</p>
+                    <p>
+                      {intern.manager ? (
+                        fullName(intern.manager)
+                      ) : (
+                        <span className="text-muted-foreground">No manager</span>
+                      )}
+                    </p>
                     <p className="text-muted-foreground">{intern.mentor ? fullName(intern.mentor) : 'No mentor'}</p>
                   </div>
                 ),

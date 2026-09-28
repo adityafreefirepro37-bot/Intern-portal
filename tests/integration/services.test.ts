@@ -154,7 +154,11 @@ describe('services return live data', () => {
     const internView = await dashboardService.getOverview(intern)
     expect(internView.internship.programme).toBeNull()
     expect(internView.internship.managed).toBeNull()
-    expect(internView.internship.self).toMatchObject({ status: 'ACTIVE', manager: expect.any(String), mentor: expect.any(String) })
+    expect(internView.internship.self).toMatchObject({
+      status: 'ACTIVE',
+      manager: expect.any(String),
+      mentor: expect.any(String),
+    })
     expect(internView.internship.self?.onboarding?.progress.complete).toBe(true)
   })
 

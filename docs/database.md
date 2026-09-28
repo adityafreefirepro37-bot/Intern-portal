@@ -26,7 +26,8 @@ id (`6f1d3b52-8a4e-4c1f-9b2d-3e7a5c9d0a11`) and slug `ayava-creatives`; nothing 
 | ---------------- | ------ |
 | Identity         | `organizations`, `users`, `roles`, `permissions`, `role_permissions`, `user_roles` |
 | Structure        | `departments`, `teams`, `positions` |
-| Interns          | `interns`, `intern_profiles`, `emergency_contacts`, `internships`, `internship_documents`, `onboarding_items` |
+| Interns          | `interns`, `intern_profiles`, `emergency_contacts`, `internships`, `internship_documents`, `intern_lifecycle_events`, `code_counters` |
+| Onboarding       | `onboarding_templates`, `onboarding_template_items`, `onboardings`, `onboarding_items`, `policies`, `document_acknowledgements` |
 | Work             | `projects`, `project_members`, `milestones`, `tasks`, `task_assignees`, `task_comments`, `task_attachments`, `task_submissions`, `submission_versions` |
 | HR               | `attendance`, `attendance_corrections`, `leave_types`, `leave_requests` |
 | Learning         | `courses`, `lessons`, `quizzes`, `quiz_attempts`, `learning_progress` |
@@ -49,6 +50,12 @@ Notes:
   `SUCCESS`/`FAILURE`/`DENIED`.
 - **`interns`** is separate from `users`: one intern record per user, with status, dates, placement, manager and mentor.
   **`internships`** records each engagement (an intern can have more than one over time).
+- **`intern_lifecycle_events`** is the intern's history (created, invited, assigned, onboarding, status and date
+  changes, documents) with actor and metadata; automated events carry a unique `idempotency_key` so jobs record them
+  once. **`code_counters`** hands out employee-code numbers atomically per organization.
+- **Onboarding** copies a template into an intern-specific snapshot (`onboardings` 1:1 `internships`,
+  `onboarding_items`); **`document_acknowledgements`** records which policy **version** a user acknowledged. See
+  [onboarding.md](onboarding.md).
 - **`learning_progress`**: course-level rows have `lesson_id = NULL`; lesson rows set it.
 - **`performance_reviews`** stores per-dimension scores (1–5) and comments; no overall judgment is computed.
 - **`settings`** holds non-secret configuration as JSON. Secrets belong in environment variables.
@@ -62,6 +69,10 @@ Defined in `prisma/migrations/*_constraints_and_rls/migration.sql` (Prisma does 
   slug/permission formats and "a task is not its own parent".
 - One attendance row per user per day; one weekly check-in per intern per week; unique certificate numbers and
   verification codes.
+- Phase 03 (`*_intern_management`, `*_intern_search_and_uniqueness`): one onboarding per internship; **one open
+  (PLANNED/ACTIVE) internship per intern** and **one pending invitation per user** (partial unique indexes); unique
+  employee codes per organization; one acknowledgement per user, policy and version; blocked onboarding items need a
+  reason; template due offsets within ±365 days; policy versions ≥ 1.
 
 ### Referential actions
 
@@ -82,7 +93,8 @@ auto-generated REST API — is denied, so the public anon key cannot read or wri
 Composite indexes follow the main query shapes: `(organization_id, status)`, `(organization_id, due_date)`,
 `(organization_id, created_at DESC)` for audit logs, plus foreign-key indexes for user, intern, project, task,
 department, team, manager and mentor lookups, and unique indexes for emails, slugs, certificate numbers and
-verification codes. Columns are not indexed blindly.
+verification codes. Intern directory search uses `pg_trgm` GIN indexes on user names, email and employee code (for
+case-insensitive substring search). Columns are not indexed blindly.
 
 ## Migrations
 
@@ -102,9 +114,11 @@ one (used by migrations).
 
 1. **Reference data** (every environment, idempotent): organization, permission catalog, system roles and their
    grants (kept in sync with `src/lib/permissions/catalog.ts`), departments (Marketing, Design, Development, HR,
-   Operations), seven intern positions, leave types, default settings.
-2. **Demo data** (development/test only — skipped when `NODE_ENV=production`): the five development accounts, six
-   fictional interns, teams, internships and onboarding, three projects with milestones, 13 tasks and submissions,
+   Operations), seven intern positions, leave types, default settings (including `internship.ending_soon_days` = 14
+   and `intern.employee_code_prefix` = `AYV-INT-`; existing values are kept).
+2. **Demo data** (development/test only — skipped when `NODE_ENV=production`): the seven development accounts, seven
+   fictional interns in every lifecycle state (selected, onboarding, active, ending soon, completed), teams,
+   internships, onboarding templates, policies, per-intern checklists and lifecycle history, three projects with milestones, 13 tasks and submissions,
    three courses with lessons, an announcement, a channel and a few audit entries marked `{ source: 'seed' }`. Demo
    rows use deterministic UUIDs, so re-running refreshes them (including relative deadlines) without duplicates.
 3. **Optional Supabase Auth users** for the development accounts when `SEED_DEV_PASSWORD` and Supabase admin keys are

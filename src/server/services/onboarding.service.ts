@@ -48,7 +48,11 @@ export interface GenerateInput {
   actorUserId: string | null
 }
 
-function assigneeFor(role: OnboardingAssigneeRole, intern: GenerateInput['intern'], fixedUserId: string | null): string | null {
+function assigneeFor(
+  role: OnboardingAssigneeRole,
+  intern: GenerateInput['intern'],
+  fixedUserId: string | null,
+): string | null {
   switch (role) {
     case 'INTERN':
       return intern.user_id
@@ -63,7 +67,10 @@ function assigneeFor(role: OnboardingAssigneeRole, intern: GenerateInput['intern
 
 /** Generates the onboarding checklist inside the caller's transaction. */
 export async function generateOnboarding(tx: Tx, input: GenerateInput) {
-  const existing = await tx.onboarding.findUnique({ where: { internship_id: input.internship.id }, select: { id: true } })
+  const existing = await tx.onboarding.findUnique({
+    where: { internship_id: input.internship.id },
+    select: { id: true },
+  })
   if (existing) throw new ConflictError('Onboarding has already been generated for this internship')
 
   const template = await tx.onboardingTemplate.findFirst({
@@ -180,7 +187,12 @@ export async function afterItemChange(ctx: RequestContext, onboardingId: string 
   if (!onboardingId) return
   const onboarding = await prisma.onboarding.findUnique({
     where: { id: onboardingId },
-    select: { id: true, completed_at: true, internship_id: true, items: { select: { required: true, status: true, due_date: true } } },
+    select: {
+      id: true,
+      completed_at: true,
+      internship_id: true,
+      items: { select: { required: true, status: true, due_date: true } },
+    },
   })
   if (!onboarding) return
   const progress = onboardingProgress(onboarding.items, todayIn(ctx.organization.timezone))
@@ -226,7 +238,11 @@ export const onboardingService = {
     const policies = new Map<string, boolean>()
     for (const item of items) {
       if (item.policy_id && item.policy) {
-        const ack = await policyRepository.findAcknowledgement(access.record.user_id, item.policy_id, item.policy.version)
+        const ack = await policyRepository.findAcknowledgement(
+          access.record.user_id,
+          item.policy_id,
+          item.policy.version,
+        )
         policies.set(item.id, Boolean(ack))
       }
     }
@@ -283,12 +299,19 @@ export const onboardingService = {
     if (intern.user_id !== ctx.actor.userId || !scopeCovers(ctx, 'onboarding.complete', intern)) {
       throw new ForbiddenError('Only the intern can acknowledge this policy')
     }
-    if (item.item_type !== 'ACKNOWLEDGEMENT' || !item.policy_id) throw new ValidationError('This item has no policy to acknowledge')
+    if (item.item_type !== 'ACKNOWLEDGEMENT' || !item.policy_id)
+      throw new ValidationError('This item has no policy to acknowledge')
     const policy = await policyRepository.findActive(ctx.organization.id, item.policy_id)
     if (!policy) throw new NotFoundError('Policy')
     await prisma.$transaction([
       prisma.documentAcknowledgement.upsert({
-        where: { user_id_policy_id_policy_version: { user_id: ctx.actor.userId, policy_id: policy.id, policy_version: policy.version } },
+        where: {
+          user_id_policy_id_policy_version: {
+            user_id: ctx.actor.userId,
+            policy_id: policy.id,
+            policy_version: policy.version,
+          },
+        },
         update: {},
         create: {
           organization_id: ctx.organization.id,
@@ -357,7 +380,8 @@ export const onboardingService = {
       block: 'BLOCKED',
       start: 'IN_PROGRESS',
     }
-    if (data.action === 'block' && !data.reason) throw new ValidationError('Say why the item is blocked', { reason: 'Required' })
+    if (data.action === 'block' && !data.reason)
+      throw new ValidationError('Say why the item is blocked', { reason: 'Required' })
     if (data.action === 'skip' && item.required && !data.reason) {
       throw new ValidationError('Give a reason for waiving a required item', { reason: 'Required' })
     }
@@ -394,7 +418,13 @@ export const onboardingService = {
       const progress: OnboardingProgress = onboardingProgress(instance.items, today)
       const dueDates = instance.items.map((item) => item.due_date).filter((d): d is Date => Boolean(d))
       const lastDue = dueDates.length ? new Date(Math.max(...dueDates.map((d) => d.getTime()))) : null
-      const state = instance.completed_at ? 'COMPLETED' : progress.blocked > 0 ? 'BLOCKED' : progress.overdue > 0 ? 'OVERDUE' : 'IN_PROGRESS'
+      const state = instance.completed_at
+        ? 'COMPLETED'
+        : progress.blocked > 0
+          ? 'BLOCKED'
+          : progress.overdue > 0
+            ? 'OVERDUE'
+            : 'IN_PROGRESS'
       return { ...instance, progress, lastDue, state }
     })
     return {

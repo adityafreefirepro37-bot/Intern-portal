@@ -22,8 +22,8 @@ const eslintConfig = defineConfig([
     rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
   {
-    // CLI scripts and the seed report progress on stdout.
-    files: ['scripts/**', 'prisma/**', 'src/lib/logging/**'],
+    // CLI scripts, the seed and the E2E mock server report progress on stdout.
+    files: ['scripts/**', 'prisma/**', 'src/lib/logging/**', 'tests/e2e/mock-auth/**'],
     rules: { 'no-console': 'off' },
   },
   globalIgnores([

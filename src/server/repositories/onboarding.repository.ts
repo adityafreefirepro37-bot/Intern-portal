@@ -95,7 +95,9 @@ export const onboardingRepository = {
       prisma.onboarding.count({ where }),
       prisma.onboarding.count({ where: { AND: [where, { completed_at: { not: null } }] } }),
       prisma.onboarding.count({
-        where: { AND: [open, { items: { some: { due_date: { lt: today }, status: { notIn: ['COMPLETED', 'SKIPPED'] } } } }] },
+        where: {
+          AND: [open, { items: { some: { due_date: { lt: today }, status: { notIn: ['COMPLETED', 'SKIPPED'] } } } }],
+        },
       }),
       prisma.onboarding.count({ where: { AND: [open, { items: { some: { status: 'BLOCKED' } } }] } }),
     ])

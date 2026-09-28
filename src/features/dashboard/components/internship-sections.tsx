@@ -35,7 +35,12 @@ export function ProgrammeStats({ programme }: { programme: NonNullable<Internshi
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Total interns" value={programme.total} icon={UsersRound} href="/interns" />
         <StatCard label="Active" value={programme.active} icon={UserRoundCheck} href="/interns?status=ACTIVE" />
-        <StatCard label="Onboarding" value={programme.onboarding} icon={ClipboardList} href="/interns?status=ONBOARDING" />
+        <StatCard
+          label="Onboarding"
+          value={programme.onboarding}
+          icon={ClipboardList}
+          href="/interns?status=ONBOARDING"
+        />
         <StatCard
           label="Ending soon"
           value={programme.endingSoon}
@@ -53,7 +58,12 @@ export function ProgrammeStats({ programme }: { programme: NonNullable<Internshi
             tone={programme.onboardingOverdue > 0 ? 'attention' : 'default'}
           />
         ) : (
-          <StatCard label="Completed" value={programme.completed} icon={GraduationCap} href="/interns?status=COMPLETED" />
+          <StatCard
+            label="Completed"
+            value={programme.completed}
+            icon={GraduationCap}
+            href="/interns?status=COMPLETED"
+          />
         )}
       </div>
     </section>
@@ -72,8 +82,7 @@ export function RelatedInternsCard({
 }) {
   const current = interns.filter((intern) => !['COMPLETED', 'ALUMNI', 'TERMINATED'].includes(intern.status))
   const ending = current.filter(
-    (intern) =>
-      intern.progress.state === 'in_progress' && intern.progress.daysRemaining <= ENDING_WINDOW_DAYS,
+    (intern) => intern.progress.state === 'in_progress' && intern.progress.daysRemaining <= ENDING_WINDOW_DAYS,
   ).length
   const shown = current.slice(0, 5)
   const title = relation === 'managed' ? 'My interns' : 'My mentees'
@@ -99,7 +108,9 @@ export function RelatedInternsCard({
       <CardContent>
         {shown.length === 0 ? (
           <p className="py-4 text-center text-small text-muted-foreground">
-            {relation === 'managed' ? 'You currently don’t have any interns assigned to you.' : 'You don’t have any current mentees.'}
+            {relation === 'managed'
+              ? 'You currently don’t have any interns assigned to you.'
+              : 'You don’t have any current mentees.'}
           </p>
         ) : (
           <ul className="divide-y">
@@ -108,7 +119,10 @@ export function RelatedInternsCard({
                 <div className="flex items-center gap-3">
                   <UserAvatar person={intern.user} className="size-8" />
                   <div className="min-w-0 flex-1">
-                    <Link href={`/interns/${intern.id}`} className="block truncate text-small font-medium hover:underline">
+                    <Link
+                      href={`/interns/${intern.id}`}
+                      className="block truncate text-small font-medium hover:underline"
+                    >
                       {fullName(intern.user)}
                     </Link>
                     <p className="truncate text-caption text-muted-foreground">
@@ -121,8 +135,15 @@ export function RelatedInternsCard({
                 </div>
                 <InternshipProgressBar progress={intern.progress} compact />
                 {intern.onboarding && !intern.onboarding.complete && (
-                  <p className={intern.onboarding.overdue > 0 ? 'text-caption text-destructive' : 'text-caption text-muted-foreground'}>
-                    Onboarding {intern.onboarding.percent}% ({intern.onboarding.requiredDone}/{intern.onboarding.requiredTotal} required
+                  <p
+                    className={
+                      intern.onboarding.overdue > 0
+                        ? 'text-caption text-destructive'
+                        : 'text-caption text-muted-foreground'
+                    }
+                  >
+                    Onboarding {intern.onboarding.percent}% ({intern.onboarding.requiredDone}/
+                    {intern.onboarding.requiredTotal} required
                     {intern.onboarding.overdue > 0 && `, ${intern.onboarding.overdue} overdue`})
                   </p>
                 )}
@@ -158,12 +179,13 @@ export function MyInternshipCard({ self }: { self: NonNullable<Internship['self'
         <InternshipProgressBar progress={self.progress} />
         {self.onboarding && (
           <div className="grid gap-2">
-            <h3 className="text-small font-medium">
-              {onboardingOpen ? 'Onboarding progress' : 'Onboarding complete'}
-            </h3>
+            <h3 className="text-small font-medium">{onboardingOpen ? 'Onboarding progress' : 'Onboarding complete'}</h3>
             <OnboardingProgressBar progress={self.onboarding.progress} />
             {onboardingOpen && (
-              <Link href={`/interns/${self.id}/onboarding`} className={buttonVariants({ size: 'sm', className: 'w-fit' })}>
+              <Link
+                href={`/interns/${self.id}/onboarding`}
+                className={buttonVariants({ size: 'sm', className: 'w-fit' })}
+              >
                 Continue onboarding
               </Link>
             )}

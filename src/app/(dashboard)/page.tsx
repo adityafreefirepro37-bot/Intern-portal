@@ -5,7 +5,11 @@ import { StatCard } from '@/components/common/stat-card'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActivityFeed } from '@/features/dashboard/components/activity-feed'
-import { MyInternshipCard, ProgrammeStats, RelatedInternsCard } from '@/features/dashboard/components/internship-sections'
+import {
+  MyInternshipCard,
+  ProgrammeStats,
+  RelatedInternsCard,
+} from '@/features/dashboard/components/internship-sections'
 import { ProjectProgress } from '@/features/dashboard/components/project-progress'
 import { QuickActions } from '@/features/dashboard/components/quick-actions'
 import { TaskStatusBreakdown } from '@/features/dashboard/components/task-status-breakdown'

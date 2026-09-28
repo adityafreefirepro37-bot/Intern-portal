@@ -202,7 +202,9 @@ test.describe('intern lifecycle', () => {
     await status.getByRole('textbox', { name: 'Reason' }).fill('Starting on a client campaign early')
     await status.getByRole('button', { name: 'Change to Active' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
-    await expect(page.locator('header').filter({ hasText: john.last }).getByText('Active', { exact: true })).toBeVisible()
+    await expect(
+      page.locator('header').filter({ hasText: john.last }).getByText('Active', { exact: true }),
+    ).toBeVisible()
     await page.context().close()
   })
 })
@@ -236,7 +238,9 @@ test.describe('HR screens', () => {
     for (const path of ['/interns', '/hr', '/onboarding', '/interns/new']) {
       await page.goto(path)
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      )
       expect(overflow, path).toBeLessThanOrEqual(1)
     }
     // The directory becomes a card list on phones.

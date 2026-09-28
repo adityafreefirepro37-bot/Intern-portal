@@ -74,14 +74,44 @@ interface ItemSeed {
 
 /** Items every template starts with. */
 const CORE_ITEMS: ItemSeed[] = [
-  { title: 'Upload your résumé', category: 'DOCUMENT', document: 'RESUME', due: 0, description: 'PDF or Word, up to 10 MB.' },
-  { title: 'Upload a government-issued ID', category: 'DOCUMENT', document: 'ID_DOCUMENT', due: 2, description: 'Visible to HR only.' },
+  {
+    title: 'Upload your résumé',
+    category: 'DOCUMENT',
+    document: 'RESUME',
+    due: 0,
+    description: 'PDF or Word, up to 10 MB.',
+  },
+  {
+    title: 'Upload a government-issued ID',
+    category: 'DOCUMENT',
+    document: 'ID_DOCUMENT',
+    due: 2,
+    description: 'Visible to HR only.',
+  },
   { title: 'Accept the confidentiality agreement (NDA)', category: 'ACKNOWLEDGEMENT', policy: 'nda', due: 0 },
   { title: 'Read the Intern Handbook', category: 'ACKNOWLEDGEMENT', policy: 'handbook', due: 1 },
   { title: 'Complete the security orientation', category: 'ACKNOWLEDGEMENT', policy: 'security', due: 2 },
-  { title: 'Meet your manager', category: 'MEETING', role: 'MANAGER', due: 1, description: 'Agree goals and working rhythm for the internship.' },
-  { title: 'Meet your mentor', category: 'MEETING', role: 'MENTOR', due: 2, description: 'Set up your weekly check-in.' },
-  { title: 'Attend company orientation', category: 'MEETING', role: 'HR', due: 3, description: 'HR walks new interns through the company, tools and policies.' },
+  {
+    title: 'Meet your manager',
+    category: 'MEETING',
+    role: 'MANAGER',
+    due: 1,
+    description: 'Agree goals and working rhythm for the internship.',
+  },
+  {
+    title: 'Meet your mentor',
+    category: 'MEETING',
+    role: 'MENTOR',
+    due: 2,
+    description: 'Set up your weekly check-in.',
+  },
+  {
+    title: 'Attend company orientation',
+    category: 'MEETING',
+    role: 'HR',
+    due: 3,
+    description: 'HR walks new interns through the company, tools and policies.',
+  },
   { title: 'Complete your first learning module', category: 'TRAINING', due: 5 },
   { title: 'Complete your first task', category: 'TASK', due: 7 },
   { title: 'Add a short bio to your profile', category: 'FORM', required: false, due: 5 },
@@ -133,7 +163,12 @@ const TEMPLATES: TemplateSeed[] = [
     description: 'Standard onboarding plus development environment and code review.',
     department: 'development',
     extra: [
-      { title: 'Set up your development environment', category: 'CHECKLIST', due: 1, description: 'Repository access, editor, Node.js and the local database.' },
+      {
+        title: 'Set up your development environment',
+        category: 'CHECKLIST',
+        due: 1,
+        description: 'Repository access, editor, Node.js and the local database.',
+      },
       { title: 'Read the engineering handbook', category: 'TRAINING', due: 3 },
       { title: 'Open your first pull request', category: 'TASK', due: 7 },
     ],
@@ -207,7 +242,12 @@ export async function seedOnboarding(
   for (const template of TEMPLATES) {
     const record = await prisma.onboardingTemplate.upsert({
       where: { organization_id_name: { organization_id: orgId, name: template.name } },
-      update: { description: template.description, is_active: true, is_default: Boolean(template.isDefault), deleted_at: null },
+      update: {
+        description: template.description,
+        is_active: true,
+        is_default: Boolean(template.isDefault),
+        deleted_at: null,
+      },
       create: {
         id: seedId(`template:${template.key}`),
         organization_id: orgId,
@@ -223,7 +263,9 @@ export async function seedOnboarding(
       ...item,
       id: seedId(`template-item:${template.key}:${index}`),
     }))
-    await prisma.onboardingTemplateItem.deleteMany({ where: { template_id: record.id, id: { notIn: items.map((i) => i.id) } } })
+    await prisma.onboardingTemplateItem.deleteMany({
+      where: { template_id: record.id, id: { notIn: items.map((i) => i.id) } },
+    })
     for (const [index, item] of items.entries()) {
       const data = {
         template_id: record.id,
@@ -238,7 +280,11 @@ export async function seedOnboarding(
         policy_id: item.policy ? policyIds[item.policy].id : null,
         sort_order: index,
       }
-      await prisma.onboardingTemplateItem.upsert({ where: { id: item.id }, update: data, create: { id: item.id, ...data } })
+      await prisma.onboardingTemplateItem.upsert({
+        where: { id: item.id },
+        update: data,
+        create: { id: item.id, ...data },
+      })
     }
     templates[template.key] = { id: record.id, name: record.name, items }
   }
@@ -253,7 +299,9 @@ export async function seedOnboarding(
     const template = templates[intern.department] ?? templates.general
     const internUserId = userIds[intern.key]
     const states = template.items.map((item) => stateFor(intern, item))
-    const allRequiredDone = template.items.every((item, i) => item.required === false || states[i].status === 'COMPLETED')
+    const allRequiredDone = template.items.every(
+      (item, i) => item.required === false || states[i].status === 'COMPLETED',
+    )
     const startedAt = daysFrom(intern.joiningDate, -3, 9)
     const onboarding = await prisma.onboarding.create({
       data: {
@@ -272,7 +320,13 @@ export async function seedOnboarding(
     for (const [index, item] of template.items.entries()) {
       const role = item.role ?? 'INTERN'
       const assignee =
-        role === 'INTERN' ? internUserId : role === 'MANAGER' ? userIds[intern.managerKey] : role === 'MENTOR' ? userIds[intern.mentorKey] : userIds.hr
+        role === 'INTERN'
+          ? internUserId
+          : role === 'MANAGER'
+            ? userIds[intern.managerKey]
+            : role === 'MENTOR'
+              ? userIds[intern.mentorKey]
+              : userIds.hr
       const state = states[index]
       const completed = state.status === 'COMPLETED'
       const dueDate = dateFrom(intern.joiningDate, item.due)
@@ -302,7 +356,13 @@ export async function seedOnboarding(
       if (completed && item.policy) {
         const policy = policyIds[item.policy]
         await prisma.documentAcknowledgement.upsert({
-          where: { user_id_policy_id_policy_version: { user_id: internUserId, policy_id: policy.id, policy_version: policy.version } },
+          where: {
+            user_id_policy_id_policy_version: {
+              user_id: internUserId,
+              policy_id: policy.id,
+              policy_version: policy.version,
+            },
+          },
           update: {},
           create: {
             organization_id: orgId,
@@ -326,8 +386,13 @@ export async function seedOnboarding(
     metadata?: Record<string, string>
   }[] = []
   for (const intern of input.interns) {
-    const add = (step: string, type: LifecycleEventType, description: string, at: Date, metadata?: Record<string, string>) =>
-      events.push({ key: `seed:${intern.key}:${step}`, internId: intern.internId, type, description, at, metadata })
+    const add = (
+      step: string,
+      type: LifecycleEventType,
+      description: string,
+      at: Date,
+      metadata?: Record<string, string>,
+    ) => events.push({ key: `seed:${intern.key}:${step}`, internId: intern.internId, type, description, at, metadata })
     add('created', 'CREATED', 'Intern created', daysFrom(intern.joiningDate, -14, 6))
     add('manager', 'MANAGER_ASSIGNED', 'Manager assigned', daysFrom(intern.joiningDate, -14, 7))
     add('mentor', 'MENTOR_ASSIGNED', 'Mentor assigned', daysFrom(intern.joiningDate, -14, 7))
@@ -335,15 +400,32 @@ export async function seedOnboarding(
     if (intern.status === 'SELECTED') continue
     add('invite-accepted', 'INVITATION_ACCEPTED', 'Invitation accepted', daysFrom(intern.joiningDate, -12, 10))
     add('onboarding', 'ONBOARDING_STARTED', 'Onboarding started', daysFrom(intern.joiningDate, -3, 9))
-    add('status-onboarding', 'STATUS_CHANGED', 'Selected → Onboarding', daysFrom(intern.joiningDate, -3, 9), { from: 'SELECTED', to: 'ONBOARDING' })
+    add('status-onboarding', 'STATUS_CHANGED', 'Selected → Onboarding', daysFrom(intern.joiningDate, -3, 9), {
+      from: 'SELECTED',
+      to: 'ONBOARDING',
+    })
     if (intern.status === 'ONBOARDING') continue
-    add('onboarding-done', 'ONBOARDING_COMPLETED', 'All required onboarding items are complete', daysFrom(intern.joiningDate, 7))
-    add('status-active', 'STATUS_CHANGED', 'Onboarding → Active', daysFrom(intern.joiningDate, 7, 13), { from: 'ONBOARDING', to: 'ACTIVE' })
+    add(
+      'onboarding-done',
+      'ONBOARDING_COMPLETED',
+      'All required onboarding items are complete',
+      daysFrom(intern.joiningDate, 7),
+    )
+    add('status-active', 'STATUS_CHANGED', 'Onboarding → Active', daysFrom(intern.joiningDate, 7, 13), {
+      from: 'ONBOARDING',
+      to: 'ACTIVE',
+    })
     if (intern.status === 'ENDING_SOON') {
-      add('status-ending', 'STATUS_CHANGED', 'Active → Ending soon', daysFrom(now, -9, 1), { from: 'ACTIVE', to: 'ENDING_SOON' })
+      add('status-ending', 'STATUS_CHANGED', 'Active → Ending soon', daysFrom(now, -9, 1), {
+        from: 'ACTIVE',
+        to: 'ENDING_SOON',
+      })
     }
     if (intern.status === 'COMPLETED') {
-      add('status-completed', 'STATUS_CHANGED', 'Active → Completed', daysFrom(now, -17, 12), { from: 'ACTIVE', to: 'COMPLETED' })
+      add('status-completed', 'STATUS_CHANGED', 'Active → Completed', daysFrom(now, -17, 12), {
+        from: 'ACTIVE',
+        to: 'COMPLETED',
+      })
     }
   }
   await prisma.internLifecycleEvent.createMany({

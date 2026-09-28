@@ -13,7 +13,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Project Status
 
 Phase 01 Foundation - COMPLETE
-Phase 02 Authentication, RBAC & security - COMPLETE (next: Prompt 03 — intern management). See README.md and docs/.
+Phase 02 Authentication, RBAC & security - COMPLETE
+Phase 03 Intern management, HR directory & onboarding - COMPLETE (next: Prompt 04 — projects, tasks, submissions).
+See README.md, docs/intern-management.md and docs/onboarding.md.
 
 ## Quick Start Commands
 
@@ -28,6 +30,7 @@ npm run dev
 npm run typecheck && npm run lint && npm test
 npm run test:integration   # real PostgreSQL (TEST_DATABASE_URL, reset each run)
 npm run test:e2e           # Playwright (PLAYWRIGHT_CHANNEL=msedge to use installed Edge)
+npm run test:e2e:local     # all E2E suites without Supabase (mock Auth + separate <db>_e2e database)
 npm run build
 ```
 
@@ -43,6 +46,8 @@ npm run build
 - Never hard-code data in components — it comes from the database via services
 - UI uses design-system tokens (src/app/globals.css) and shared components (src/components)
 - Unbuilt features show a "Phase NN" placeholder or disabled control — no fake functionality
+- Intern access goes through resolveInternAccess() (src/server/services/intern-access.ts); status changes only
+  through internLifecycleService.transitionStatus(); emit domain events after commit (src/server/events)
 - `_archive/` holds files from the earlier partial attempt; not compiled — safe to delete once reviewed
 
 ## Development Accounts
@@ -53,6 +58,8 @@ The seed creates these profiles (development only; skipped in production):
 - manager@ayavacreatives.com (Manager)
 - mentor@ayavacreatives.com (Mentor)
 - intern@ayavacreatives.com (Intern)
+- marketing.manager@ayavacreatives.com (Manager — Marketing interns)
+- design.mentor@ayavacreatives.com (Mentor — Design interns)
 
 No passwords are stored in this database. With Supabase keys + SEED_DEV_PASSWORD in .env, `npm run db:seed` creates
 matching Supabase users with that password (development only). Production bootstrap: `npm run admin:invite`.

@@ -27,6 +27,12 @@ Details: [authentication.md](authentication.md) (identity, sessions) · [authori
 - Privilege-escalation defences: no self role/status changes; role ranks bound what can be assigned and who can be
   managed; the last Super Admin can't be removed; strict schemas reject smuggled `organization_id`, `role_id`,
   `permission_id`, status or manager fields.
+- Interns (Phase 03): one access decision per intern (`resolveInternAccess`) drives pages, services and API routes.
+  Interns reach only their own record (resolved from the session, never from a URL id); managers and mentors only
+  interns where they are `manager_id`/`mentor_id`; HR/Admin the organization. Intern self-edits accept only phone,
+  bio and location; HR edits use a strict schema without status, email, manager or organization. Onboarding items and
+  documents are looked up through the intern's scope, so another intern's item or file is "not found". See
+  [intern-management.md](intern-management.md#access-rules).
 
 ## CSRF
 
@@ -64,7 +70,8 @@ verification resend 5/hour; invitation create 30/hour per admin; invitation acce
 
 ## Database
 
-- Parameterized queries only (Prisma; the one raw query is a tagged template).
+- Parameterized queries only (Prisma; the few raw queries — rate limits, employee-code counters — are tagged
+  templates with bound parameters).
 - CHECK/UNIQUE/FK constraints enforce integrity; historical records use `RESTRICT`.
 - Row-level security enabled on every table with no policies: Supabase's `anon`/`authenticated` REST roles are denied.
 
@@ -74,12 +81,20 @@ Uploads are validated server-side for type, extension, file signature (magic byt
 keys (never the user's filename), and re-validated on read/delete. Avatars are served only to signed-in members of
 the same organization, and only the user's current avatar.
 
+Intern documents are private: they're downloaded only through `GET /api/documents/:id` after checking the viewer's
+access to the intern and the document's visibility level (`INTERN`, `MANAGER`, `HR`, `ADMIN`), with
+`Cache-Control: private, no-store`, `nosniff` and a sandboxing CSP. Invisible documents are 404. Interns can't pick
+visibility (ID documents default to HR-only); mentors have no document access; deletion is HR/Admin-only and soft.
+
 ## Audit and logging
 
 - Security events are written server-side to `audit_logs` with actor, organization, action, resource, **status**
   (success/failure/denied), IP and user agent: sign-in success/failure, logout, password reset requested/completed,
   password changed, email verified, invitations, user created/updated/suspended/reactivated/deactivated, role changed,
   session revoked, access denied. Admins filter them at **Audit Logs**.
+- Intern management adds intern created/updated, manager/mentor assigned, status changed, internship
+  created/updated, onboarding created/completed, onboarding item completed/updated, policy acknowledged, template
+  created/updated and document uploaded/deleted. Audit metadata never includes document contents.
 - Passwords, tokens and invitation links are never logged; emails in security metadata are masked. The logger
   redacts sensitive keys at any depth.
 
@@ -94,6 +109,8 @@ the build if imported by client code. The `settings` table never holds secrets. 
 - [ ] `NODE_ENV=production`; `SEED_DEV_PASSWORD` unset; separate Supabase project
 - [ ] Supabase keys and database URLs from a secret manager; database over TLS
 - [ ] `npm run db:migrate:deploy`, then `npm run db:seed` (reference data only)
+- [ ] `CRON_SECRET` (24+ characters) set and a daily cron calling `POST /api/jobs/daily`
+- [ ] `STORAGE_PROVIDER=supabase` with a **private** bucket for documents
 - [ ] Email delivery configured (required for invitations in production)
 - [ ] Supabase Site URL / Redirect URLs set to the production domain
 - [ ] HTTPS enforced (HSTS is sent automatically)

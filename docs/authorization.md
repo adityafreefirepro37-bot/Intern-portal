@@ -119,5 +119,7 @@ for application authorization.
 ## Tests
 
 `tests/unit/authorization.test.ts`, `tests/unit/permissions.test.ts` (engine, scopes, matrix, navigation) and
-`tests/integration/access-control.test.ts` (the spec's allow/deny matrix, escalation attempts, IDOR, invitations) —
+`tests/integration/access-control.test.ts` (the spec's allow/deny matrix, escalation attempts, IDOR, invitations),
+`tests/integration/interns.test.ts` (intern, manager, mentor and HR scope; onboarding and document access; mass
+assignment) —
 all against the real database.

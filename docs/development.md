@@ -18,9 +18,19 @@ Using your own PostgreSQL or Supabase: edit `DATABASE_URL`, `DIRECT_URL` and `TE
 ### Signing in as different roles
 
 Configure Supabase ([authentication.md](authentication.md#supabase-setup-one-time)), set `SEED_DEV_PASSWORD` in `.env`
-and run `npm run db:seed`. Then sign in as any development account (admin, hr, manager, mentor, intern
-`@ayavacreatives.com`) with that password. Navigation, dashboard sections and page access follow each role's
+and run `npm run db:seed`. Then sign in as any development account (admin, hr, manager, mentor, intern,
+marketing.manager, design.mentor `@ayavacreatives.com`) with that password. Arjun (`manager@`) manages the
+Development and Design interns and Priya (`marketing.manager@`) the Marketing ones; Rohan (`mentor@`) mentors
+Development and Marketing and Sana (`design.mentor@`) Design — useful for checking manager/mentor scope. Navigation, dashboard sections and page access follow each role's
 permissions and scopes from the database.
+
+### End-to-end tests without Supabase
+
+`npm run test:e2e:local [playwright args]` starts a mock of the Supabase Auth API (`tests/e2e/mock-auth`, test-only),
+rebuilds a separate database (`DATABASE_URL` + `_e2e`, or `E2E_DATABASE_URL`) with migrations and the seed, links the
+development accounts to the mock and runs Playwright against a dev server on port 3100. The application code is the
+same; only `SUPABASE_URL` points at the mock. Use it where no Supabase project is available (CI containers); keep
+`npm run test:e2e` against real Supabase for release checks.
 
 ## Everyday commands
 
@@ -31,6 +41,8 @@ npm run format          # Prettier
 npm test                # unit tests
 npm run test:integration
 npm run test:e2e        # PLAYWRIGHT_CHANNEL=msedge to use installed Edge
+npm run test:e2e:local  # every E2E suite without Supabase (mock Auth + separate <db>_e2e database)
+npm run jobs:daily      # ending-soon + overdue-onboarding jobs (what the daily cron runs)
 npm run build
 ```
 
@@ -72,4 +84,6 @@ Before committing: `npm run typecheck && npm run lint && npm test`.
 | `Can't reach database server` | Start `npm run db:local` or fix `DATABASE_URL` |
 | Stale route types in `tsc` | Run `npm run typecheck` (regenerates types) |
 | Integration tests refuse to run | `TEST_DATABASE_URL` must be set, differ from `DATABASE_URL`, and name a database containing `test` |
-| Playwright can't find a browser | `npx playwright install chromium` or set `PLAYWRIGHT_CHANNEL=msedge` |
+| Playwright can't find a browser | `npx playwright install chromium`, `PLAYWRIGHT_CHANNEL=msedge`, or `PLAYWRIGHT_EXECUTABLE_PATH=/path/to/chrome` |
+| Signed-in E2E tests are skipped | Configure Supabase + `SEED_DEV_PASSWORD`, or use `npm run test:e2e:local` |
+| `test:e2e:local` times out starting the app | Another `next dev` for this folder is still running; stop it and retry |

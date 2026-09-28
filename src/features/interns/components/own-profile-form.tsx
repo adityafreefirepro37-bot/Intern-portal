@@ -11,7 +11,13 @@ import { useUnsavedChanges } from './use-unsaved-changes'
 export function OwnInternProfileForm({
   initial,
 }: {
-  initial: { phone: string | null; bio: string | null; city: string | null; state: string | null; country: string | null }
+  initial: {
+    phone: string | null
+    bio: string | null
+    city: string | null
+    state: string | null
+    country: string | null
+  }
 }) {
   const [dirty, setDirty] = React.useState(false)
   const [state, action] = useFormAction(updateOwnInternProfileAction, { onSuccess: () => setDirty(false) })

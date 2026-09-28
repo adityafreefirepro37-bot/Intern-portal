@@ -4,8 +4,11 @@ The intern management and work operating system for **Ayava Creatives** — inte
 attendance, leave, documents, learning, performance, AI assistance, certificates and analytics in one place.
 
 Implemented so far: **Phase 01 — Foundation** (architecture, database, design system, shell, read-only views of real data)
-and **Phase 02 — Authentication, RBAC & security** (Supabase sign-in, sessions, scoped permissions, user management,
-invitations, audit log). Features are delivered in later phases (see
+**Phase 02 — Authentication, RBAC & security** (Supabase sign-in, sessions, scoped permissions, user management,
+invitations, audit log) and **Phase 03 — Intern management, HR directory & onboarding** (intern directory and
+profiles, internship lifecycle, manager/mentor scope, onboarding templates and checklists, policy acknowledgements,
+private intern documents, HR and role-aware dashboards — see [docs/intern-management.md](docs/intern-management.md)
+and [docs/onboarding.md](docs/onboarding.md)). Features are delivered in later phases (see
 [Roadmap](#roadmap)); pages for unbuilt features say so plainly instead of pretending to work.
 
 ## Tech stack
@@ -100,8 +103,11 @@ page redirects to a sign-in page that explains sign-in isn't configured.
 | manager@ayavacreatives.com   | Manager     |
 | mentor@ayavacreatives.com    | Mentor      |
 | intern@ayavacreatives.com    | Intern      |
+| marketing.manager@ayavacreatives.com | Manager (Marketing interns) |
+| design.mentor@ayavacreatives.com     | Mentor (Design interns)     |
 
-Plus six fictional demo interns (`*@demo.ayavacreatives.com`). No passwords exist in this database: with
+Plus seven fictional demo interns (`*@demo.ayavacreatives.com`) covering every lifecycle state, four onboarding
+templates and sample policies. No passwords exist in this database: with
 `SEED_DEV_PASSWORD` and the Supabase service-role key set, the seed creates matching Supabase Auth users with that
 password (development only). Demo data and accounts are skipped entirely when `NODE_ENV=production`; production starts
 with `npm run admin:invite` (below).
@@ -125,6 +131,8 @@ with `npm run admin:invite` (below).
 | `npm run db:reset`          | Drop, re-migrate and re-seed the development database          |
 | `npm run db:studio`         | Prisma Studio                                                  |
 | `npm run admin:invite`      | Print a one-time Super Admin invitation link (bootstrap)       |
+| `npm run jobs:daily`        | Ending-soon and overdue-onboarding jobs (also `POST /api/jobs/daily`) |
+| `npm run test:e2e:local`    | All E2E suites without Supabase (mock Auth, separate database) |
 
 ## Testing
 
@@ -133,10 +141,13 @@ with `npm run admin:invite` (below).
 - **Integration** (`tests/integration`): real PostgreSQL. Global setup drops the test database, applies every migration
   and seeds it. Covers schema, constraints, RLS, isolation, the sign-in/logout/reset/verification flows and account
   states (with an in-memory auth provider), the spec's authorization matrix, privilege escalation, IDOR, invitations,
-  sessions, rate limiting and audit. Refuses any database whose name lacks `test`.
+  sessions, rate limiting and audit. Phase 03 adds intern creation (transactions, concurrent employee codes,
+  duplicates), lifecycle rules and jobs, onboarding, documents, manager/mentor/intern scope, IDOR and mass assignment.
+  Refuses any database whose name lacks `test`.
 - **End-to-end** (`tests/e2e`): public checks always run (route protection, 401s, auth pages, accessibility, CSP and
   headers). Signed-in checks (navigation, roles, logout/back button, multi-tab, profile, security, users) run once
-  Supabase keys and `SEED_DEV_PASSWORD` are set; otherwise they are reported as skipped.
+  Supabase keys and `SEED_DEV_PASSWORD` are set; otherwise they are reported as skipped. `npm run test:e2e:local` runs
+  them all against a mock Auth server instead (including the Phase 03 intern lifecycle flow).
   Use `npx playwright install chromium` or `PLAYWRIGHT_CHANNEL=msedge`.
 
 ## Deployment
@@ -148,6 +159,8 @@ with `npm run admin:invite` (below).
    `SEED_DEV_PASSWORD`. In Supabase, set the Site URL and add `https://<your-domain>/auth/confirm` as a redirect URL.
 3. `npm ci && npm run db:migrate:deploy && npm run db:seed && npm run build && npm start` (the seed only writes
    reference data in production). Works on Vercel, Railway, Render or any Node host.
+   Set `CRON_SECRET` and call `POST /api/jobs/daily` once a day (`Authorization: Bearer $CRON_SECRET`) for the
+   ending-soon and overdue-onboarding jobs.
 4. Create the first Super Admin: `npm run admin:invite -- --email you@company.com --first Name --last Surname`, open
    the printed link, set a password. Invite everyone else from **Users**.
 
@@ -165,7 +178,7 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | ------ | ------------------------------------------------------------------------- |
 | 01     | **Foundation** — done                                                     |
 | 02     | **Authentication, RBAC & security** — done                                |
-| 03     | Intern management: profiles, onboarding, offboarding, departments, teams  |
+| 03     | **Intern management, HR directory & onboarding** — done                   |
 | 04     | Projects, tasks, submissions and reviews, calendar                         |
 | 05     | HR operations: attendance, leave, documents, learning                     |
 | 06     | Communication and performance: announcements, messages, notifications, reviews |
@@ -177,6 +190,7 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 ## Documentation
 
 [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Authentication](docs/authentication.md) ·
-[Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md)
+[Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md) ·
+[Intern management](docs/intern-management.md) · [Onboarding](docs/onboarding.md)
 
 Internal use only — Ayava Creatives.

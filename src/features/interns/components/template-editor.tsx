@@ -84,8 +84,18 @@ export function TemplateSettingsForm({
       <Field label="Name" htmlFor="tpl-name" error={f.name}>
         <Input id="tpl-name" name="name" required defaultValue={v?.name ?? template?.name} />
       </Field>
-      <Field label="Department (optional)" htmlFor="tpl-dept" error={f.departmentId} hint="Auto-selected for interns in this department.">
-        <select id="tpl-dept" name="departmentId" defaultValue={v?.departmentId ?? template?.department_id ?? ''} className={inputClassName}>
+      <Field
+        label="Department (optional)"
+        htmlFor="tpl-dept"
+        error={f.departmentId}
+        hint="Auto-selected for interns in this department."
+      >
+        <select
+          id="tpl-dept"
+          name="departmentId"
+          defaultValue={v?.departmentId ?? template?.department_id ?? ''}
+          className={inputClassName}
+        >
           <option value="">Any department</option>
           {options.departments.map((d) => (
             <option key={d.id} value={d.id}>
@@ -94,8 +104,18 @@ export function TemplateSettingsForm({
           ))}
         </select>
       </Field>
-      <Field label="Position (optional)" htmlFor="tpl-pos" error={f.positionId} hint="A position match wins over a department match.">
-        <select id="tpl-pos" name="positionId" defaultValue={v?.positionId ?? template?.position_id ?? ''} className={inputClassName}>
+      <Field
+        label="Position (optional)"
+        htmlFor="tpl-pos"
+        error={f.positionId}
+        hint="A position match wins over a department match."
+      >
+        <select
+          id="tpl-pos"
+          name="positionId"
+          defaultValue={v?.positionId ?? template?.position_id ?? ''}
+          className={inputClassName}
+        >
           <option value="">Any position</option>
           {options.positions.map((p) => (
             <option key={p.id} value={p.id}>
@@ -106,16 +126,32 @@ export function TemplateSettingsForm({
       </Field>
       <div className="flex flex-col justify-end gap-2 text-small">
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="isActive" defaultChecked={template ? template.is_active : true} className="size-4 accent-primary" /> Active
+          <input
+            type="checkbox"
+            name="isActive"
+            defaultChecked={template ? template.is_active : true}
+            className="size-4 accent-primary"
+          />{' '}
+          Active
         </label>
         <label className="flex items-center gap-2">
-          <input type="checkbox" name="isDefault" defaultChecked={template?.is_default ?? false} className="size-4 accent-primary" />
+          <input
+            type="checkbox"
+            name="isDefault"
+            defaultChecked={template?.is_default ?? false}
+            className="size-4 accent-primary"
+          />
           Default template (used when nothing more specific matches)
         </label>
       </div>
       <div className="sm:col-span-2">
         <Field label="Description (optional)" htmlFor="tpl-desc" error={f.description}>
-          <Textarea id="tpl-desc" name="description" rows={2} defaultValue={v?.description ?? template?.description ?? ''} />
+          <Textarea
+            id="tpl-desc"
+            name="description"
+            rows={2}
+            defaultValue={v?.description ?? template?.description ?? ''}
+          />
         </Field>
       </div>
       <div>
@@ -165,7 +201,9 @@ export function TemplateItems({ template, options }: { template: TemplateView; o
   return (
     <div className="space-y-3">
       {template.items.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-6 text-center text-small text-muted-foreground">No items yet.</p>
+        <p className="rounded-xl border border-dashed p-6 text-center text-small text-muted-foreground">
+          No items yet.
+        </p>
       ) : (
         <ol className="divide-y rounded-xl border bg-card">
           {template.items.map((item, index) => (
@@ -177,18 +215,32 @@ export function TemplateItems({ template, options }: { template: TemplateView; o
                 </p>
                 <div className="mt-1 flex flex-wrap gap-1.5 text-caption text-muted-foreground">
                   <Badge variant="outline">{humanizeEnum(item.category)}</Badge>
-                  {item.required ? <Badge variant="neutral">Required</Badge> : <Badge variant="outline">Optional</Badge>}
+                  {item.required ? (
+                    <Badge variant="neutral">Required</Badge>
+                  ) : (
+                    <Badge variant="outline">Optional</Badge>
+                  )}
                   <span>
                     Due day {item.due_days_after_start >= 0 ? '+' : ''}
                     {item.due_days_after_start}
                   </span>
                   <span>· {item.assigned_user ? fullName(item.assigned_user) : humanizeEnum(item.assigned_role)}</span>
-                  {item.policy && <span>· {item.policy.title} v{item.policy.version}</span>}
+                  {item.policy && (
+                    <span>
+                      · {item.policy.title} v{item.policy.version}
+                    </span>
+                  )}
                   {item.required_document_type && <span>· {humanizeEnum(item.required_document_type)}</span>}
                 </div>
               </div>
               <div className="flex gap-1">
-                <Button variant="ghost" size="icon-sm" aria-label={`Move ${item.title} up`} disabled={index === 0} onClick={() => command(item.id, 'up')}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Move ${item.title} up`}
+                  disabled={index === 0}
+                  onClick={() => command(item.id, 'up')}
+                >
                   <ArrowUp aria-hidden />
                 </Button>
                 <Button
@@ -200,10 +252,20 @@ export function TemplateItems({ template, options }: { template: TemplateView; o
                 >
                   <ArrowDown aria-hidden />
                 </Button>
-                <Button variant="ghost" size="icon-sm" aria-label={`Edit ${item.title}`} onClick={() => setEditing(item)}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Edit ${item.title}`}
+                  onClick={() => setEditing(item)}
+                >
                   <Pencil aria-hidden />
                 </Button>
-                <Button variant="ghost" size="icon-sm" aria-label={`Delete ${item.title}`} onClick={() => setDeleting(item)}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete ${item.title}`}
+                  onClick={() => setDeleting(item)}
+                >
                   <Trash2 aria-hidden />
                 </Button>
               </div>
@@ -273,7 +335,13 @@ function ItemDialog({
             </Field>
           </div>
           <Field label="Type" htmlFor="item-type" error={f.category}>
-            <select id="item-type" name="category" value={category} onChange={(e) => setCategory(e.target.value)} className={inputClassName}>
+            <select
+              id="item-type"
+              name="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={inputClassName}
+            >
               {options.itemTypes.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -281,11 +349,29 @@ function ItemDialog({
               ))}
             </select>
           </Field>
-          <Field label="Due (days after start)" htmlFor="item-due" error={f.dueDaysAfterStart} hint="Negative = before the start date.">
-            <Input id="item-due" name="dueDaysAfterStart" type="number" min={-365} max={365} defaultValue={v?.dueDaysAfterStart ?? item?.due_days_after_start ?? 0} />
+          <Field
+            label="Due (days after start)"
+            htmlFor="item-due"
+            error={f.dueDaysAfterStart}
+            hint="Negative = before the start date."
+          >
+            <Input
+              id="item-due"
+              name="dueDaysAfterStart"
+              type="number"
+              min={-365}
+              max={365}
+              defaultValue={v?.dueDaysAfterStart ?? item?.due_days_after_start ?? 0}
+            />
           </Field>
           <Field label="Responsible" htmlFor="item-role" error={f.assignedRole}>
-            <select id="item-role" name="assignedRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClassName}>
+            <select
+              id="item-role"
+              name="assignedRole"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className={inputClassName}
+            >
               <option value="INTERN">Intern</option>
               <option value="MANAGER">Their manager</option>
               <option value="MENTOR">Their mentor</option>
@@ -294,7 +380,12 @@ function ItemDialog({
           </Field>
           {role === 'HR' ? (
             <Field label="HR person" htmlFor="item-user" error={f.assignedUserId}>
-              <select id="item-user" name="assignedUserId" defaultValue={v?.assignedUserId ?? item?.assigned_user_id ?? ''} className={inputClassName}>
+              <select
+                id="item-user"
+                name="assignedUserId"
+                defaultValue={v?.assignedUserId ?? item?.assigned_user_id ?? ''}
+                className={inputClassName}
+              >
                 <option value="" disabled>
                   Choose
                 </option>
@@ -310,7 +401,12 @@ function ItemDialog({
           )}
           {category === 'DOCUMENT' && (
             <Field label="Required document" htmlFor="item-doc" error={f.requiredDocumentType}>
-              <select id="item-doc" name="requiredDocumentType" defaultValue={v?.requiredDocumentType ?? item?.required_document_type ?? ''} className={inputClassName}>
+              <select
+                id="item-doc"
+                name="requiredDocumentType"
+                defaultValue={v?.requiredDocumentType ?? item?.required_document_type ?? ''}
+                className={inputClassName}
+              >
                 <option value="">Any type</option>
                 {options.documentTypes.map((d) => (
                   <option key={d.value} value={d.value}>
@@ -322,7 +418,12 @@ function ItemDialog({
           )}
           {category === 'ACKNOWLEDGEMENT' && (
             <Field label="Policy" htmlFor="item-policy" error={f.policyId}>
-              <select id="item-policy" name="policyId" defaultValue={v?.policyId ?? item?.policy_id ?? ''} className={inputClassName}>
+              <select
+                id="item-policy"
+                name="policyId"
+                defaultValue={v?.policyId ?? item?.policy_id ?? ''}
+                className={inputClassName}
+              >
                 <option value="" disabled>
                   Choose a policy
                 </option>
@@ -335,12 +436,22 @@ function ItemDialog({
             </Field>
           )}
           <label className="flex items-center gap-2 text-small sm:col-span-2">
-            <input type="checkbox" name="required" defaultChecked={item ? item.required : true} className="size-4 accent-primary" />
+            <input
+              type="checkbox"
+              name="required"
+              defaultChecked={item ? item.required : true}
+              className="size-4 accent-primary"
+            />
             Required to complete onboarding
           </label>
           <div className="sm:col-span-2">
             <Field label="Instructions (optional)" htmlFor="item-desc" error={f.description}>
-              <Textarea id="item-desc" name="description" rows={3} defaultValue={v?.description ?? item?.description ?? ''} />
+              <Textarea
+                id="item-desc"
+                name="description"
+                rows={3}
+                defaultValue={v?.description ?? item?.description ?? ''}
+              />
             </Field>
           </div>
           <DialogFooter className="sm:col-span-2">

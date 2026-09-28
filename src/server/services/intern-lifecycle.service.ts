@@ -80,7 +80,10 @@ export const internLifecycleService = {
             `Onboarding isn’t finished (${progress.requiredDone} of ${progress.requiredTotal} required items). Complete it or override with a reason.`,
           )
         }
-        if (!data.reason) throw new ValidationError('Give a reason for activating before onboarding is complete', { reason: 'Required' })
+        if (!data.reason)
+          throw new ValidationError('Give a reason for activating before onboarding is complete', {
+            reason: 'Required',
+          })
         if (!scopeCovers(ctx, 'onboarding.manage', r)) throw new ForbiddenError('Only HR can override onboarding')
       }
     }
@@ -88,9 +91,14 @@ export const internLifecycleService = {
     // SELECTED → ONBOARDING generates the checklist if it doesn't exist yet.
     const needsOnboarding = to === 'ONBOARDING' && internship && !internship.onboarding
     const templateId = needsOnboarding
-      ? (data.templateId ?? (await templateRepository.pickFor(ctx.organization.id, { departmentId: r.department_id, positionId: r.position_id })))
+      ? (data.templateId ??
+        (await templateRepository.pickFor(ctx.organization.id, {
+          departmentId: r.department_id,
+          positionId: r.position_id,
+        })))
       : null
-    if (needsOnboarding && !templateId) throw new ValidationError('Choose an onboarding template', { templateId: 'Required' })
+    if (needsOnboarding && !templateId)
+      throw new ValidationError('Choose an onboarding template', { templateId: 'Required' })
 
     const closing = to === 'COMPLETED' || to === 'TERMINATED'
     const generated = await prisma.$transaction(async (tx) => {
@@ -163,15 +171,25 @@ export const internLifecycleService = {
           status: 'ACTIVE',
           expected_end_date: { gte: today, lte: addDays(today, days) },
         },
-        select: { id: true, expected_end_date: true, internships: { orderBy: { start_date: 'desc' }, take: 1, select: { id: true } } },
+        select: {
+          id: true,
+          expected_end_date: true,
+          internships: { orderBy: { start_date: 'desc' }, take: 1, select: { id: true } },
+        },
       })
       for (const intern of candidates) {
         const endDate = formatDateOnly(intern.expected_end_date!)
         const key = `ending_soon:${intern.id}:${endDate}`
         const done = await prisma.$transaction(async (tx) => {
-          const seen = await tx.internLifecycleEvent.findUnique({ where: { idempotency_key: key }, select: { id: true } })
+          const seen = await tx.internLifecycleEvent.findUnique({
+            where: { idempotency_key: key },
+            select: { id: true },
+          })
           if (seen) return false
-          const { count } = await tx.intern.updateMany({ where: { id: intern.id, status: 'ACTIVE' }, data: { status: 'ENDING_SOON' } })
+          const { count } = await tx.intern.updateMany({
+            where: { id: intern.id, status: 'ACTIVE' },
+            data: { status: 'ENDING_SOON' },
+          })
           if (count === 0) return false
           return lifecycleRepository.record(tx, {
             organizationId: org.id,
@@ -222,7 +240,13 @@ export const internLifecycleService = {
       const yesterday = addDays(today, -1)
       const batch = 500
       for (let skip = 0; ; skip += batch) {
-        const items = await onboardingRepository.listItemsDueOn(org.id, yesterday, ['PENDING', 'IN_PROGRESS', 'BLOCKED'], skip, batch)
+        const items = await onboardingRepository.listItemsDueOn(
+          org.id,
+          yesterday,
+          ['PENDING', 'IN_PROGRESS', 'BLOCKED'],
+          skip,
+          batch,
+        )
         for (const item of items) {
           const intern = item.internship.intern
           if (!intern || intern.deleted_at) continue

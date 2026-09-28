@@ -198,7 +198,13 @@ describe('onboarding progress', () => {
       ],
       today,
     )
-    expect(progress).toMatchObject({ requiredDone: 8, requiredTotal: 10, percent: 80, optionalTotal: 2, optionalDone: 1 })
+    expect(progress).toMatchObject({
+      requiredDone: 8,
+      requiredTotal: 10,
+      percent: 80,
+      optionalTotal: 2,
+      optionalDone: 1,
+    })
     expect(progress.complete).toBe(false)
   })
 
@@ -228,7 +234,11 @@ describe('onboarding progress', () => {
 
   it('counts overdue and blocked items', () => {
     const progress = onboardingProgress(
-      [item({ due_date: d('2026-01-01') }), item({ status: 'BLOCKED' }), item({ status: 'COMPLETED', due_date: d('2026-01-01') })],
+      [
+        item({ due_date: d('2026-01-01') }),
+        item({ status: 'BLOCKED' }),
+        item({ status: 'COMPLETED', due_date: d('2026-01-01') }),
+      ],
       today,
     )
     expect(progress).toMatchObject({ overdue: 1, blocked: 1 })
@@ -327,7 +337,14 @@ describe('intern validation schemas', () => {
       page: '-3',
       pageSize: '5000',
     })
-    expect(parsed).toMatchObject({ status: undefined, department: undefined, sort: 'name', dir: 'asc', page: 1, pageSize: 25 })
+    expect(parsed).toMatchObject({
+      status: undefined,
+      department: undefined,
+      sort: 'name',
+      dir: 'asc',
+      page: 1,
+      pageSize: 25,
+    })
     expect(directoryQuerySchema.parse({ pageSize: '50', page: '2', sort: 'end', dir: 'desc' })).toMatchObject({
       pageSize: 50,
       page: 2,
@@ -356,7 +373,16 @@ describe('intern scope coverage', () => {
       },
     }) as unknown as RequestContext
 
-  const record = (overrides: Partial<{ user_id: string; manager_id: string | null; mentor_id: string | null; team_id: string | null; department_id: string | null; organization_id: string }> = {}) => ({
+  const record = (
+    overrides: Partial<{
+      user_id: string
+      manager_id: string | null
+      mentor_id: string | null
+      team_id: string | null
+      department_id: string | null
+      organization_id: string
+    }> = {},
+  ) => ({
     user_id: OTHER,
     manager_id: null,
     mentor_id: null,
@@ -380,12 +406,20 @@ describe('intern scope coverage', () => {
   it('TEAM and DEPARTMENT scopes follow led teams and headed departments', () => {
     expect(scopeCovers(ctx('TEAM', { ledTeamIds: ['t1'] }), 'intern.read', record({ team_id: 't1' }))).toBe(true)
     expect(scopeCovers(ctx('TEAM', { ledTeamIds: ['t1'] }), 'intern.read', record({ team_id: 't2' }))).toBe(false)
-    expect(scopeCovers(ctx('DEPARTMENT', { headedDepartmentIds: ['d1'] }), 'intern.read', record({ department_id: 'd1' }))).toBe(true)
+    expect(
+      scopeCovers(ctx('DEPARTMENT', { headedDepartmentIds: ['d1'] }), 'intern.read', record({ department_id: 'd1' })),
+    ).toBe(true)
   })
 
   it('ORGANIZATION covers everyone in the organization but never another organization', () => {
     expect(scopeCovers(ctx('ORGANIZATION'), 'intern.read', record())).toBe(true)
-    expect(scopeCovers(ctx('ORGANIZATION'), 'intern.read', record({ organization_id: '22222222-2222-4222-8222-222222222222' }))).toBe(false)
+    expect(
+      scopeCovers(
+        ctx('ORGANIZATION'),
+        'intern.read',
+        record({ organization_id: '22222222-2222-4222-8222-222222222222' }),
+      ),
+    ).toBe(false)
   })
 
   it('a missing permission covers nothing', () => {

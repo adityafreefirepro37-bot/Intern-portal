@@ -270,7 +270,13 @@ export const internRepository = {
   /** Current interns missing a manager or a mentor. */
   countUnassigned(scope: Prisma.InternWhereInput, statuses: InternStatus[]) {
     return prisma.intern.count({
-      where: { AND: [scope, { deleted_at: null, status: { in: statuses } }, { OR: [{ manager_id: null }, { mentor_id: null }] }] },
+      where: {
+        AND: [
+          scope,
+          { deleted_at: null, status: { in: statuses } },
+          { OR: [{ manager_id: null }, { mentor_id: null }] },
+        ],
+      },
     })
   },
 

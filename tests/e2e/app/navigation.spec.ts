@@ -49,7 +49,14 @@ test.describe('overview dashboard', () => {
     await page.goto('/')
     // Admins see the internship programme figures in their own section.
     const programme = page.getByRole('region', { name: 'Internship programme' })
-    for (const label of ['Total interns', 'Active', 'Onboarding', 'Ending soon', 'Upcoming joins', 'Onboarding overdue']) {
+    for (const label of [
+      'Total interns',
+      'Active',
+      'Onboarding',
+      'Ending soon',
+      'Upcoming joins',
+      'Onboarding overdue',
+    ]) {
       await expect(programme.getByText(label, { exact: true })).toBeVisible()
     }
     const stats = page.getByRole('region', { name: 'Today’s overview' })

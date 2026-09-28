@@ -8,7 +8,13 @@ import type { InternshipProgress, OnboardingProgress } from '@/lib/interns/progr
 import { formatDay, fullName, pluralize } from '@/lib/utils'
 import { InternshipProgressBar } from './progress'
 
-type Person = { id: string; first_name: string; last_name: string; display_name: string | null; avatar_url: string | null }
+type Person = {
+  id: string
+  first_name: string
+  last_name: string
+  display_name: string | null
+  avatar_url: string | null
+}
 
 export interface RelatedIntern {
   id: string
@@ -27,7 +33,13 @@ export interface RelatedIntern {
 }
 
 /** Cards for My Interns / My Mentees. */
-export function RelatedInternGrid({ interns, relation }: { interns: RelatedIntern[]; relation: 'managed' | 'mentored' }) {
+export function RelatedInternGrid({
+  interns,
+  relation,
+}: {
+  interns: RelatedIntern[]
+  relation: 'managed' | 'mentored'
+}) {
   if (interns.length === 0) {
     return (
       <EmptyState
@@ -47,7 +59,10 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
               <div className="flex items-start gap-3">
                 <UserAvatar person={intern.user} className="size-11" />
                 <div className="min-w-0 flex-1">
-                  <Link href={`/interns/${intern.id}`} className="block truncate font-medium after:absolute after:inset-0">
+                  <Link
+                    href={`/interns/${intern.id}`}
+                    className="block truncate font-medium after:absolute after:inset-0"
+                  >
                     {fullName(intern.user)}
                   </Link>
                   <p className="truncate text-caption text-muted-foreground">
@@ -69,7 +84,13 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
                 <div>
                   <dt className="text-muted-foreground">Onboarding</dt>
                   {/* Overdue matters only while onboarding is unfinished (open optional items don't block it). */}
-                  <dd className={intern.onboarding && !intern.onboarding.complete && intern.onboarding.overdue > 0 ? 'text-destructive' : undefined}>
+                  <dd
+                    className={
+                      intern.onboarding && !intern.onboarding.complete && intern.onboarding.overdue > 0
+                        ? 'text-destructive'
+                        : undefined
+                    }
+                  >
                     {!intern.onboarding
                       ? 'Not started'
                       : intern.onboarding.complete

@@ -68,12 +68,22 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
           href="/onboarding?state=OVERDUE"
           tone={stats.overdue > 0 ? 'attention' : 'default'}
         />
-        <StatCard label="Blocked" value={stats.blocked} icon={Ban} href="/onboarding?state=BLOCKED" tone={stats.blocked > 0 ? 'attention' : 'default'} />
+        <StatCard
+          label="Blocked"
+          value={stats.blocked}
+          icon={Ban}
+          href="/onboarding?state=BLOCKED"
+          tone={stats.blocked > 0 ? 'attention' : 'default'}
+        />
         <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} href="/onboarding?state=COMPLETED" />
       </section>
 
       <nav aria-label="Filter onboarding" className="mb-4 flex flex-wrap gap-2">
-        <Link href="/onboarding" aria-current={!state ? 'page' : undefined} className={buttonVariants({ variant: !state ? 'default' : 'outline', size: 'sm' })}>
+        <Link
+          href="/onboarding"
+          aria-current={!state ? 'page' : undefined}
+          className={buttonVariants({ variant: !state ? 'default' : 'outline', size: 'sm' })}
+        >
           Open
         </Link>
         {STATES.map((s) => (
@@ -109,7 +119,10 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
                 <div className="flex min-w-48 items-center gap-3">
                   <UserAvatar person={intern.user} className="size-8" />
                   <div className="min-w-0">
-                    <Link href={`/interns/${intern.id}/onboarding`} className="block truncate font-medium hover:underline">
+                    <Link
+                      href={`/interns/${intern.id}/onboarding`}
+                      className="block truncate font-medium hover:underline"
+                    >
                       {fullName(intern.user)}
                     </Link>
                     <p className="text-caption text-muted-foreground">{intern.employee_code}</p>
@@ -126,21 +139,38 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
                 <Progress value={row.progress.percent} label={`${row.progress.percent}% of required items done`} />
                 <p className="text-caption text-muted-foreground">
                   {row.progress.requiredDone}/{row.progress.requiredTotal}
-                  {row.progress.overdue > 0 && <span className="text-destructive"> · {row.progress.overdue} overdue</span>}
+                  {row.progress.overdue > 0 && (
+                    <span className="text-destructive"> · {row.progress.overdue} overdue</span>
+                  )}
                 </p>
               </div>
             ),
           },
-          { key: 'state', header: 'State', cell: (row) => <StatusBadge status={row.state === 'OVERDUE' ? 'LATE' : row.state} /> },
+          {
+            key: 'state',
+            header: 'State',
+            cell: (row) => <StatusBadge status={row.state === 'OVERDUE' ? 'LATE' : row.state} />,
+          },
           { key: 'template', header: 'Template', hideBelow: 'md', cell: (row) => row.template_name ?? '—' },
-          { key: 'intern-status', header: 'Intern status', hideBelow: 'lg', cell: (row) => <StatusBadge status={row.internship.intern.status} /> },
+          {
+            key: 'intern-status',
+            header: 'Intern status',
+            hideBelow: 'lg',
+            cell: (row) => <StatusBadge status={row.internship.intern.status} />,
+          },
           { key: 'start', header: 'Start date', hideBelow: 'lg', cell: (row) => formatDay(row.internship.start_date) },
-          { key: 'due', header: 'Due date', hideBelow: 'md', cell: (row) => (row.lastDue ? formatDay(row.lastDue) : '—') },
+          {
+            key: 'due',
+            header: 'Due date',
+            hideBelow: 'md',
+            cell: (row) => (row.lastDue ? formatDay(row.lastDue) : '—'),
+          },
           {
             key: 'completed',
             header: 'Completed',
             hideBelow: 'lg',
-            cell: (row) => (row.completed_at ? formatDay(row.completed_at) : <span className="text-muted-foreground">Not yet</span>),
+            cell: (row) =>
+              row.completed_at ? formatDay(row.completed_at) : <span className="text-muted-foreground">Not yet</span>,
           },
         ]}
       />

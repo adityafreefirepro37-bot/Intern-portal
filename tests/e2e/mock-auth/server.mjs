@@ -204,7 +204,8 @@ const server = createServer(async (req, res) => {
       const grant = url.searchParams.get('grant_type')
       if (grant === 'password') {
         const record = findByEmail(body.email)
-        if (!record || record.password !== body.password) return fail(res, 400, 'invalid_credentials', 'Invalid login credentials')
+        if (!record || record.password !== body.password)
+          return fail(res, 400, 'invalid_credentials', 'Invalid login credentials')
         if (isBanned(record)) return fail(res, 400, 'user_banned', 'User is banned')
         if (!record.confirmedAt) return fail(res, 400, 'email_not_confirmed', 'Email not confirmed')
         return send(res, 200, issueSession(record))
@@ -212,7 +213,8 @@ const server = createServer(async (req, res) => {
       if (grant === 'refresh_token') {
         const entry = refreshTokens.get(body.refresh_token)
         const record = entry && findById(entry.userId)
-        if (!entry || !record || isBanned(record)) return fail(res, 400, 'refresh_token_not_found', 'Invalid Refresh Token')
+        if (!entry || !record || isBanned(record))
+          return fail(res, 400, 'refresh_token_not_found', 'Invalid Refresh Token')
         refreshTokens.delete(body.refresh_token)
         return send(res, 200, issueSession(record, entry.sessionId))
       }
@@ -229,7 +231,8 @@ const server = createServer(async (req, res) => {
       const current = currentSession(req)
       if (!current) return fail(res, 401, 'no_authorization', 'This endpoint requires a valid Bearer token')
       if (typeof body.password === 'string') {
-        if (body.password === current.record.password) return fail(res, 422, 'same_password', 'New password should be different')
+        if (body.password === current.record.password)
+          return fail(res, 422, 'same_password', 'New password should be different')
         current.record.password = body.password
         save()
       }
@@ -280,8 +283,13 @@ const server = createServer(async (req, res) => {
         return send(res, 200, { users: list, aud: 'authenticated' })
       }
       if (route === 'POST /auth/v1/admin/users') {
-        if (findByEmail(body.email)) return fail(res, 422, 'email_exists', 'A user with this email address has already been registered')
-        return send(res, 200, toUser(createUser({ email: body.email, password: body.password, confirmed: body.email_confirm === true })))
+        if (findByEmail(body.email))
+          return fail(res, 422, 'email_exists', 'A user with this email address has already been registered')
+        return send(
+          res,
+          200,
+          toUser(createUser({ email: body.email, password: body.password, confirmed: body.email_confirm === true })),
+        )
       }
       const match = url.pathname.match(/^\/auth\/v1\/admin\/users\/([0-9a-f-]{36})$/)
       if (match && req.method === 'PUT') {
