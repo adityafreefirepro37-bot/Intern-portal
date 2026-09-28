@@ -131,9 +131,31 @@ describe('services return live data', () => {
     const pending = await prisma.taskSubmission.count({
       where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }, task: { organization_id: AYAVA_ORGANIZATION_ID } },
     })
-    expect(overview.stats.activeInterns).toBe(activeInterns)
+    const programme = overview.internship.programme!
+    expect(programme.active + programme.endingSoon).toBe(activeInterns)
+    // Shown in the programme section instead, so the headline card is omitted.
+    expect(overview.stats.activeInterns).toBeNull()
+    expect(programme.total).toBe(
+      await prisma.intern.count({ where: { organization_id: AYAVA_ORGANIZATION_ID, deleted_at: null } }),
+    )
     expect(overview.stats.pendingReviews).toBe(pending)
     expect(activeInterns).toBeGreaterThan(0)
+  })
+
+  it('shows managers only their own interns and interns their own internship', async () => {
+    const manager = await contextFor('manager@ayavacreatives.com')
+    const managerView = await dashboardService.getOverview(manager)
+    expect(managerView.internship.programme).toBeNull()
+    expect(managerView.internship.self).toBeNull()
+    const managed = await prisma.intern.count({ where: { manager_id: manager.actor.userId, deleted_at: null } })
+    expect(managerView.internship.managed).toHaveLength(managed)
+
+    const intern = await contextFor('intern@ayavacreatives.com')
+    const internView = await dashboardService.getOverview(intern)
+    expect(internView.internship.programme).toBeNull()
+    expect(internView.internship.managed).toBeNull()
+    expect(internView.internship.self).toMatchObject({ status: 'ACTIVE', manager: expect.any(String), mentor: expect.any(String) })
+    expect(internView.internship.self?.onboarding?.progress.complete).toBe(true)
   })
 
   it('computes project progress from tasks', async () => {

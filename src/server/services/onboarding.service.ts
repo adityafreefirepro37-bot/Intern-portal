@@ -19,6 +19,9 @@ import { resolveInternAccess, scopeCovers } from './intern-access'
 
 type Tx = Prisma.TransactionClient
 
+/** Onboardings listed on the HR dashboard table (stats always cover all of them). */
+const DASHBOARD_ROWS = 200
+
 /**
  * Onboarding.
  *
@@ -83,7 +86,7 @@ export async function generateOnboarding(tx: Tx, input: GenerateInput) {
     },
     select: { id: true },
   })
-  await tx.onboardingItem.createMany({
+  const items = await tx.onboardingItem.createManyAndReturn({
     data: template.items.map((item, index) => ({
       organization_id: input.organizationId,
       internship_id: input.internship.id,
@@ -100,6 +103,7 @@ export async function generateOnboarding(tx: Tx, input: GenerateInput) {
       policy_id: item.policy_id,
       sort_order: index,
     })),
+    select: { id: true, assigned_to: true },
   })
   await lifecycleRepository.record(tx, {
     organizationId: input.organizationId,
@@ -110,7 +114,44 @@ export async function generateOnboarding(tx: Tx, input: GenerateInput) {
     metadata: { templateId: template.id },
     idempotencyKey: `onboarding_started:${input.internship.id}`,
   })
-  return { onboardingId: onboarding.id, itemCount: template.items.length, templateName: template.name }
+  return {
+    onboardingId: onboarding.id,
+    itemCount: template.items.length,
+    templateName: template.name,
+    assignments: items.flatMap((item) => (item.assigned_to ? [{ itemId: item.id, assigneeId: item.assigned_to }] : [])),
+  }
+}
+
+export type GeneratedOnboarding = Awaited<ReturnType<typeof generateOnboarding>>
+
+/** After-commit side effects of generating an onboarding: audit entry and domain events. */
+export async function announceOnboarding(ctx: RequestContext, internId: string, generated: GeneratedOnboarding) {
+  await auditService.logForContext(ctx, {
+    action: AUDIT_ACTIONS.ONBOARDING_CREATED,
+    resourceType: 'onboarding',
+    resourceId: generated.onboardingId,
+    metadata: { internId, template: generated.templateName, items: generated.itemCount },
+  })
+  await domainEvents.emit('onboarding.created', {
+    organizationId: ctx.organization.id,
+    actorUserId: ctx.actor.userId,
+    payload: { internId, onboardingId: generated.onboardingId, itemCount: generated.itemCount },
+  })
+  await emitItemAssignments(ctx, internId, generated.assignments)
+}
+
+export async function emitItemAssignments(
+  ctx: RequestContext,
+  internId: string,
+  assignments: readonly { itemId: string; assigneeId: string }[],
+) {
+  for (const { itemId, assigneeId } of assignments) {
+    await domainEvents.emit('onboarding.item_assigned', {
+      organizationId: ctx.organization.id,
+      actorUserId: ctx.actor.userId,
+      payload: { internId, itemId, assigneeId },
+    })
+  }
 }
 
 export interface ChecklistItem extends OnboardingItemRecord {
@@ -334,14 +375,21 @@ export const onboardingService = {
     await afterItemChange(ctx, item.onboarding_id, intern.id)
   },
 
-  /** HR onboarding dashboard (onboarding.manage, scoped). */
+  /**
+   * HR onboarding dashboard (onboarding.manage, scoped). Stats count every
+   * onboarding in scope; the table lists the most recent ones.
+   */
   async dashboard(ctx: RequestContext) {
     const scope = authorizationService.require(ctx, 'onboarding.manage')
     const today = todayIn(ctx.organization.timezone)
-    const instances = await onboardingRepository.listInstances({
+    const where: Prisma.OnboardingWhereInput = {
       organization_id: ctx.organization.id,
       internship: { intern: { AND: [internScope(ctx.actor, scope), { deleted_at: null }] } },
-    })
+    }
+    const [instances, stats] = await Promise.all([
+      onboardingRepository.listInstances(where, DASHBOARD_ROWS),
+      onboardingRepository.stats(where, today),
+    ])
     const rows = instances.map((instance) => {
       const progress: OnboardingProgress = onboardingProgress(instance.items, today)
       const dueDates = instance.items.map((item) => item.due_date).filter((d): d is Date => Boolean(d))
@@ -350,14 +398,9 @@ export const onboardingService = {
       return { ...instance, progress, lastDue, state }
     })
     return {
-      stats: {
-        total: rows.length,
-        inProgress: rows.filter((row) => !row.completed_at).length,
-        completed: rows.filter((row) => row.completed_at).length,
-        overdue: rows.filter((row) => !row.completed_at && row.progress.overdue > 0).length,
-        blocked: rows.filter((row) => !row.completed_at && row.progress.blocked > 0).length,
-      },
+      stats: { ...stats, completionRate: stats.total === 0 ? 0 : Math.round((stats.completed / stats.total) * 100) },
       rows,
+      truncated: stats.total > rows.length,
     }
   },
 }

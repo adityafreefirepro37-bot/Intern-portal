@@ -6,6 +6,14 @@ afterAll(() => prisma.$disconnect())
 const EXPECTED_TABLES = [
   'organizations',
   'users',
+  // Phase 03
+  'code_counters',
+  'document_acknowledgements',
+  'intern_lifecycle_events',
+  'onboarding_template_items',
+  'onboarding_templates',
+  'onboardings',
+  'policies',
   'roles',
   'permissions',
   'role_permissions',

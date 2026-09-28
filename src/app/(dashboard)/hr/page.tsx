@@ -2,7 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   CalendarClock,
+  CalendarPlus,
   ClipboardList,
+  FileCheck,
+  GraduationCap,
+  ListChecks,
   LayoutTemplate,
   OctagonAlert,
   UserPlus,
@@ -15,12 +19,12 @@ import { PageHeader } from '@/components/common/page-header'
 import { StatCard } from '@/components/common/stat-card'
 import { AccessDenied } from '@/components/common/states'
 import { UserAvatar } from '@/components/common/user-avatar'
-import { buttonVariants } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDay, fullName } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
-import { internService } from '@/server/services/intern.service'
+import { internService, UPCOMING_JOIN_DAYS } from '@/server/services/intern.service'
 import { onboardingService } from '@/server/services/onboarding.service'
 
 export const metadata: Metadata = { title: 'HR Dashboard' }
@@ -51,11 +55,12 @@ export default async function HrDashboardPage() {
   const ctx = await requirePageContext()
   if (!authorizationService.can(ctx, 'intern.create')) return <AccessDenied what="the HR dashboard" />
   const canOnboarding = authorizationService.can(ctx, 'onboarding.manage')
+  const canReviewDocuments = authorizationService.can(ctx, 'document.manage')
   const [overview, onboarding] = await Promise.all([
     internService.hrOverview(ctx),
     canOnboarding ? onboardingService.dashboard(ctx) : Promise.resolve(null),
   ])
-  const count = (status: string) => overview.byStatus[status as keyof typeof overview.byStatus] ?? 0
+  const { totals } = overview
   const attention = onboarding?.rows.filter((row) => row.state === 'OVERDUE' || row.state === 'BLOCKED').slice(0, 6) ?? []
 
   return (
@@ -69,31 +74,72 @@ export default async function HrDashboardPage() {
               <UserPlus aria-hidden /> Add intern
             </Link>
             {canOnboarding && (
-              <Link href="/onboarding/templates" className={buttonVariants({ variant: 'outline' })}>
-                <LayoutTemplate aria-hidden /> Templates
+              <Link href="/interns?status=SELECTED" className={buttonVariants({ variant: 'outline' })}>
+                <ClipboardList aria-hidden /> Start onboarding
               </Link>
+            )}
+            <Link href="/interns" className={buttonVariants({ variant: 'outline' })}>
+              <UsersRound aria-hidden /> View interns
+            </Link>
+            {canOnboarding && (
+              <Link href="/onboarding/templates" className={buttonVariants({ variant: 'outline' })}>
+                <LayoutTemplate aria-hidden /> Manage templates
+              </Link>
+            )}
+            {canReviewDocuments && (
+              <Button variant="outline" disabled title="Organization-wide document review arrives in Phase 05">
+                <FileCheck aria-hidden /> Review documents
+                <span className="sr-only">(available in Phase 05)</span>
+              </Button>
             )}
           </>
         }
       />
 
-      <section aria-label="Programme totals" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Active" value={count('ACTIVE')} icon={UserRoundCheck} href="/interns?status=ACTIVE" />
-        <StatCard label="Onboarding" value={count('ONBOARDING')} icon={ClipboardList} href="/interns?status=ONBOARDING" />
-        <StatCard label="Selected" value={count('SELECTED')} icon={UsersRound} href="/interns?status=SELECTED" hint="Not yet onboarding" />
+      <section aria-label="Programme totals" className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard label="Total interns" value={totals.total} icon={UsersRound} href="/interns" className="col-span-2 lg:col-span-1" />
+        <StatCard label="Active" value={totals.active} icon={UserRoundCheck} href="/interns?status=ACTIVE" />
+        <StatCard label="Onboarding" value={totals.onboarding} icon={ClipboardList} href="/interns?status=ONBOARDING" />
         <StatCard
           label="Ending soon"
-          value={count('ENDING_SOON')}
+          value={totals.endingSoon}
           icon={CalendarClock}
           href="/interns?status=ENDING_SOON"
-          tone={count('ENDING_SOON') > 0 ? 'attention' : 'default'}
+          tone={totals.endingSoon > 0 ? 'attention' : 'default'}
         />
+        <StatCard label="Completed" value={totals.completed} icon={GraduationCap} href="/interns?status=COMPLETED" hint="Including alumni" />
+      </section>
+      <section aria-label="Needs attention" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Upcoming joins"
+          value={overview.upcomingJoins}
+          icon={CalendarPlus}
+          hint={`Starting in the next ${UPCOMING_JOIN_DAYS} days`}
+        />
+        {onboarding && (
+          <StatCard
+            label="Onboarding completion"
+            value={`${onboarding.stats.completionRate}%`}
+            icon={ListChecks}
+            href="/onboarding?state=COMPLETED"
+            hint={`${onboarding.stats.completed} of ${onboarding.stats.total} checklists`}
+          />
+        )}
+        {onboarding && (
+          <StatCard
+            label="Overdue onboarding"
+            value={onboarding.stats.overdue}
+            icon={OctagonAlert}
+            href="/onboarding?state=OVERDUE"
+            tone={onboarding.stats.overdue > 0 ? 'attention' : 'default'}
+          />
+        )}
         <StatCard
           label="Missing manager/mentor"
           value={overview.unassigned}
           icon={UserRoundX}
           tone={overview.unassigned > 0 ? 'attention' : 'default'}
-          className="col-span-2 lg:col-span-1"
+          hint={`${totals.selected} selected, not yet onboarding`}
         />
       </section>
 

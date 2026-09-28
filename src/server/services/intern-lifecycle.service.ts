@@ -22,7 +22,7 @@ import { templateRepository } from '../repositories/template.repository'
 import { AUDIT_ACTIONS } from './audit-actions'
 import { auditService } from './audit.service'
 import { resolveInternAccess, scopeCovers } from './intern-access'
-import { generateOnboarding } from './onboarding.service'
+import { announceOnboarding, generateOnboarding } from './onboarding.service'
 import { settingsService } from './settings.service'
 
 export const transitionSchema = z.strictObject({
@@ -132,19 +132,7 @@ export const internLifecycleService = {
       resourceId: r.id,
       metadata: { from, to, reason: data.reason, override: data.override || undefined },
     })
-    if (generated) {
-      await auditService.logForContext(ctx, {
-        action: AUDIT_ACTIONS.ONBOARDING_CREATED,
-        resourceType: 'onboarding',
-        resourceId: generated.onboardingId,
-        metadata: { internId: r.id, template: generated.templateName },
-      })
-      await domainEvents.emit('onboarding.created', {
-        organizationId: ctx.organization.id,
-        actorUserId: ctx.actor.userId,
-        payload: { internId: r.id, onboardingId: generated.onboardingId, itemCount: generated.itemCount },
-      })
-    }
+    if (generated) await announceOnboarding(ctx, r.id, generated)
     await domainEvents.emit('intern.status_changed', {
       organizationId: ctx.organization.id,
       actorUserId: ctx.actor.userId,
@@ -232,16 +220,20 @@ export const internLifecycleService = {
     for (const org of organizations) {
       const today = todayIn(org.timezone, options.now)
       const yesterday = addDays(today, -1)
-      const items = await onboardingRepository.listOverdueItems(org.id, today, ['PENDING', 'IN_PROGRESS', 'BLOCKED'])
-      for (const item of items) {
-        const intern = item.internship.intern
-        if (!intern || intern.deleted_at || item.due_date?.getTime() !== yesterday.getTime()) continue
-        emitted += 1
-        await domainEvents.emit('onboarding.item_overdue', {
-          organizationId: org.id,
-          actorUserId: null,
-          payload: { internId: intern.id, itemId: item.id, assigneeId: item.assigned_to },
-        })
+      const batch = 500
+      for (let skip = 0; ; skip += batch) {
+        const items = await onboardingRepository.listItemsDueOn(org.id, yesterday, ['PENDING', 'IN_PROGRESS', 'BLOCKED'], skip, batch)
+        for (const item of items) {
+          const intern = item.internship.intern
+          if (!intern || intern.deleted_at) continue
+          emitted += 1
+          await domainEvents.emit('onboarding.item_overdue', {
+            organizationId: org.id,
+            actorUserId: null,
+            payload: { internId: intern.id, itemId: item.id, assigneeId: item.assigned_to },
+          })
+        }
+        if (items.length < batch) break
       }
     }
     return { emitted }

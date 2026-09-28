@@ -35,7 +35,7 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
     return <AccessDenied what="onboarding" />
   }
 
-  const { stats, rows } = await onboardingService.dashboard(ctx)
+  const { stats, rows, truncated } = await onboardingService.dashboard(ctx)
   const requested = (await searchParams).state
   const state = STATES.find((s) => s === requested)
   const visible = state ? rows.filter((row) => row.state === state) : rows.filter((row) => row.state !== 'COMPLETED')
@@ -52,7 +52,14 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
           </Link>
         }
       />
-      <section aria-label="Onboarding totals" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section aria-label="Onboarding totals" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard
+          label="Total onboarding"
+          value={stats.total}
+          icon={ClipboardList}
+          hint={`${stats.completionRate}% completed`}
+          className="col-span-2 lg:col-span-1"
+        />
         <StatCard label="In progress" value={stats.inProgress} icon={Timer} href="/onboarding" />
         <StatCard
           label="Overdue"
@@ -128,8 +135,20 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
           { key: 'template', header: 'Template', hideBelow: 'md', cell: (row) => row.template_name ?? '—' },
           { key: 'intern-status', header: 'Intern status', hideBelow: 'lg', cell: (row) => <StatusBadge status={row.internship.intern.status} /> },
           { key: 'start', header: 'Start date', hideBelow: 'lg', cell: (row) => formatDay(row.internship.start_date) },
+          { key: 'due', header: 'Due date', hideBelow: 'md', cell: (row) => (row.lastDue ? formatDay(row.lastDue) : '—') },
+          {
+            key: 'completed',
+            header: 'Completed',
+            hideBelow: 'lg',
+            cell: (row) => (row.completed_at ? formatDay(row.completed_at) : <span className="text-muted-foreground">Not yet</span>),
+          },
         ]}
       />
+      {truncated && (
+        <p className="mt-3 text-caption text-muted-foreground">
+          Showing the {rows.length} most recent checklists. The totals above include all of them.
+        </p>
+      )}
     </>
   )
 }

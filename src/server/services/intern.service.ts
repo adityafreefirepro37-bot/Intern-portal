@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db/client'
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import type { RequestMeta } from '@/lib/http/request-meta'
-import { EMPLOYEE_CODE_COUNTER_KEY, formatEmployeeCode, parseEmployeeCode } from '@/lib/interns/employee-code'
-import { parseDateOnly, todayIn } from '@/lib/interns/dates'
+import { EMPLOYEE_CODE_COUNTER_KEY, formatEmployeeCode } from '@/lib/interns/employee-code'
+import { addDays, parseDateOnly, todayIn } from '@/lib/interns/dates'
 import { INTERN_STATUSES } from '@/lib/interns/lifecycle'
 import { internshipProgress, onboardingProgress } from '@/lib/interns/progress'
 import { logger } from '@/lib/logging'
@@ -22,10 +22,13 @@ import { auditService } from './audit.service'
 import { authorizationService } from './authorization.service'
 import { resolveInternAccess } from './intern-access'
 import { invitationIssuer } from './invitation.service'
-import { generateOnboarding } from './onboarding.service'
+import { announceOnboarding, emitItemAssignments, generateOnboarding } from './onboarding.service'
 import { skipTake, toPage } from './pagination'
 import { settingsService } from './settings.service'
 import { userService } from './user.service'
+
+/** "Upcoming joins" look this many days ahead. */
+export const UPCOMING_JOIN_DAYS = 30
 
 /** Statuses that count as "currently interning". */
 export const ACTIVE_INTERN_STATUSES: InternStatus[] = ['ACTIVE', 'ENDING_SOON']
@@ -176,13 +179,22 @@ async function assertStaff(organizationId: string, userId: string | undefined, f
 }
 
 async function nextEmployeeCode(tx: Prisma.TransactionClient, organizationId: string, prefix: string) {
-  const existing = await tx.intern.findMany({
-    where: { organization_id: organizationId, employee_code: { startsWith: prefix } },
-    select: { employee_code: true },
-  })
-  const highest = existing.reduce((max, row) => Math.max(max, parseEmployeeCode(row.employee_code, prefix) ?? 0), 0)
+  const highest = await counterRepository.highestEmployeeCode(tx, organizationId, prefix)
   const value = await counterRepository.next(tx, organizationId, EMPLOYEE_CODE_COUNTER_KEY, highest + 1)
   return formatEmployeeCode(value, prefix)
+}
+
+/** Headline figures from per-status counts ("completed" includes alumni). */
+function statusTotals(byStatus: Partial<Record<InternStatus, number>>) {
+  const count = (status: InternStatus) => byStatus[status] ?? 0
+  return {
+    total: Object.values(byStatus).reduce((sum, n) => sum + (n ?? 0), 0),
+    active: count('ACTIVE'),
+    onboarding: count('ONBOARDING'),
+    endingSoon: count('ENDING_SOON'),
+    completed: count('COMPLETED') + count('ALUMNI'),
+    selected: count('SELECTED'),
+  }
 }
 
 // ── Service ─────────────────────────────────────────────────────────────────
@@ -211,19 +223,7 @@ export const internService = {
       internRepository.directoryPage(where, { filter, sort: query.sort, dir: query.dir, ...skipTake(pagination) }),
       internRepository.countByStatus(where),
     ])
-    const count = (status: InternStatus) => byStatus[status] ?? 0
-    return {
-      query,
-      page: toPage(rows, total, pagination),
-      stats: {
-        total: Object.values(byStatus).reduce((sum, n) => sum + (n ?? 0), 0),
-        active: count('ACTIVE'),
-        onboarding: count('ONBOARDING'),
-        endingSoon: count('ENDING_SOON'),
-        completed: count('COMPLETED') + count('ALUMNI'),
-        selected: count('SELECTED'),
-      },
-    }
+    return { query, page: toPage(rows, total, pagination), stats: statusTotals(byStatus) }
   },
 
   async list(ctx: RequestContext, pagination: Pagination, filter: { status?: InternStatus } = {}) {
@@ -365,8 +365,13 @@ export const internService = {
       where: { organization_id_email: { organization_id: org, email: data.email } },
       select: { id: true, status: true, deleted_at: true, intern: { select: { id: true, employee_code: true, deleted_at: true } } },
     })
-    if (existing?.intern && !existing.intern.deleted_at) {
-      throw new ConflictError(`This person is already an intern (${existing.intern.employee_code})`)
+    if (existing?.intern) {
+      // interns.user_id is unique: an archived (soft-deleted) record is kept for history, not replaced.
+      throw new ConflictError(
+        existing.intern.deleted_at
+          ? `This email belongs to an archived intern record (${existing.intern.employee_code}). Ask an administrator to restore it.`
+          : `This person is already an intern (${existing.intern.employee_code})`,
+      )
     }
     if (existing && !existing.deleted_at && (existing.status === 'ACTIVE' || existing.status === 'SUSPENDED')) {
       throw new ConflictError('This email belongs to an existing staff account')
@@ -478,10 +483,7 @@ export const internService = {
     await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.INTERNSHIP_CREATED, resourceType: 'internship', resourceId: result.internship.id, metadata: { internId: result.intern.id } })
     if (data.managerId) await auditService.logForContext(ctx, { ...base, action: AUDIT_ACTIONS.MANAGER_ASSIGNED, metadata: { managerId: data.managerId } })
     if (data.mentorId) await auditService.logForContext(ctx, { ...base, action: AUDIT_ACTIONS.MENTOR_ASSIGNED, metadata: { mentorId: data.mentorId } })
-    if (result.onboarding) {
-      await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.ONBOARDING_CREATED, resourceType: 'onboarding', resourceId: result.onboarding.onboardingId, metadata: { internId: result.intern.id, template: result.onboarding.templateName } })
-      await domainEvents.emit('onboarding.created', { organizationId: org, actorUserId: ctx.actor.userId, payload: { internId: result.intern.id, onboardingId: result.onboarding.onboardingId, itemCount: result.onboarding.itemCount } })
-    }
+    if (result.onboarding) await announceOnboarding(ctx, result.intern.id, result.onboarding)
     await domainEvents.emit('intern.created', { organizationId: org, actorUserId: ctx.actor.userId, payload: { internId: result.intern.id, userId: result.user.id, invited: Boolean(result.issued) } })
 
     let invitation: { delivery: 'email' | 'link'; inviteUrl: string | null } | null = null
@@ -597,15 +599,18 @@ export const internService = {
     const newName = data.userId
       ? fullName(await prisma.user.findUniqueOrThrow({ where: { id: data.userId }, select: { first_name: true, last_name: true, display_name: true } }))
       : null
-    await prisma.$transaction(async (tx) => {
+    const moved = await prisma.$transaction(async (tx) => {
       await tx.intern.update({ where: { id: r.id }, data: { [field]: data.userId } })
       if (internship) await tx.internship.update({ where: { id: internship.id }, data: { [field]: data.userId } })
       // Open onboarding items owned by the old manager/mentor move to the new one.
-      if (internship) {
-        await tx.onboardingItem.updateMany({
-          where: { internship_id: internship.id, assigned_role: data.role === 'manager' ? 'MANAGER' : 'MENTOR', status: { notIn: ['COMPLETED', 'SKIPPED'] } },
-          data: { assigned_to: data.userId },
-        })
+      const moved = internship
+        ? await tx.onboardingItem.findMany({
+            where: { internship_id: internship.id, assigned_role: data.role === 'manager' ? 'MANAGER' : 'MENTOR', status: { notIn: ['COMPLETED', 'SKIPPED'] } },
+            select: { id: true },
+          })
+        : []
+      if (moved.length) {
+        await tx.onboardingItem.updateMany({ where: { id: { in: moved.map((item) => item.id) } }, data: { assigned_to: data.userId } })
       }
       await lifecycleRepository.record(tx, {
         organizationId: ctx.organization.id,
@@ -615,6 +620,7 @@ export const internService = {
         actorUserId: ctx.actor.userId,
         metadata: { from: previous, to: data.userId },
       })
+      return moved
     })
     await auditService.logForContext(ctx, {
       action: data.role === 'manager' ? AUDIT_ACTIONS.MANAGER_ASSIGNED : AUDIT_ACTIONS.MENTOR_ASSIGNED,
@@ -630,6 +636,10 @@ export const internService = {
           ? { internId: r.id, managerId: data.userId, previousManagerId: previous }
           : { internId: r.id, mentorId: data.userId, previousMentorId: previous },
     } as never)
+    if (data.userId) {
+      const assigneeId = data.userId
+      await emitItemAssignments(ctx, r.id, moved.map((item) => ({ itemId: item.id, assigneeId })))
+    }
     return { changed: true }
   },
 
@@ -651,7 +661,11 @@ export const internService = {
     await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.INTERN_UPDATED, resourceType: 'intern', resourceId: internId, metadata: { fields: Object.keys(data), self: true } })
   },
 
-  /** Interns the viewer manages or mentors, with progress summaries. */
+  /**
+   * Interns the viewer manages or mentors, with progress summaries. Open task
+   * counts are included only when the viewer may read tasks (their interns'
+   * tasks are within an ASSIGNED task scope).
+   */
   async related(ctx: RequestContext, relation: 'managed' | 'mentored') {
     authorizationService.require(ctx, 'intern.read')
     const today = todayIn(ctx.organization.timezone)
@@ -659,14 +673,31 @@ export const internService = {
       ctx.organization.id,
       relation === 'managed' ? { managerId: ctx.actor.userId } : { mentorId: ctx.actor.userId },
     )
+    const taskGrant = ctx.actor.permissions.get('task.read')
+    const openTasks = taskGrant
+      ? await internRepository.openTaskCounts(taskScope(ctx.actor, taskGrant), rows.map((row) => row.user.id))
+      : null
     return rows.map(({ internships, ...row }) => {
       const internship = internships[0]
       return {
         ...row,
         progress: internshipProgress({ start: internship?.start_date ?? row.joining_date, expectedEnd: internship?.expected_end_date ?? row.expected_end_date, actualEnd: internship?.actual_end_date, status: row.status, today }),
         onboarding: internship?.onboarding ? onboardingProgress(internship.onboarding_items, today) : null,
+        openTasks: openTasks ? (openTasks.get(row.user.id) ?? 0) : null,
       }
     })
+  },
+
+  /** Programme headline figures for HR/Admin dashboards (intern.create + intern.read scope). */
+  async programmeTotals(ctx: RequestContext) {
+    authorizationService.require(ctx, 'intern.create')
+    const scope = internScope(ctx.actor, authorizationService.require(ctx, 'intern.read'))
+    const today = todayIn(ctx.organization.timezone)
+    const [byStatus, upcomingJoins] = await Promise.all([
+      internRepository.countByStatus(scope),
+      internRepository.countFiltered(scope, { joinedFrom: today, joinedTo: addDays(today, UPCOMING_JOIN_DAYS) }),
+    ])
+    return { ...statusTotals(byStatus), upcomingJoins }
   },
 
   /** Lifecycle timeline (staff with access to the record; not the intern themself). */
@@ -714,14 +745,24 @@ export const internService = {
     const today = todayIn(ctx.organization.timezone)
     const page = (filter: InternDirectoryFilter, sort: (typeof INTERN_SORTS)[number], dir: 'asc' | 'desc') =>
       internRepository.directoryPage(scope, { filter, sort, dir, skip: 0, take: 6 }).then(([rows]) => rows)
-    const [byStatus, endingSoon, joining, recent, unassigned] = await Promise.all([
+    const joinWindow = { joinedFrom: today, joinedTo: addDays(today, UPCOMING_JOIN_DAYS) }
+    const [byStatus, endingSoon, joining, recent, unassigned, upcomingJoins] = await Promise.all([
       internRepository.countByStatus(scope),
       page({ status: 'ENDING_SOON' }, 'end', 'asc'),
       page({ joinedFrom: today }, 'joining', 'asc'),
       page({}, 'created', 'desc'),
       internRepository.countUnassigned(scope, ['SELECTED', 'ONBOARDING', 'ACTIVE', 'ENDING_SOON']),
+      internRepository.countFiltered(scope, joinWindow),
     ])
-    return { byStatus, endingSoon, joining, recent, unassigned }
+    return {
+      byStatus,
+      totals: statusTotals(byStatus),
+      upcomingJoins,
+      endingSoon,
+      joining,
+      recent,
+      unassigned,
+    }
   },
 
   async relationCounts(ctx: RequestContext) {

@@ -35,7 +35,21 @@ function Section({ title, description, children }: { title: string; description?
 }
 
 /** HR "Add intern" form. Every rule is re-checked by internService.create on the server. */
-export function CreateInternForm({ options, canInvite }: { options: InternFormOptions; canInvite: boolean }) {
+export function CreateInternForm(props: { options: InternFormOptions; canInvite: boolean }) {
+  // Remounting (new key) is how "Add another intern" starts over with a blank form.
+  const [round, setRound] = React.useState(0)
+  return <CreateInternFormBody key={round} {...props} onAddAnother={() => setRound((n) => n + 1)} />
+}
+
+function CreateInternFormBody({
+  options,
+  canInvite,
+  onAddAnother,
+}: {
+  options: InternFormOptions
+  canInvite: boolean
+  onAddAnother: () => void
+}) {
   const [state, action] = useActionState(createInternAction, idle)
   const [dirty, setDirty] = React.useState(false)
   const [departmentId, setDepartmentId] = React.useState(state.values?.departmentId ?? '')
@@ -86,9 +100,9 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
             <Link href={`/interns/${result.internId}`} className={buttonVariants()}>
               Open profile
             </Link>
-            <a href="/interns/new" className={buttonVariants({ variant: 'outline' })}>
+            <Button type="button" variant="outline" onClick={onAddAnother}>
               Add another intern
-            </a>
+            </Button>
           </div>
         </CardContent>
       </Card>

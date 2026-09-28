@@ -51,7 +51,8 @@ describe('authorization matrix (Prompt 02 §54)', () => {
     const other = await prisma.intern.findFirstOrThrow({
       where: { user: { email: { not: 'intern@ayavacreatives.com' } } },
     })
-    await expect(internService.getById(intern, other.id)).rejects.toBeInstanceOf(ForbiddenError)
+    // Out of scope is indistinguishable from missing (no existence leak).
+    await expect(internService.getProfile(intern, other.id)).rejects.toBeInstanceOf(NotFoundError)
     await expect(internService.list(intern, page)).rejects.toBeInstanceOf(ForbiddenError)
   })
 
@@ -81,10 +82,10 @@ describe('authorization matrix (Prompt 02 §54)', () => {
   it('manager → assigned intern: ALLOW; unrelated intern: DENY (404)', async () => {
     const manager = await contextFor('manager@ayavacreatives.com')
     const assigned = await prisma.intern.findFirstOrThrow({ where: { manager_id: manager.actor.userId } })
-    await expect(internService.getById(manager, assigned.id)).resolves.toMatchObject({ id: assigned.id })
+    await expect(internService.getProfile(manager, assigned.id)).resolves.toMatchObject({ id: assigned.id })
 
     const { intern } = await unrelatedIntern()
-    await expect(internService.getById(manager, intern.id)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(internService.getProfile(manager, intern.id)).rejects.toBeInstanceOf(NotFoundError)
     const list = await internService.list(manager, page)
     expect(list.items.some((row) => row.id === intern.id)).toBe(false)
     expect(list.items.length).toBeGreaterThan(0)
@@ -94,8 +95,9 @@ describe('authorization matrix (Prompt 02 §54)', () => {
     const manager = await contextFor('manager@ayavacreatives.com')
     const assigned = await prisma.intern.findFirstOrThrow({ where: { manager_id: manager.actor.userId } })
     await prisma.user.update({ where: { id: assigned.user_id }, data: { phone: '+91 98765 43210' } })
-    const detail = await internService.getById(manager, assigned.id)
-    expect(detail.user.phone).toBe('••••••3210')
+    const detail = await internService.getProfile(manager, assigned.id)
+    expect(detail.phone).toBe('••••••3210')
+    expect(detail.emergencyContacts).toBeNull()
     await expect(userService.list(manager, page)).rejects.toBeInstanceOf(ForbiddenError)
   })
 
@@ -103,8 +105,8 @@ describe('authorization matrix (Prompt 02 §54)', () => {
     const hr = await contextFor('hr@ayavacreatives.com')
     const { intern } = await unrelatedIntern()
     await prisma.user.update({ where: { id: intern.user_id }, data: { phone: '+91 90000 11111' } })
-    const detail = await internService.getById(hr, intern.id)
-    expect(detail.user.phone).toBe('+91 90000 11111')
+    const detail = await internService.getProfile(hr, intern.id)
+    expect(detail.phone).toBe('+91 90000 11111')
   })
 
   it('intern → audit logs: DENY, and the denial itself is audited', async () => {
@@ -220,7 +222,7 @@ describe('privilege escalation (Prompt 02 §30, §55)', () => {
       data: { organization_id: other.id, user_id: user.id, employee_code: 'EXT-1' },
     })
     const hr = await contextFor('hr@ayavacreatives.com')
-    await expect(internService.getById(hr, foreignIntern.id)).rejects.toBeInstanceOf(NotFoundError)
+    await expect(internService.getProfile(hr, foreignIntern.id)).rejects.toBeInstanceOf(NotFoundError)
   })
 
   it('malformed ids are rejected as validation errors, not database errors', async () => {

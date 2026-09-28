@@ -35,7 +35,7 @@ export function FormMessage({ status, message }: { status: 'idle' | 'success' | 
 export function SubmitButton({ children, pendingLabel, ...props }: ButtonProps & { pendingLabel?: string }) {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" disabled={pending || props.disabled} aria-busy={pending} {...props}>
+    <Button type="submit" {...props} disabled={pending || props.disabled} aria-busy={pending}>
       {pending && <Loader2 className="animate-spin" aria-hidden />}
       {pending ? (pendingLabel ?? children) : children}
     </Button>

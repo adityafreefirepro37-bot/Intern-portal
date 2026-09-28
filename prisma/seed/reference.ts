@@ -154,6 +154,9 @@ export async function seedReference(prisma: PrismaClient) {
     { key: 'work_week', value: { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] } },
     { key: 'attendance.late_after', value: { time: '10:15' } },
     { key: 'internship.default_duration_weeks', value: { weeks: 12 } },
+    // Read by settingsService (defaults apply if an admin removes them).
+    { key: 'internship.ending_soon_days', value: { days: 14 } },
+    { key: 'intern.employee_code_prefix', value: { prefix: 'AYV-INT-' } },
   ]
   for (const setting of settingSeeds) {
     await prisma.setting.upsert({

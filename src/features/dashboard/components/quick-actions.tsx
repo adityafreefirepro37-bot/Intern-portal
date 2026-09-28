@@ -19,7 +19,7 @@ interface QuickAction {
 export function QuickActions({ can }: { can: (permission: string) => boolean }) {
   const actions: QuickAction[] = [
     can('task.create') && { label: 'Create task', icon: ClipboardPlus, phase: '04' },
-    can('intern.create') && { label: 'Add intern', icon: UserPlus, phase: '03' },
+    can('intern.create') && { label: 'Add intern', icon: UserPlus, href: '/interns/new' },
     can('meeting.manage') && { label: 'Schedule meeting', icon: CalendarPlus, phase: '04' },
     can('leave.request') && { label: 'Request leave', icon: Palmtree, phase: '05' },
     can('team.read') && { label: 'Browse teams', icon: UsersRound, href: '/teams' },

@@ -122,7 +122,23 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
           <DialogTitle>Edit {intern.name}</DialogTitle>
           <DialogDescription>Changes to dates are recorded on the timeline.</DialogDescription>
         </DialogHeader>
-        <form action={action} onChange={() => setDirty(true)} className="grid gap-4 sm:grid-cols-2" noValidate>
+        <form
+          action={action}
+          onChange={() => setDirty(true)}
+          onSubmit={(event) => {
+            // Moving internship dates shifts progress and "ending soon" — confirm it.
+            const data = new FormData(event.currentTarget)
+            const datesChanged = data.get('joiningDate') !== intern.joiningDate || data.get('expectedEndDate') !== intern.expectedEndDate
+            if (
+              datesChanged &&
+              !window.confirm('You’re changing the internship dates. Progress, due dates shown to the intern and the “ending soon” status follow the new dates. Continue?')
+            ) {
+              event.preventDefault()
+            }
+          }}
+          className="grid gap-4 sm:grid-cols-2"
+          noValidate
+        >
           <div className="sm:col-span-2">
             <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           </div>
@@ -231,6 +247,10 @@ function AssignDialog({
   const [state, action] = useFormAction(assignInternAction, { onSuccess: onClose })
   const current = role === 'manager' ? intern.managerId : intern.mentorId
   const label = role === 'manager' ? 'Manager' : 'Mentor'
+  const [selected, setSelected] = React.useState(current ?? '')
+  const [confirmed, setConfirmed] = React.useState(false)
+  // Replacing or removing someone already assigned is a high-risk change: confirm it.
+  const replacing = Boolean(current) && selected !== current
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
@@ -248,7 +268,16 @@ function AssignDialog({
           <input type="hidden" name="internId" value={intern.id} />
           <input type="hidden" name="role" value={role} />
           <Field label={label} htmlFor="assign-user" error={state.fields?.userId}>
-            <select id="assign-user" name="userId" defaultValue={current ?? ''} className={inputClassName}>
+            <select
+              id="assign-user"
+              name="userId"
+              value={selected}
+              onChange={(event) => {
+                setSelected(event.target.value)
+                setConfirmed(false)
+              }}
+              className={inputClassName}
+            >
               <option value="">No {label.toLowerCase()}</option>
               {staff.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -257,8 +286,25 @@ function AssignDialog({
               ))}
             </select>
           </Field>
+          {replacing && (
+            <label className="flex items-start gap-2 text-small">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={confirmed}
+                onChange={(event) => setConfirmed(event.target.checked)}
+              />
+              <span>
+                {selected
+                  ? `I want to replace the current ${label.toLowerCase()}. They lose access to this intern unless they have another role for them.`
+                  : `I want to remove the ${label.toLowerCase()}. The intern will have no ${label.toLowerCase()} until one is assigned.`}
+              </span>
+            </label>
+          )}
           <DialogFooter>
-            <SubmitButton pendingLabel="Saving…">Save</SubmitButton>
+            <SubmitButton pendingLabel="Saving…" disabled={replacing && !confirmed}>
+              Save
+            </SubmitButton>
           </DialogFooter>
         </form>
       </DialogContent>

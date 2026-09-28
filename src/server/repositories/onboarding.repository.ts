@@ -84,6 +84,24 @@ export const onboardingRepository = {
     await prisma.onboarding.updateMany({ where: { id: onboardingId }, data: { completed_at: null } })
   },
 
+  /**
+   * Headline counts over every onboarding matching `where` (not just a page of
+   * rows). "Overdue" and "blocked" only count unfinished onboardings; an item
+   * is overdue when its due date is before `today` and it isn't done.
+   */
+  async stats(where: Prisma.OnboardingWhereInput, today: Date) {
+    const open = { AND: [where, { completed_at: null }] }
+    const [total, completed, overdue, blocked] = await prisma.$transaction([
+      prisma.onboarding.count({ where }),
+      prisma.onboarding.count({ where: { AND: [where, { completed_at: { not: null } }] } }),
+      prisma.onboarding.count({
+        where: { AND: [open, { items: { some: { due_date: { lt: today }, status: { notIn: ['COMPLETED', 'SKIPPED'] } } } }] },
+      }),
+      prisma.onboarding.count({ where: { AND: [open, { items: { some: { status: 'BLOCKED' } } }] } }),
+    ])
+    return { total, completed, inProgress: total - completed, overdue, blocked }
+  },
+
   /** Onboarding instances in an organization with item status for dashboards. */
   listInstances(where: Prisma.OnboardingWhereInput, take = 200) {
     return prisma.onboarding.findMany({
@@ -114,17 +132,19 @@ export const onboardingRepository = {
     })
   },
 
-  /** Open items past their due date (for the overdue job). */
-  listOverdueItems(organizationId: string, today: Date, statuses: OnboardingItemStatus[]) {
+  /** Open items that were due on `dueDate` (the overdue job passes yesterday). */
+  listItemsDueOn(organizationId: string, dueDate: Date, statuses: OnboardingItemStatus[], skip = 0, take = 500) {
     return prisma.onboardingItem.findMany({
-      where: { organization_id: organizationId, due_date: { lt: today }, status: { in: statuses } },
+      where: { organization_id: organizationId, due_date: dueDate, status: { in: statuses } },
+      orderBy: { id: 'asc' },
+      skip,
       select: {
         id: true,
         due_date: true,
         assigned_to: true,
         internship: { select: { intern: { select: { id: true, deleted_at: true } } } },
       },
-      take: 1000,
+      take,
     })
   },
 }

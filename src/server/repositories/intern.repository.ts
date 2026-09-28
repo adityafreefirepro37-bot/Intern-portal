@@ -249,6 +249,24 @@ export const internRepository = {
     })
   },
 
+  countFiltered(scope: Prisma.InternWhereInput, filter: InternDirectoryFilter) {
+    return prisma.intern.count({ where: { AND: [scope, { deleted_at: null }, ...filterWhere(filter)] } })
+  },
+
+  /** Open (not completed/cancelled) tasks per assignee, limited to tasks within `taskScope`. */
+  async openTaskCounts(taskScope: Prisma.TaskWhereInput, userIds: string[]): Promise<Map<string, number>> {
+    if (userIds.length === 0) return new Map()
+    const rows = await prisma.taskAssignee.groupBy({
+      by: ['user_id'],
+      where: {
+        user_id: { in: userIds },
+        task: { AND: [taskScope, { deleted_at: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } }] },
+      },
+      _count: { _all: true },
+    })
+    return new Map(rows.map((row) => [row.user_id, row._count._all]))
+  },
+
   /** Current interns missing a manager or a mentor. */
   countUnassigned(scope: Prisma.InternWhereInput, statuses: InternStatus[]) {
     return prisma.intern.count({

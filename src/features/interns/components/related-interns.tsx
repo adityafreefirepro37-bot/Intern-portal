@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/common/states'
 import { UserAvatar } from '@/components/common/user-avatar'
 import { Card } from '@/components/ui/card'
 import type { InternshipProgress, OnboardingProgress } from '@/lib/interns/progress'
-import { fullName } from '@/lib/utils'
+import { formatDay, fullName, pluralize } from '@/lib/utils'
 import { InternshipProgressBar } from './progress'
 
 type Person = { id: string; first_name: string; last_name: string; display_name: string | null; avatar_url: string | null }
@@ -19,8 +19,11 @@ export interface RelatedIntern {
   department: { name: string } | null
   manager: Person | null
   mentor: Person | null
+  expected_end_date?: Date | null
   progress: InternshipProgress
   onboarding: OnboardingProgress | null
+  /** Open tasks assigned to the intern; null when the viewer can't read tasks. */
+  openTasks?: number | null
 }
 
 /** Cards for My Interns / My Mentees. */
@@ -54,16 +57,36 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
                 <StatusBadge status={intern.status} />
               </div>
               <InternshipProgressBar progress={intern.progress} compact />
-              <div className="flex justify-between gap-2 text-caption text-muted-foreground">
-                <span>
-                  {relation === 'managed' ? 'Mentor' : 'Manager'}: {other ? fullName(other) : 'not assigned'}
-                </span>
-                {intern.onboarding && intern.status === 'ONBOARDING' && (
-                  <span className={intern.onboarding.overdue > 0 ? 'text-destructive' : undefined}>
-                    Onboarding {intern.onboarding.percent}%
-                  </span>
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-caption">
+                <div>
+                  <dt className="text-muted-foreground">{relation === 'managed' ? 'Mentor' : 'Manager'}</dt>
+                  <dd>{other ? fullName(other) : 'Not assigned'}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Internship ends</dt>
+                  <dd>{intern.expected_end_date ? formatDay(intern.expected_end_date) : '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Onboarding</dt>
+                  <dd className={intern.onboarding && intern.onboarding.overdue > 0 ? 'text-destructive' : undefined}>
+                    {intern.onboarding
+                      ? `${intern.onboarding.percent}%${intern.onboarding.overdue > 0 ? ` · ${intern.onboarding.overdue} overdue` : ''}`
+                      : 'Not started'}
+                  </dd>
+                </div>
+                {intern.openTasks !== undefined && intern.openTasks !== null && (
+                  <div>
+                    <dt className="text-muted-foreground">Current work</dt>
+                    <dd>{pluralize(intern.openTasks, 'open task')}</dd>
+                  </div>
                 )}
-              </div>
+                {relation === 'mentored' && (
+                  <div className="col-span-2">
+                    <dt className="text-muted-foreground">Learning progress</dt>
+                    <dd className="text-muted-foreground">Available when the Learning Hub launches (Phase 06)</dd>
+                  </div>
+                )}
+              </dl>
             </Card>
           </li>
         )

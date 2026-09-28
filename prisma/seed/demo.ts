@@ -6,8 +6,10 @@ import type {
   TaskPriority,
   TaskStatus,
 } from '@prisma/client'
+import { internshipStatusFor } from '../../src/lib/interns/lifecycle'
 import type { SystemRoleSlug } from '../../src/lib/permissions/catalog'
 import { dateFrom, daysFrom, seedId } from './ids'
+import { seedOnboarding } from './onboarding'
 import type { ReferenceData } from './reference'
 
 /**
@@ -32,6 +34,9 @@ export const DEV_ACCOUNTS: PersonSeed[] = [
   { key: 'manager', email: 'manager@ayavacreatives.com', first: 'Arjun', last: 'Mehta', role: 'manager' },
   { key: 'mentor', email: 'mentor@ayavacreatives.com', first: 'Rohan', last: 'Das', role: 'mentor' },
   { key: 'intern', email: 'intern@ayavacreatives.com', first: 'Aanya', last: 'Sharma', role: 'intern' },
+  // Phase 03: a manager and a mentor for other departments, so manager/mentor scope is visible.
+  { key: 'marketingManager', email: 'marketing.manager@ayavacreatives.com', first: 'Priya', last: 'Kapoor', role: 'manager' },
+  { key: 'designMentor', email: 'design.mentor@ayavacreatives.com', first: 'Sana', last: 'Qureshi', role: 'mentor' },
 ]
 
 const DEMO_INTERNS: PersonSeed[] = [
@@ -41,6 +46,7 @@ const DEMO_INTERNS: PersonSeed[] = [
   { key: 'tara', email: 'tara.menon@demo.ayavacreatives.com', first: 'Tara', last: 'Menon', role: 'intern' },
   { key: 'diya', email: 'diya.patel@demo.ayavacreatives.com', first: 'Diya', last: 'Patel', role: 'intern' },
   { key: 'kabir', email: 'kabir.singh@demo.ayavacreatives.com', first: 'Kabir', last: 'Singh', role: 'intern' },
+  { key: 'rhea', email: 'rhea.kulkarni@demo.ayavacreatives.com', first: 'Rhea', last: 'Kulkarni', role: 'intern' },
 ]
 
 export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = new Date()) {
@@ -91,7 +97,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       slug: 'social-studio',
       name: 'Social Studio',
       department: 'marketing',
-      lead: 'manager',
+      lead: 'marketingManager',
       description: 'Plans, creates and reports on social content.',
     },
     {
@@ -99,7 +105,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       slug: 'brand-design',
       name: 'Brand Design',
       department: 'design',
-      lead: 'mentor',
+      lead: 'designMentor',
       description: 'Identity systems, campaign visuals and templates.',
     },
   ]
@@ -121,6 +127,9 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
   }
 
   // ── Interns and internships ───────────────────────────────────────────────
+  // Managers and mentors follow the department, so scoping is realistic:
+  // Arjun manages Development and Design, Priya manages Marketing; Rohan mentors
+  // Development and Marketing, Sana mentors Design.
   const internSeeds: {
     key: string
     code: string
@@ -130,84 +139,25 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     position: string
     department: string
     team: string
+    manager: string
+    mentor: string
   }[] = [
-    {
-      key: 'intern',
-      code: 'AYV-INT-001',
-      status: 'ACTIVE',
-      joinedDaysAgo: 30,
-      weeks: 12,
-      position: 'web-development-intern',
-      department: 'development',
-      team: 'web',
-    },
-    {
-      key: 'ishaan',
-      code: 'AYV-INT-002',
-      status: 'ACTIVE',
-      joinedDaysAgo: 45,
-      weeks: 12,
-      position: 'social-media-intern',
-      department: 'marketing',
-      team: 'social',
-    },
-    {
-      key: 'zara',
-      code: 'AYV-INT-003',
-      status: 'ACTIVE',
-      joinedDaysAgo: 20,
-      weeks: 12,
-      position: 'graphic-design-intern',
-      department: 'design',
-      team: 'brand',
-    },
-    {
-      key: 'neel',
-      code: 'AYV-INT-004',
-      status: 'ONBOARDING',
-      joinedDaysAgo: 2,
-      weeks: 16,
-      position: 'ai-ml-intern',
-      department: 'development',
-      team: 'web',
-    },
-    {
-      key: 'tara',
-      code: 'AYV-INT-005',
-      status: 'ENDING_SOON',
-      joinedDaysAgo: 78,
-      weeks: 12,
-      position: 'content-writing-intern',
-      department: 'marketing',
-      team: 'social',
-    },
-    {
-      key: 'diya',
-      code: 'AYV-INT-006',
-      status: 'ACTIVE',
-      joinedDaysAgo: 15,
-      weeks: 12,
-      position: 'ui-ux-intern',
-      department: 'design',
-      team: 'brand',
-    },
-    {
-      key: 'kabir',
-      code: 'AYV-INT-007',
-      status: 'SELECTED',
-      joinedDaysAgo: -10,
-      weeks: 12,
-      position: 'digital-marketing-intern',
-      department: 'marketing',
-      team: 'social',
-    },
+    { key: 'intern', code: 'AYV-INT-0001', status: 'ACTIVE', joinedDaysAgo: 30, weeks: 12, position: 'web-development-intern', department: 'development', team: 'web', manager: 'manager', mentor: 'mentor' },
+    { key: 'ishaan', code: 'AYV-INT-0002', status: 'ACTIVE', joinedDaysAgo: 45, weeks: 12, position: 'social-media-intern', department: 'marketing', team: 'social', manager: 'marketingManager', mentor: 'mentor' },
+    { key: 'zara', code: 'AYV-INT-0003', status: 'ACTIVE', joinedDaysAgo: 20, weeks: 12, position: 'graphic-design-intern', department: 'design', team: 'brand', manager: 'manager', mentor: 'designMentor' },
+    { key: 'neel', code: 'AYV-INT-0004', status: 'ONBOARDING', joinedDaysAgo: 2, weeks: 16, position: 'ai-ml-intern', department: 'development', team: 'web', manager: 'manager', mentor: 'mentor' },
+    { key: 'tara', code: 'AYV-INT-0005', status: 'ENDING_SOON', joinedDaysAgo: 78, weeks: 12, position: 'content-writing-intern', department: 'marketing', team: 'social', manager: 'marketingManager', mentor: 'mentor' },
+    { key: 'diya', code: 'AYV-INT-0006', status: 'ACTIVE', joinedDaysAgo: 15, weeks: 12, position: 'ui-ux-intern', department: 'design', team: 'brand', manager: 'manager', mentor: 'designMentor' },
+    { key: 'kabir', code: 'AYV-INT-0007', status: 'SELECTED', joinedDaysAgo: -10, weeks: 12, position: 'digital-marketing-intern', department: 'marketing', team: 'social', manager: 'marketingManager', mentor: 'mentor' },
+    { key: 'rhea', code: 'AYV-INT-0008', status: 'COMPLETED', joinedDaysAgo: 100, weeks: 12, position: 'graphic-design-intern', department: 'design', team: 'brand', manager: 'manager', mentor: 'designMentor' },
   ]
 
   const internIds: Record<string, string> = {}
   const internshipIds: Record<string, string> = {}
   for (const seed of internSeeds) {
     const joining = dateFrom(now, -seed.joinedDaysAgo)
-    const expectedEnd = dateFrom(joining, seed.weeks * 7)
+    const expectedEnd = dateFrom(joining, seed.weeks * 7 - 1)
+    const finished = seed.status === 'COMPLETED' || seed.status === 'ALUMNI'
     const data = {
       organization_id: orgId,
       user_id: userIds[seed.key],
@@ -218,8 +168,9 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       department_id: ref.departmentIds[seed.department],
       team_id: teamIds[seed.team],
       position_id: ref.positionIds[seed.position],
-      manager_id: userIds.manager,
-      mentor_id: userIds.mentor,
+      manager_id: userIds[seed.manager],
+      mentor_id: userIds[seed.mentor],
+      actual_end_date: finished ? expectedEnd : null,
     }
     const intern = await prisma.intern.upsert({
       where: { user_id: userIds[seed.key] },
@@ -237,11 +188,12 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       position_id: ref.positionIds[seed.position],
       start_date: joining,
       expected_end_date: expectedEnd,
-      status: seed.status === 'SELECTED' ? ('PLANNED' as const) : ('ACTIVE' as const),
+      status: internshipStatusFor(seed.status),
+      actual_end_date: finished ? expectedEnd : null,
       work_mode: seed.key === 'zara' ? ('ONSITE' as const) : ('HYBRID' as const),
       location: 'Bengaluru',
-      manager_id: userIds.manager,
-      mentor_id: userIds.mentor,
+      manager_id: userIds[seed.manager],
+      mentor_id: userIds[seed.mentor],
     }
     await prisma.internship.upsert({
       where: { id: internshipId },
@@ -267,30 +219,35 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     },
   })
 
-  // Onboarding checklist for the newest intern
-  const onboardingSeeds = [
-    { title: 'Sign NDA and offer letter', type: 'DOCUMENT', status: 'COMPLETED', due: -1 },
-    { title: 'Set up workspace accounts', type: 'ACCOUNT_SETUP', status: 'COMPLETED', due: 0 },
-    { title: 'Complete Ayava Orientation course', type: 'TRAINING', status: 'IN_PROGRESS', due: 3 },
-    { title: 'Intro call with mentor', type: 'MEETING', status: 'PENDING', due: 2 },
-    { title: 'Ship first starter task', type: 'TASK', status: 'PENDING', due: 7 },
-  ] as const
-  for (const [index, item] of onboardingSeeds.entries()) {
-    const id = seedId(`onboarding:neel:${index}`)
-    const data = {
-      organization_id: orgId,
-      internship_id: internshipIds.neel,
-      title: item.title,
-      item_type: item.type,
-      status: item.status,
-      due_date: dateFrom(now, item.due),
-      assigned_to: userIds.neel,
-      completed_at: item.status === 'COMPLETED' ? daysFrom(now, item.due) : null,
-      completed_by: item.status === 'COMPLETED' ? userIds.neel : null,
-      sort_order: index,
-    }
-    await prisma.onboardingItem.upsert({ where: { id }, update: data, create: { id, ...data } })
-  }
+  await prisma.emergencyContact.upsert({
+    where: { id: seedId('emergency:intern') },
+    update: {},
+    create: {
+      id: seedId('emergency:intern'),
+      intern_id: internIds.intern,
+      name: 'Rakesh Sharma',
+      relationship: 'Parent',
+      phone: '+91 98450 00000',
+    },
+  })
+
+  // Onboarding templates, policies, per-intern checklists and lifecycle history.
+  await seedOnboarding(prisma, {
+    organizationId: orgId,
+    departmentIds: ref.departmentIds,
+    userIds,
+    interns: internSeeds.map((seed) => ({
+      key: seed.key,
+      status: seed.status,
+      department: seed.department,
+      internId: internIds[seed.key],
+      internshipId: internshipIds[seed.key],
+      joiningDate: dateFrom(now, -seed.joinedDaysAgo),
+      managerKey: seed.manager,
+      mentorKey: seed.mentor,
+    })),
+    now,
+  })
 
   // ── Projects, milestones, tasks ───────────────────────────────────────────
   const projectSeeds: {

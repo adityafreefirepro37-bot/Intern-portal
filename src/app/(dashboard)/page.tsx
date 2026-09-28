@@ -5,6 +5,7 @@ import { StatCard } from '@/components/common/stat-card'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ActivityFeed } from '@/features/dashboard/components/activity-feed'
+import { MyInternshipCard, ProgrammeStats, RelatedInternsCard } from '@/features/dashboard/components/internship-sections'
 import { ProjectProgress } from '@/features/dashboard/components/project-progress'
 import { QuickActions } from '@/features/dashboard/components/quick-actions'
 import { TaskStatusBreakdown } from '@/features/dashboard/components/task-status-breakdown'
@@ -19,7 +20,7 @@ export default async function OverviewPage() {
   const ctx = await requirePageContext()
   const now = new Date()
   const overview = await dashboardService.getOverview(ctx, now)
-  const { stats } = overview
+  const { stats, internship } = overview
   const firstName = ctx.actor.displayName.split(' ')[0]
   const timeZone = ctx.organization.timezone
 
@@ -78,6 +79,8 @@ export default async function OverviewPage() {
         <p className="text-body text-muted-foreground">Here’s today’s overview for {ctx.organization.name}.</p>
       </header>
 
+      {internship.programme && <ProgrammeStats programme={internship.programme} />}
+
       {statCards.length > 0 && (
         <section aria-label="Today’s overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {statCards}
@@ -86,6 +89,13 @@ export default async function OverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {internship.self && <MyInternshipCard self={internship.self} />}
+          {(internship.managed || internship.mentored) && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {internship.managed && <RelatedInternsCard interns={internship.managed} relation="managed" />}
+              {internship.mentored && <RelatedInternsCard interns={internship.mentored} relation="mentored" />}
+            </div>
+          )}
           {overview.upcomingTasks && (
             <Card>
               <CardHeader className="flex-row items-center justify-between">
