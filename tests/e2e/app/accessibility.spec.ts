@@ -10,6 +10,10 @@ const PAGES = [
   '/tasks',
   '/projects',
   '/interns',
+  '/interns/new',
+  '/hr',
+  '/onboarding',
+  '/onboarding/templates',
   '/teams',
   '/learning',
   '/announcements',
@@ -34,6 +38,18 @@ for (const path of PAGES) {
     expect(summary).toEqual([])
   })
 }
+
+test('intern profile tabs and onboarding checklist are accessible', async ({ page }) => {
+  await page.goto('/interns?q=AYV-INT-0004')
+  await page.getByRole('link', { name: 'Neel Joshi' }).first().click()
+  await page.getByRole('heading', { level: 1 }).first().waitFor()
+  for (const tab of ['', '?tab=internship', '?tab=onboarding', '?tab=documents', '?tab=activity']) {
+    await page.goto(`${new URL(page.url()).pathname}${tab}`)
+    await page.getByRole('heading', { level: 1 }).first().waitFor()
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+    expect(results.violations.map((v) => `${tab || 'overview'}: ${v.id} ${v.nodes[0]?.target.join(' ')}`)).toEqual([])
+  }
+})
 
 test('command menu dialog is accessible', async ({ page, isMobile }) => {
   test.skip(isMobile, 'desktop keyboard shortcut')

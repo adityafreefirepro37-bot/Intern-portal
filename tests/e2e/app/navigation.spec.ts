@@ -47,8 +47,12 @@ test.describe('primary routes', () => {
 test.describe('overview dashboard', () => {
   test('shows figures from the database', async ({ page }) => {
     await page.goto('/')
+    // Admins see the internship programme figures in their own section.
+    const programme = page.getByRole('region', { name: 'Internship programme' })
+    for (const label of ['Total interns', 'Active', 'Onboarding', 'Ending soon', 'Upcoming joins', 'Onboarding overdue']) {
+      await expect(programme.getByText(label, { exact: true })).toBeVisible()
+    }
     const stats = page.getByRole('region', { name: 'Today’s overview' })
-    await expect(stats.getByText('Active interns', { exact: true })).toBeVisible()
     await expect(stats.getByText('Open tasks', { exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Upcoming deadlines' })).toBeVisible()
   })

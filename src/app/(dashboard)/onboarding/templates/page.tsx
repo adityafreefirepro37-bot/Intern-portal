@@ -29,7 +29,7 @@ export default async function TemplatesPage() {
       {templates.length === 0 ? (
         <EmptyState icon={LayoutTemplate} title="No templates yet" description="Create one to start onboarding interns." />
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {templates.map((template) => (
             <li key={template.id}>
               <Card className="relative h-full space-y-3 p-5 transition-colors hover:border-ring/40">

@@ -157,13 +157,13 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       <ProfileTabs tabs={tabs} active={tab} basePath={basePath} />
 
       {tab === 'overview' && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Email" value={profile.email} />
                 <Detail label="Phone" value={profile.phone} />
                 <Detail label="Department" value={profile.department?.name} />
@@ -255,7 +255,7 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
             {profile.internship?.description && <CardDescription className="whitespace-pre-line">{profile.internship.description}</CardDescription>}
           </CardHeader>
           <CardContent>
-            <dl className="grid gap-4 sm:grid-cols-3">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Detail label="Status" value={<StatusBadge status={profile.status} />} />
               <Detail label="Joining date" value={formatDay(profile.joiningDate)} />
               <Detail label="Expected end" value={formatDay(profile.expectedEndDate)} />

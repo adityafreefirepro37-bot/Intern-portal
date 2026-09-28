@@ -12,11 +12,18 @@ loadEnvConfig(process.cwd())
  *            development accounts linked via SEED_DEV_PASSWORD (see
  *            docs/authentication.md). Without those they are skipped.
  *
- * Browser: Playwright's Chromium (`npx playwright install chromium`), or an
- * installed browser via PLAYWRIGHT_CHANNEL=msedge / chrome.
+ * Browser: Playwright's Chromium (`npx playwright install chromium`), an
+ * installed browser via PLAYWRIGHT_CHANNEL=msedge / chrome, or a binary via
+ * PLAYWRIGHT_EXECUTABLE_PATH.
+ *
+ * Without a Supabase project, `npm run test:e2e:local` runs everything against
+ * a mock Auth server (tests/e2e/mock-auth).
  */
 const channel = process.env.PLAYWRIGHT_CHANNEL || undefined
-const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3000'
+// A specific browser binary (e.g. a preinstalled Chromium in CI containers).
+const executablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined
+const port = Number(process.env.E2E_PORT ?? 3000)
+const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${port}`
 const signedIn = { storageState: 'playwright/.auth/admin.json' }
 
 export default defineConfig({
@@ -29,7 +36,7 @@ export default defineConfig({
   globalSetup: './tests/e2e/global-setup.ts',
   // The dev server compiles routes on first use; allow for that on network-bound steps.
   expect: { timeout: 15_000 },
-  use: { baseURL, trace: 'on-first-retry' },
+  use: { baseURL, trace: 'on-first-retry', ...(executablePath ? { launchOptions: { executablePath } } : {}) },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/, use: { channel } },
     { name: 'public-desktop', testMatch: /public.*\.spec\.ts/, use: { ...devices['Desktop Chrome'], channel } },
@@ -50,7 +57,7 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: 'npm run dev',
+        command: `npm run dev -- --port ${port}`,
         url: `${baseURL}/api/health`,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

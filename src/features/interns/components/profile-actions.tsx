@@ -136,7 +136,7 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
               event.preventDefault()
             }
           }}
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
           noValidate
         >
           <div className="sm:col-span-2">

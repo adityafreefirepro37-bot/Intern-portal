@@ -16,7 +16,7 @@ test.describe('sessions', () => {
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('returns to the requested page after sign-in, never off-site', async ({ page }) => {
+  test('returns to the requested page after sign-in, never off-site', async ({ page, baseURL }) => {
     await signIn(page, 'admin', '/projects')
     await expect(page).toHaveURL(/\/projects$/)
     await page.context().clearCookies()
@@ -24,7 +24,7 @@ test.describe('sessions', () => {
     await page.getByLabel('Email').fill('admin@ayavacreatives.com')
     await page.getByLabel('Password', { exact: true }).fill(process.env.SEED_DEV_PASSWORD ?? '')
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page).toHaveURL('http://localhost:3000/')
+    await expect(page).toHaveURL(new URL('/', baseURL).toString())
   })
 
   test('logout ends access, including via the back button and other tabs', async ({ page, context }) => {
@@ -60,9 +60,10 @@ test.describe('sessions', () => {
     await expect(page.getByRole('heading', { name: 'You don’t have access' })).toBeVisible()
     await page.goto('/audit-logs')
     await expect(page.getByRole('heading', { name: 'You don’t have access' })).toBeVisible()
-    // Direct API access is enforced server-side too.
+    // Direct API access is enforced server-side too: another intern's record is
+    // indistinguishable from a missing one.
     const response = await page.request.get('/api/interns/00000000-0000-4000-8000-000000000000')
-    expect(response.status()).toBe(403)
+    expect(response.status()).toBe(404)
   })
 
   test('a manager gets 404 for an intern outside their scope (IDOR)', async ({ page }) => {

@@ -16,6 +16,8 @@ export const ACCOUNTS = {
   manager: 'manager@ayavacreatives.com',
   mentor: 'mentor@ayavacreatives.com',
   intern: 'intern@ayavacreatives.com',
+  marketingManager: 'marketing.manager@ayavacreatives.com',
+  designMentor: 'design.mentor@ayavacreatives.com',
 } as const
 
 export type AccountRole = keyof typeof ACCOUNTS

@@ -82,16 +82,16 @@ export default async function OverviewPage() {
       {internship.programme && <ProgrammeStats programme={internship.programme} />}
 
       {statCards.length > 0 && (
-        <section aria-label="Today’s overview" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section aria-label="Today’s overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {statCards}
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {internship.self && <MyInternshipCard self={internship.self} />}
           {(internship.managed || internship.mentored) && (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {internship.managed && <RelatedInternsCard interns={internship.managed} relation="managed" />}
               {internship.mentored && <RelatedInternsCard interns={internship.mentored} relation="mentored" />}
             </div>
@@ -115,7 +115,7 @@ export default async function OverviewPage() {
             </Card>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {overview.projects && (
               <Card>
                 <CardHeader>

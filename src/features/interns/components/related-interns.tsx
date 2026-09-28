@@ -38,7 +38,7 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
     )
   }
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {interns.map((intern) => {
         const other = relation === 'managed' ? intern.mentor : intern.manager
         return (
@@ -68,10 +68,13 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Onboarding</dt>
-                  <dd className={intern.onboarding && intern.onboarding.overdue > 0 ? 'text-destructive' : undefined}>
-                    {intern.onboarding
-                      ? `${intern.onboarding.percent}%${intern.onboarding.overdue > 0 ? ` · ${intern.onboarding.overdue} overdue` : ''}`
-                      : 'Not started'}
+                  {/* Overdue matters only while onboarding is unfinished (open optional items don't block it). */}
+                  <dd className={intern.onboarding && !intern.onboarding.complete && intern.onboarding.overdue > 0 ? 'text-destructive' : undefined}>
+                    {!intern.onboarding
+                      ? 'Not started'
+                      : intern.onboarding.complete
+                        ? 'Complete'
+                        : `${intern.onboarding.percent}%${intern.onboarding.overdue > 0 ? ` · ${intern.onboarding.overdue} overdue` : ''}`}
                   </dd>
                 </div>
                 {intern.openTasks !== undefined && intern.openTasks !== null && (

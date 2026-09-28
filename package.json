@@ -14,6 +14,7 @@
     "test:integration": "jest --selectProjects integration --runInBand",
     "test:all": "jest --runInBand",
     "test:e2e": "playwright test",
+    "test:e2e:local": "node tests/e2e/mock-auth/run.mjs",
     "db:local": "node scripts/local-db.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

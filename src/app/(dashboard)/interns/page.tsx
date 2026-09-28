@@ -109,7 +109,7 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
       ) : (
         <>
           {/* Mobile: cards */}
-          <ul className="grid gap-3 md:hidden" aria-label="Interns">
+          <ul className="grid grid-cols-1 gap-3 md:hidden" aria-label="Interns">
             {page.items.map((intern) => (
               <li key={intern.id}>
                 <Card className="relative p-4">
