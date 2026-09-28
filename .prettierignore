@@ -1,0 +1,14 @@
+.next
+node_modules
+.local
+_archive
+coverage
+playwright-report
+test-results
+package-lock.json
+prisma/migrations
+.agents
+.claude
+.cursor
+.devin
+*.md
