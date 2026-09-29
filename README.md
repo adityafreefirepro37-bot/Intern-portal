@@ -142,6 +142,7 @@ Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages S
 | `npm run db:studio`         | Prisma Studio                                                  |
 | `npm run admin:invite`      | Print a one-time Super Admin invitation link (bootstrap)       |
 | `npm run jobs:daily`        | Daily jobs: ending-soon status, overdue onboarding events      |
+| `npm run email:test -- you@example.com` | Check email settings (SMTP login) and send a test message |
 
 ## Testing
 
@@ -166,7 +167,10 @@ Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages S
 1. Provision PostgreSQL (Supabase recommended). Set `DATABASE_URL` (pooled) and `DIRECT_URL` (direct) — see
    `.env.example`.
 2. Set `NODE_ENV=production`, `NEXT_PUBLIC_APP_URL`, the Supabase keys (a **separate** Supabase project from
-   development) and email delivery (`EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM`). Do **not** set
+   development) and email delivery: `EMAIL_PROVIDER=smtp` with `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`
+   (e.g. your Hostinger mailbox), or `EMAIL_PROVIDER=resend` with `EMAIL_API_KEY`, plus `EMAIL_FROM`; check it with
+   `npm run email:test -- you@example.com`, and set the same SMTP in Supabase for password-reset emails
+   ([details](docs/authentication.md#email)). Do **not** set
    `SEED_DEV_PASSWORD`. In Supabase, set the Site URL and add `https://<your-domain>/auth/confirm` as a redirect URL.
 3. `npm ci && npm run db:migrate:deploy && npm run db:seed && npm run build && npm start` (the seed only writes
    reference data in production). Works on Vercel, Railway, Render or any Node host.

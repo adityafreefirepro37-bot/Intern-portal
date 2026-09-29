@@ -107,7 +107,7 @@ Masking helpers: `src/lib/security/masking.ts`. Services select only the fields 
 - Requires `user.invite`; the role must be assignable by the inviter.
 - Creates (or reuses) the profile as `INVITED` with that role, and an invitation holding only the **SHA-256 hash** of a
   32-byte random token. Newer invitations revoke older ones.
-- Delivery: email via Resend when configured. In development without email, the link is shown **once** to the
+- Delivery: email via SMTP or Resend when configured. In development without email, the link is shown **once** to the
   inviting admin (never logged); production refuses to create invitations without email delivery.
 - Acceptance (`/invite/{token}`) is rate-limited, checks the password policy, **atomically claims** the invitation
   (single use, unexpired, unrevoked), creates the Supabase account (confirmation email sent when enabled) and activates

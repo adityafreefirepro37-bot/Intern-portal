@@ -113,7 +113,8 @@ the build if imported by client code. The `settings` table never holds secrets. 
 - [ ] `NODE_ENV=production`; `SEED_DEV_PASSWORD` unset; separate Supabase project
 - [ ] Supabase keys and database URLs from a secret manager; database over TLS
 - [ ] `npm run db:migrate:deploy`, then `npm run db:seed` (reference data only)
-- [ ] Email delivery configured (required for invitations in production)
+- [ ] Email delivery configured and tested with `npm run email:test` (required for invitations in production);
+      custom SMTP set in Supabase for password-reset emails
 - [ ] Supabase Site URL / Redirect URLs set to the production domain
 - [ ] HTTPS enforced (HSTS is sent automatically)
 - [ ] Create the first Super Admin (see docs/authentication.md) and verify sign-in

@@ -23,7 +23,8 @@
     "db:studio": "prisma studio",
     "postinstall": "prisma generate && (prisma skills sync || exit 0)",
     "admin:invite": "tsx scripts/invite-admin.ts",
-    "jobs:daily": "tsx --conditions=react-server scripts/daily-jobs.ts"
+    "jobs:daily": "tsx --conditions=react-server scripts/daily-jobs.ts",
+    "email:test": "tsx --conditions=react-server scripts/email-test.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -44,6 +45,7 @@
     "date-fns": "^4.4.0",
     "lucide-react": "^1.47.0",
     "next": "16.3.5",
+    "nodemailer": "^10.0.12",
     "prisma": "^5.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",

@@ -40,11 +40,23 @@ const envSchema = z.object({
   AI_API_KEY: optionalString,
 
   EMAIL_PROVIDER: z
-    .enum(['', 'resend'])
+    .enum(['', 'resend', 'smtp'])
     .optional()
     .transform((value) => value || undefined),
   EMAIL_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
+  // SMTP (EMAIL_PROVIDER=smtp), e.g. Hostinger: smtp.hostinger.com, port 465.
+  SMTP_HOST: optionalString,
+  SMTP_PORT: optionalString
+    .transform((value) => (value === undefined ? undefined : Number(value)))
+    .pipe(z.number().int().min(1).max(65535).optional()),
+  /** TLS from the first byte (port 465). Defaults to true on 465, STARTTLS otherwise. */
+  SMTP_SECURE: z
+    .enum(['', 'true', 'false'])
+    .optional()
+    .transform((value) => (value ? value === 'true' : undefined)),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
@@ -102,6 +114,13 @@ function buildConfig(env: Env) {
       provider: env.EMAIL_PROVIDER,
       apiKey: env.EMAIL_API_KEY,
       from: env.EMAIL_FROM,
+      smtp: {
+        host: env.SMTP_HOST,
+        port: env.SMTP_PORT ?? 465,
+        secure: env.SMTP_SECURE ?? (env.SMTP_PORT ?? 465) === 465,
+        user: env.SMTP_USER,
+        password: env.SMTP_PASSWORD,
+      },
     },
     logging: {
       level: env.LOG_LEVEL,

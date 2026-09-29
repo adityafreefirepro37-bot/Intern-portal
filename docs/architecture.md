@@ -101,7 +101,7 @@ See [authorization.md](authorization.md).
 | `userService`          | user admin (roles, status) with escalation guards; self-service profile |
 | `invitationService`    | hashed single-use invitations, acceptance                              |
 | `rateLimitService`     | PostgreSQL-backed limits for sensitive operations                      |
-| `emailService`         | invitation email (Resend)                                              |
+| `emailService`         | invitation email (SMTP or Resend)                                      |
 
 Each later phase adds `create / update / delete / workflow` methods to these services (or new services) following the
 same pattern, and wraps mutations with `defineAction()` (`src/server/actions/define-action.ts`).

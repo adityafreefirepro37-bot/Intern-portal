@@ -114,6 +114,20 @@ password and confirms their email; everyone else is then invited from **Users**.
 `AUTH_PASSWORD_MIN_LENGTH` (default `10`), `INVITATION_TTL_HOURS` (default `168`), `EMAIL_PROVIDER`/`EMAIL_API_KEY`/
 `EMAIL_FROM` (invitation email), `SEED_DEV_PASSWORD` (development only).
 
+### Email
+
+Two senders, configured separately:
+
+- **Invitations** are sent by the app (`src/server/services/email.service.ts`). `EMAIL_PROVIDER=smtp` uses any SMTP
+  server — `SMTP_HOST`, `SMTP_PORT` (465 TLS by default, or 587 with STARTTLS; plain-text logins are refused),
+  `SMTP_USER`, `SMTP_PASSWORD`; `EMAIL_PROVIDER=resend` uses the Resend API with `EMAIL_API_KEY`. `EMAIL_FROM` is the
+  sender for both. `npm run email:test -- you@example.com` checks the login and sends a test message. Failures are
+  logged with the SMTP error code only — never the message (which holds the invitation token) or the password.
+- **Password reset and email verification** are sent by Supabase Auth. Its built-in sender is heavily rate limited:
+  for production, set custom SMTP in Supabase → **Authentication → Emails → SMTP Settings** (the same mailbox works).
+
+For deliverability, publish SPF, DKIM and DMARC records for the sending domain.
+
 ## Not yet available
 
 Multi-factor authentication (UI marks it as Phase 09), social sign-in, and self-service email change.
