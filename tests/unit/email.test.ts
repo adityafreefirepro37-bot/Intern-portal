@@ -76,6 +76,32 @@ describe('email configuration', () => {
   })
 })
 
+describe('option settings pasted into hosting dashboards', () => {
+  it('ignores quotes, spaces and capitals', () => {
+    expect(parseEnv({ STORAGE_PROVIDER: ' "Supabase" ', EMAIL_PROVIDER: "'SMTP'" })).toMatchObject({
+      STORAGE_PROVIDER: 'supabase',
+      EMAIL_PROVIDER: 'smtp',
+    })
+  })
+
+  it('treats blank or missing values as the default', () => {
+    const empty = parseEnv({})
+    expect(empty).toMatchObject({ STORAGE_PROVIDER: 'local', LOG_LEVEL: 'info' })
+    expect(empty.EMAIL_PROVIDER).toBeUndefined()
+    expect(parseEnv({ STORAGE_PROVIDER: '', EMAIL_PROVIDER: '', LOG_LEVEL: ' ' })).toMatchObject({
+      STORAGE_PROVIDER: 'local',
+      EMAIL_PROVIDER: undefined,
+      LOG_LEVEL: 'info',
+    })
+  })
+
+  it('explains an invalid value with the allowed options', () => {
+    expect(() => parseEnv({ STORAGE_PROVIDER: 's3' })).toThrow(
+      'STORAGE_PROVIDER: must be one of local, supabase (got "s3")',
+    )
+  })
+})
+
 describe('SMTP delivery', () => {
   it('sends through the configured server with TLS on 465', async () => {
     sendMail.mockResolvedValue({ messageId: '1' })

@@ -12,16 +12,43 @@ const optionalString = z
   .optional()
   .transform((value) => (value && value.trim() !== '' ? value.trim() : undefined))
 
+/**
+ * A setting with fixed options (e.g. STORAGE_PROVIDER). Hosting dashboards make
+ * it easy to paste `"supabase"` with its quotes or a trailing space, so values
+ * are trimmed, unquoted and lower-cased first. Blank or missing means
+ * `fallback` (or "not set" when there is none). Errors name the allowed options
+ * and the value received (these are never secrets).
+ */
+function choice<const T extends readonly [string, ...string[]]>(options: T): z.ZodType<T[number] | undefined>
+function choice<const T extends readonly [string, ...string[]]>(options: T, fallback: T[number]): z.ZodType<T[number]>
+function choice<const T extends readonly [string, ...string[]]>(options: T, fallback?: T[number]) {
+  return z
+    .preprocess(
+      (value) => {
+        if (typeof value !== 'string') return value
+        const cleaned = value
+          .trim()
+          .replace(/^(['"])(.*)\1$/, '$2')
+          .trim()
+          .toLowerCase()
+        return cleaned === '' ? undefined : cleaned
+      },
+      z
+        .enum(options, {
+          error: (issue) => `must be one of ${options.join(', ')} (got ${JSON.stringify(issue.input)})`,
+        })
+        .optional(),
+    )
+    .transform((value) => value ?? fallback)
+}
+
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  NODE_ENV: choice(['development', 'test', 'production'], 'development'),
   DATABASE_URL: optionalString,
   NEXT_PUBLIC_APP_URL: z.url().default('http://localhost:3000'),
   DEFAULT_ORGANIZATION_SLUG: z.string().min(1).default('ayava-creatives'),
 
-  AUTH_REQUIRE_EMAIL_VERIFICATION: z
-    .enum(['true', 'false'])
-    .default('true')
-    .transform((value) => value === 'true'),
+  AUTH_REQUIRE_EMAIL_VERIFICATION: choice(['true', 'false'], 'true').transform((value) => value === 'true'),
   AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).max(64).default(10),
   INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
 
@@ -32,17 +59,14 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
   SUPABASE_SECRET_KEY: optionalString,
 
-  STORAGE_PROVIDER: z.enum(['local', 'supabase']).default('local'),
+  STORAGE_PROVIDER: choice(['local', 'supabase'], 'local'),
   STORAGE_LOCAL_PATH: z.string().default('./.local/uploads'),
   STORAGE_MAX_UPLOAD_MB: z.coerce.number().positive().max(100).default(10),
 
   AI_PROVIDER: optionalString,
   AI_API_KEY: optionalString,
 
-  EMAIL_PROVIDER: z
-    .enum(['', 'resend', 'smtp'])
-    .optional()
-    .transform((value) => value || undefined),
+  EMAIL_PROVIDER: choice(['resend', 'smtp']),
   EMAIL_API_KEY: optionalString,
   EMAIL_FROM: optionalString,
   // SMTP (EMAIL_PROVIDER=smtp), e.g. Hostinger: smtp.hostinger.com, port 465.
@@ -51,14 +75,11 @@ const envSchema = z.object({
     .transform((value) => (value === undefined ? undefined : Number(value)))
     .pipe(z.number().int().min(1).max(65535).optional()),
   /** TLS from the first byte (port 465). Defaults to true on 465, STARTTLS otherwise. */
-  SMTP_SECURE: z
-    .enum(['', 'true', 'false'])
-    .optional()
-    .transform((value) => (value ? value === 'true' : undefined)),
+  SMTP_SECURE: choice(['true', 'false']).transform((value) => (value === undefined ? undefined : value === 'true')),
   SMTP_USER: optionalString,
   SMTP_PASSWORD: optionalString,
 
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  LOG_LEVEL: choice(['debug', 'info', 'warn', 'error'], 'info'),
 
   /** Shared secret for scheduled job endpoints (/api/jobs/*). Jobs are disabled without it. */
   CRON_SECRET: optionalString.pipe(z.string().min(24).optional()),
