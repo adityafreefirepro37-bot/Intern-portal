@@ -95,6 +95,13 @@ describe('option settings pasted into hosting dashboards', () => {
     })
   })
 
+  it('reads ports with quotes and explains a port that is not a number', () => {
+    expect(parseEnv({ SMTP_PORT: ' "587" ' }).SMTP_PORT).toBe(587)
+    expect(() => parseEnv({ SMTP_PORT: '465 # TLS' })).toThrow(
+      'SMTP_PORT: must be a port number such as 465 or 587 (got "465 # TLS")',
+    )
+  })
+
   it('explains an invalid value with the allowed options', () => {
     expect(() => parseEnv({ STORAGE_PROVIDER: 's3' })).toThrow(
       'STORAGE_PROVIDER: must be one of local, supabase (got "s3")',

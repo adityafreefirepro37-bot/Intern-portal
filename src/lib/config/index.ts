@@ -19,6 +19,14 @@ const optionalString = z
  * `fallback` (or "not set" when there is none). Errors name the allowed options
  * and the value received (these are never secrets).
  */
+/** Removes surrounding whitespace and one pair of matching quotes: ` "465" ` → `465`. */
+function unquote(value: string): string {
+  return value
+    .trim()
+    .replace(/^(['"])(.*)\1$/, '$2')
+    .trim()
+}
+
 function choice<const T extends readonly [string, ...string[]]>(options: T): z.ZodType<T[number] | undefined>
 function choice<const T extends readonly [string, ...string[]]>(options: T, fallback: T[number]): z.ZodType<T[number]>
 function choice<const T extends readonly [string, ...string[]]>(options: T, fallback?: T[number]) {
@@ -26,11 +34,7 @@ function choice<const T extends readonly [string, ...string[]]>(options: T, fall
     .preprocess(
       (value) => {
         if (typeof value !== 'string') return value
-        const cleaned = value
-          .trim()
-          .replace(/^(['"])(.*)\1$/, '$2')
-          .trim()
-          .toLowerCase()
+        const cleaned = unquote(value).toLowerCase()
         return cleaned === '' ? undefined : cleaned
       },
       z
@@ -72,8 +76,17 @@ const envSchema = z.object({
   // SMTP (EMAIL_PROVIDER=smtp), e.g. Hostinger: smtp.hostinger.com, port 465.
   SMTP_HOST: optionalString,
   SMTP_PORT: optionalString
-    .transform((value) => (value === undefined ? undefined : Number(value)))
-    .pipe(z.number().int().min(1).max(65535).optional()),
+    .transform((value) => (value === undefined ? undefined : unquote(value)))
+    .pipe(
+      z
+        .string()
+        .regex(/^\d{1,5}$/, {
+          error: (issue) => `must be a port number such as 465 or 587 (got ${JSON.stringify(issue.input)})`,
+        })
+        .transform(Number)
+        .pipe(z.number().int().min(1).max(65535))
+        .optional(),
+    ),
   /** TLS from the first byte (port 465). Defaults to true on 465, STARTTLS otherwise. */
   SMTP_SECURE: choice(['true', 'false']).transform((value) => (value === undefined ? undefined : value === 'true')),
   SMTP_USER: optionalString,
