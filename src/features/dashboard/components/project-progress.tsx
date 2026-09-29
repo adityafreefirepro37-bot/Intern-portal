@@ -23,10 +23,7 @@ export function ProjectProgress({ projects, timeZone }: { projects: ProjectListI
         <li key={project.id} className="space-y-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Link
-                href={`/projects?highlight=${project.id}`}
-                className="block truncate text-small font-medium hover:underline"
-              >
+              <Link href={`/projects/${project.id}`} className="block truncate text-small font-medium hover:underline">
                 {project.name}
               </Link>
               <p className="text-caption text-muted-foreground">

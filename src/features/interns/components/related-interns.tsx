@@ -8,7 +8,13 @@ import type { InternshipProgress, OnboardingProgress } from '@/lib/interns/progr
 import { fullName } from '@/lib/utils'
 import { InternshipProgressBar } from './progress'
 
-type Person = { id: string; first_name: string; last_name: string; display_name: string | null; avatar_url: string | null }
+type Person = {
+  id: string
+  first_name: string
+  last_name: string
+  display_name: string | null
+  avatar_url: string | null
+}
 
 export interface RelatedIntern {
   id: string
@@ -24,7 +30,13 @@ export interface RelatedIntern {
 }
 
 /** Cards for My Interns / My Mentees. */
-export function RelatedInternGrid({ interns, relation }: { interns: RelatedIntern[]; relation: 'managed' | 'mentored' }) {
+export function RelatedInternGrid({
+  interns,
+  relation,
+}: {
+  interns: RelatedIntern[]
+  relation: 'managed' | 'mentored'
+}) {
   if (interns.length === 0) {
     return (
       <EmptyState
@@ -35,7 +47,7 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
     )
   }
   return (
-    <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {interns.map((intern) => {
         const other = relation === 'managed' ? intern.mentor : intern.manager
         return (
@@ -44,7 +56,10 @@ export function RelatedInternGrid({ interns, relation }: { interns: RelatedInter
               <div className="flex items-start gap-3">
                 <UserAvatar person={intern.user} className="size-11" />
                 <div className="min-w-0 flex-1">
-                  <Link href={`/interns/${intern.id}`} className="block truncate font-medium after:absolute after:inset-0">
+                  <Link
+                    href={`/interns/${intern.id}`}
+                    className="block truncate font-medium after:absolute after:inset-0"
+                  >
                     {fullName(intern.user)}
                   </Link>
                   <p className="truncate text-caption text-muted-foreground">

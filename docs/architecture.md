@@ -76,9 +76,22 @@ See [authorization.md](authorization.md).
 | `authorizationService` | permission checks, organization guard                                  |
 | `auditService`         | append-only audit trail (`log`, `logForContext`, `listPage`)           |
 | `dashboardService`     | overview figures and lists, shaped to the viewer's permissions         |
-| `internService`        | intern list and counts                                                 |
-| `projectService`       | project list with task-based progress                                  |
-| `taskService`          | task list, counts, upcoming deadlines, status breakdown                |
+| `internService`        | directory, stats, viewer-specific profile DTOs, transactional create, edit, assignment, self-edit, HR/manager/mentor dashboards |
+| `internLifecycleService` | the only way to change intern status; ending-soon and overdue daily jobs |
+| `onboardingService`    | onboarding snapshot generation, checklist, item completion, policy acknowledgement, HR controls |
+| `onboardingTemplateService` | onboarding templates and items (CRUD, reorder)                     |
+| `documentService`      | intern documents: visibility-filtered list, validated private upload, authorized download, soft delete |
+| `settingsService`      | typed organization settings with defaults                              |
+| `projectService`       | project list/filters, overview dashboard, create/edit, members, files   |
+| `projectLifecycleService` | the only way to change project status                               |
+| `milestoneService`     | milestones (create/edit/reorder/complete) and the milestone-due job      |
+| `projectProgressService` | cached project progress (completed ÷ non-cancelled top-level tasks)   |
+| `taskService`          | task list/board (server-side filters), detail, create/edit, assign, bulk |
+| `taskLifecycleService` | the only way to change a task’s status manually (transition table)      |
+| `taskSubmissionService` | submit/resubmit (versioned) and review (approve / request changes)     |
+| `taskCollaborationService` | checklist, dependencies, comments + mentions, attachments, time     |
+| `workService` / `workloadService` | My Work, dashboard work summaries, metrics; workload levels   |
+| `notificationService`  | in-app notifications (written by domain-event subscribers)             |
 | `learningService`      | course catalog                                                         |
 | `announcementService`  | active announcements                                                   |
 | `organizationService`  | departments, teams, positions                                          |
@@ -92,6 +105,23 @@ See [authorization.md](authorization.md).
 
 Each later phase adds `create / update / delete / workflow` methods to these services (or new services) following the
 same pattern, and wraps mutations with `defineAction()` (`src/server/actions/define-action.ts`).
+
+## Intern access and domain events (Phase 03)
+
+- `resolveInternAccess()` (`src/server/services/intern-access.ts`) loads one intern through the scope filter and
+  computes every per-viewer capability (`can.seeContact`, `can.editDetails`, `can.viewDocuments`, …). Services and
+  pages use the same flags, so what a page shows and what the server allows never drift apart.
+- Services emit in-process **domain events** after commit (`src/server/events/domain-events.ts`); later phases
+  subscribe for notifications and email. Durable history is the audit log plus `intern_lifecycle_events`.
+- Scheduled work (ending soon, overdue onboarding) runs from `npm run jobs:daily` or the `CRON_SECRET`-protected
+  `POST /api/jobs/daily` — never during page rendering.
+
+See [intern-management.md](intern-management.md) and [onboarding.md](onboarding.md).
+
+Phase 04 applies the same pattern to work: `work-access.ts` resolves a project or task once (404 when out of scope)
+and computes capabilities from RBAC **and** project membership; lifecycle services own every status change; domain
+events feed built-in subscribers (`src/server/events/subscribers.ts`) that write in-app notifications. See
+[work-management.md](work-management.md).
 
 ## Global search
 

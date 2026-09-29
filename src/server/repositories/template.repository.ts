@@ -59,7 +59,10 @@ export const templateRepository = {
   async pickFor(organizationId: string, placement: { departmentId?: string | null; positionId?: string | null }) {
     const active = { organization_id: organizationId, is_active: true, deleted_at: null }
     if (placement.positionId) {
-      const byPosition = await prisma.onboardingTemplate.findFirst({ where: { ...active, position_id: placement.positionId }, select: { id: true } })
+      const byPosition = await prisma.onboardingTemplate.findFirst({
+        where: { ...active, position_id: placement.positionId },
+        select: { id: true },
+      })
       if (byPosition) return byPosition.id
     }
     if (placement.departmentId) {
@@ -69,7 +72,10 @@ export const templateRepository = {
       })
       if (byDepartment) return byDepartment.id
     }
-    const fallback = await prisma.onboardingTemplate.findFirst({ where: { ...active, is_default: true }, select: { id: true } })
+    const fallback = await prisma.onboardingTemplate.findFirst({
+      where: { ...active, is_default: true },
+      select: { id: true },
+    })
     return fallback?.id ?? null
   },
 

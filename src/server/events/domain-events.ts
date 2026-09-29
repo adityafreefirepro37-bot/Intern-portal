@@ -25,6 +25,32 @@ export interface DomainEventMap {
   'onboarding.completed': { internId: string; onboardingId: string }
   'document.uploaded': { internId: string; documentId: string; documentType: string }
   'document.deleted': { internId: string; documentId: string }
+  'task.created': { taskId: string; projectId: string | null }
+  'task.assigned': { taskId: string; projectId: string | null; assigneeIds: string[] }
+  'task.status_changed': { taskId: string; projectId: string | null; from: string; to: string }
+  'task.commented': { taskId: string; projectId: string | null; commentId: string }
+  'task.comment_mention': { taskId: string; commentId: string; mentionedUserIds: string[] }
+  'task.submitted': {
+    taskId: string
+    projectId: string | null
+    submissionId: string
+    version: number
+    resubmission: boolean
+  }
+  'task.reviewed': {
+    taskId: string
+    projectId: string | null
+    submissionId: string
+    version: number
+    decision: 'APPROVED' | 'CHANGES_REQUESTED'
+    submitterId: string
+  }
+  'task.due_soon': { taskId: string; dueDate: string }
+  'task.overdue': { taskId: string; dueDate: string }
+  'project.created': { projectId: string }
+  'project.member_added': { projectId: string; userId: string; role: string }
+  'project.status_changed': { projectId: string; from: string; to: string }
+  'project.milestone_due': { projectId: string; milestoneId: string; dueDate: string }
 }
 
 export type DomainEventName = keyof DomainEventMap
@@ -41,6 +67,14 @@ type Handler<N extends DomainEventName> = (event: DomainEvent<N>) => void | Prom
 
 const handlers = new Map<DomainEventName, Set<Handler<DomainEventName>>>()
 
+// Built-in subscribers (in-app notifications) load lazily on first emit, which
+// avoids an import cycle with the services they use.
+let subscribers: Promise<void> | null = null
+function loadSubscribers() {
+  subscribers ??= import('./subscribers').then((module) => module.registerSubscribers())
+  return subscribers
+}
+
 export const domainEvents = {
   on<N extends DomainEventName>(name: N, handler: Handler<N>): () => void {
     const set = handlers.get(name) ?? new Set()
@@ -53,6 +87,7 @@ export const domainEvents = {
     name: N,
     input: { organizationId: string; actorUserId: string | null; payload: DomainEventMap[N] },
   ): Promise<void> {
+    await loadSubscribers().catch((error) => logger.error('Loading event subscribers failed', { error }))
     const event: DomainEvent<N> = { name, occurredAt: new Date(), ...input }
     logger.debug('Domain event', { name, organizationId: input.organizationId })
     for (const handler of handlers.get(name) ?? []) {
@@ -67,5 +102,6 @@ export const domainEvents = {
   /** Test seam. */
   reset() {
     handlers.clear()
+    subscribers = null
   },
 }

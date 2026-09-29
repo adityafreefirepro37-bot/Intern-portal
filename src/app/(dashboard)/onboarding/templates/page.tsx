@@ -16,7 +16,10 @@ export const metadata: Metadata = { title: 'Onboarding templates' }
 export default async function TemplatesPage() {
   const ctx = await requirePageContext()
   if (!authorizationService.can(ctx, 'onboarding.manage')) return <AccessDenied what="onboarding templates" />
-  const [templates, options] = await Promise.all([onboardingTemplateService.list(ctx), onboardingTemplateService.options(ctx)])
+  const [templates, options] = await Promise.all([
+    onboardingTemplateService.list(ctx),
+    onboardingTemplateService.options(ctx),
+  ])
 
   return (
     <>
@@ -27,20 +30,29 @@ export default async function TemplatesPage() {
         actions={<NewTemplateButton options={options} />}
       />
       {templates.length === 0 ? (
-        <EmptyState icon={LayoutTemplate} title="No templates yet" description="Create one to start onboarding interns." />
+        <EmptyState
+          icon={LayoutTemplate}
+          title="No templates yet"
+          description="Create one to start onboarding interns."
+        />
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {templates.map((template) => (
             <li key={template.id}>
               <Card className="relative h-full space-y-3 p-5 transition-colors hover:border-ring/40">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Link href={`/onboarding/templates/${template.id}`} className="font-medium after:absolute after:inset-0">
+                  <Link
+                    href={`/onboarding/templates/${template.id}`}
+                    className="font-medium after:absolute after:inset-0"
+                  >
                     {template.name}
                   </Link>
                   {template.is_default && <Badge variant="primary">Default</Badge>}
                   {!template.is_active && <Badge variant="outline">Inactive</Badge>}
                 </div>
-                {template.description && <p className="line-clamp-2 text-small text-muted-foreground">{template.description}</p>}
+                {template.description && (
+                  <p className="line-clamp-2 text-small text-muted-foreground">{template.description}</p>
+                )}
                 <p className="text-caption text-muted-foreground">
                   {pluralize(template._count.items, 'item')} · used {pluralize(template._count.onboardings, 'time')}
                   {template.department && ` · ${template.department.name}`}

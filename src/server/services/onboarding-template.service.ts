@@ -73,7 +73,11 @@ const itemSchema = z
       .string()
       .optional()
       .transform((value) => (value || undefined) as DocumentType | undefined)
-      .pipe(z.enum(['RESUME', 'OFFER_LETTER', 'NDA', 'ID_DOCUMENT', 'CERTIFICATE', 'EXPERIENCE_LETTER', 'OTHER']).optional()),
+      .pipe(
+        z
+          .enum(['RESUME', 'OFFER_LETTER', 'NDA', 'ID_DOCUMENT', 'CERTIFICATE', 'EXPERIENCE_LETTER', 'OTHER'])
+          .optional(),
+      ),
     policyId: optionalId,
   })
   .refine((item) => item.category !== 'ACKNOWLEDGEMENT' || item.policyId, {
@@ -87,10 +91,19 @@ const itemSchema = z
 
 async function assertRefs(ctx: RequestContext, data: { departmentId?: string; positionId?: string }) {
   const org = ctx.organization.id
-  if (data.departmentId && !(await prisma.department.findFirst({ where: { id: data.departmentId, organization_id: org }, select: { id: true } }))) {
+  if (
+    data.departmentId &&
+    !(await prisma.department.findFirst({
+      where: { id: data.departmentId, organization_id: org },
+      select: { id: true },
+    }))
+  ) {
     throw new ValidationError('Choose a valid department', { departmentId: 'Not found' })
   }
-  if (data.positionId && !(await prisma.position.findFirst({ where: { id: data.positionId, organization_id: org }, select: { id: true } }))) {
+  if (
+    data.positionId &&
+    !(await prisma.position.findFirst({ where: { id: data.positionId, organization_id: org }, select: { id: true } }))
+  ) {
     throw new ValidationError('Choose a valid position', { positionId: 'Not found' })
   }
 }
@@ -102,7 +115,13 @@ async function assertItemRefs(ctx: RequestContext, item: z.infer<typeof itemSche
   }
   if (item.assignedUserId) {
     const user = await prisma.user.findFirst({
-      where: { id: item.assignedUserId, organization_id: org, status: 'ACTIVE', deleted_at: null, intern: { is: null } },
+      where: {
+        id: item.assignedUserId,
+        organization_id: org,
+        status: 'ACTIVE',
+        deleted_at: null,
+        intern: { is: null },
+      },
       select: { id: true },
     })
     if (!user) throw new ValidationError('Choose an active staff member', { assignedUserId: 'Not found' })
@@ -149,8 +168,16 @@ export const onboardingTemplateService = {
     authorizationService.require(ctx, 'onboarding.manage')
     const org = ctx.organization.id
     const [departments, positions, policies, hrStaff] = await Promise.all([
-      prisma.department.findMany({ where: { organization_id: org, is_active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-      prisma.position.findMany({ where: { organization_id: org, is_active: true }, orderBy: { title: 'asc' }, select: { id: true, title: true } }),
+      prisma.department.findMany({
+        where: { organization_id: org, is_active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
+      prisma.position.findMany({
+        where: { organization_id: org, is_active: true },
+        orderBy: { title: 'asc' },
+        select: { id: true, title: true },
+      }),
       policyRepository.listActive(org),
       prisma.user.findMany({
         where: {
@@ -177,7 +204,10 @@ export const onboardingTemplateService = {
     if (exists) throw new ConflictError('A template with this name already exists')
     const created = await prisma.$transaction(async (tx) => {
       if (data.isDefault) {
-        await tx.onboardingTemplate.updateMany({ where: { organization_id: ctx.organization.id }, data: { is_default: false } })
+        await tx.onboardingTemplate.updateMany({
+          where: { organization_id: ctx.organization.id },
+          data: { is_default: false },
+        })
       }
       return tx.onboardingTemplate.create({
         data: {
@@ -245,7 +275,11 @@ export const onboardingTemplateService = {
     const data = parseInput(itemSchema, input)
     await assertItemRefs(ctx, data)
     const last = template.items.at(-1)?.sort_order ?? -1
-    const item = await templateRepository.createItem({ template_id: template.id, sort_order: last + 1, ...itemData(data) })
+    const item = await templateRepository.createItem({
+      template_id: template.id,
+      sort_order: last + 1,
+      ...itemData(data),
+    })
     await auditService.logForContext(ctx, {
       action: AUDIT_ACTIONS.TEMPLATE_UPDATED,
       resourceType: 'onboarding_template',
@@ -296,7 +330,9 @@ export const onboardingTemplateService = {
     const reordered = [...items]
     ;[reordered[index], reordered[swapWith]] = [reordered[swapWith], reordered[index]]
     await prisma.$transaction(
-      reordered.map((item, order) => prisma.onboardingTemplateItem.update({ where: { id: item.id }, data: { sort_order: order } })),
+      reordered.map((item, order) =>
+        prisma.onboardingTemplateItem.update({ where: { id: item.id }, data: { sort_order: order } }),
+      ),
     )
   },
 }

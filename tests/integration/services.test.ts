@@ -128,8 +128,13 @@ describe('services return live data', () => {
     const activeInterns = await prisma.intern.count({
       where: { organization_id: AYAVA_ORGANIZATION_ID, deleted_at: null, status: { in: ['ACTIVE', 'ENDING_SOON'] } },
     })
-    const pending = await prisma.taskSubmission.count({
-      where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }, task: { organization_id: AYAVA_ORGANIZATION_ID } },
+    const pending = await prisma.task.count({
+      where: {
+        organization_id: AYAVA_ORGANIZATION_ID,
+        deleted_at: null,
+        status: 'IN_REVIEW',
+        submissions: { some: { status: { in: ['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW'] } } },
+      },
     })
     expect(overview.stats.activeInterns).toBe(activeInterns)
     expect(overview.stats.pendingReviews).toBe(pending)
@@ -138,8 +143,8 @@ describe('services return live data', () => {
 
   it('computes project progress from tasks', async () => {
     const admin = await contextFor('admin@ayavacreatives.com')
-    const { items } = await projectService.list(admin, { page: 1, pageSize: 10 })
-    const website = items.find((project) => project.slug === 'ayava-website-revamp')
+    const { items } = await projectService.list(admin, { page: 1, pageSize: 100 })
+    const website = items.find((project) => project.slug === 'ayava-website-redesign')
     expect(website).toBeDefined()
     expect(website!.taskCount).toBeGreaterThan(0)
     expect(website!.progressPercent).toBe(Math.round((website!.completedTaskCount / website!.taskCount) * 100))
@@ -189,6 +194,12 @@ describe('seed', () => {
       projects: await prisma.project.count(),
       courses: await prisma.course.count(),
     })
+    // Simulate interns created after the first seed: re-seeding must never move the code counter backwards.
+    const counterKey = { organization_id: AYAVA_ORGANIZATION_ID, key: 'intern.employee_code' }
+    const counter = await prisma.codeCounter.update({
+      where: { organization_id_key: counterKey },
+      data: { value: { increment: 10 } },
+    })
     const before = await counts()
     const client = new PrismaClient()
     try {
@@ -198,5 +209,7 @@ describe('seed', () => {
       await client.$disconnect()
     }
     expect(await counts()).toEqual(before)
+    const after = await prisma.codeCounter.findUniqueOrThrow({ where: { organization_id_key: counterKey } })
+    expect(after.value).toBe(counter.value)
   })
 })

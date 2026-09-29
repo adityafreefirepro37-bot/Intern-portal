@@ -29,7 +29,7 @@ function Section({ title, description, children }: { title: string; description?
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
-      <CardContent className="grid gap-4 sm:grid-cols-2">{children}</CardContent>
+      <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</CardContent>
     </Card>
   )
 }
@@ -39,7 +39,9 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
   const [state, action] = useActionState(createInternAction, idle)
   const [dirty, setDirty] = React.useState(false)
   const [departmentId, setDepartmentId] = React.useState(state.values?.departmentId ?? '')
-  const [startOnboarding, setStartOnboarding] = React.useState(state.values ? state.values.startOnboarding === 'on' : true)
+  const [startOnboarding, setStartOnboarding] = React.useState(
+    state.values ? state.values.startOnboarding === 'on' : true,
+  )
   const [copied, setCopied] = React.useState(false)
   useUnsavedChanges(dirty && state.status !== 'success')
 
@@ -53,21 +55,30 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
             Employee code <span className="font-mono font-medium text-foreground">{result.employeeCode}</span>
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4">
+        <CardContent className="grid grid-cols-1 gap-4">
           <FormMessage status="success" message={state.message} />
           {result.warnings.map((warning) => (
-            <p key={warning} role="alert" className="flex gap-2 rounded-lg bg-warning/12 px-3 py-2.5 text-small text-warning">
+            <p
+              key={warning}
+              role="alert"
+              className="flex gap-2 rounded-lg bg-warning/12 px-3 py-2.5 text-small text-warning"
+            >
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> {warning}
             </p>
           ))}
           {result.inviteUrl && (
             <div className="grid gap-2">
               <p className="text-small text-muted-foreground">
-                Email delivery isn’t configured in this environment. Share this one-time invitation link with the intern —
-                it won’t be shown again.
+                Email delivery isn’t configured in this environment. Share this one-time invitation link with the intern
+                — it won’t be shown again.
               </p>
               <div className="flex gap-2">
-                <Input readOnly value={result.inviteUrl} aria-label="Invitation link" className="font-mono text-caption" />
+                <Input
+                  readOnly
+                  value={result.inviteUrl}
+                  aria-label="Invitation link"
+                  className="font-mono text-caption"
+                />
                 <Button
                   variant="outline"
                   size="icon"
@@ -86,9 +97,9 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
             <Link href={`/interns/${result.internId}`} className={buttonVariants()}>
               Open profile
             </Link>
-            <a href="/interns/new" className={buttonVariants({ variant: 'outline' })}>
+            <Button variant="outline" onClick={() => window.location.reload()}>
               Add another intern
-            </a>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -97,8 +108,12 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
 
   const v = state.values ?? {}
   const f = state.fields ?? {}
-  const teams = options.teams.filter((team) => !departmentId || !team.department_id || team.department_id === departmentId)
-  const positions = options.positions.filter((p) => !departmentId || !p.department_id || p.department_id === departmentId)
+  const teams = options.teams.filter(
+    (team) => !departmentId || !team.department_id || team.department_id === departmentId,
+  )
+  const positions = options.positions.filter(
+    (p) => !departmentId || !p.department_id || p.department_id === departmentId,
+  )
 
   return (
     <form action={action} onChange={() => setDirty(true)} className="grid max-w-4xl gap-6" noValidate>
@@ -143,7 +158,13 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
           </select>
         </Field>
         <Field label="Position" htmlFor="positionId" error={f.positionId}>
-          <select id="positionId" name="positionId" required defaultValue={v.positionId ?? ''} className={inputClassName}>
+          <select
+            id="positionId"
+            name="positionId"
+            required
+            defaultValue={v.positionId ?? ''}
+            className={inputClassName}
+          >
             <option value="" disabled>
               Choose a position
             </option>
@@ -200,7 +221,12 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
         <Field label="Expected end date" htmlFor="expectedEndDate" error={f.expectedEndDate}>
           <Input id="expectedEndDate" name="expectedEndDate" type="date" required defaultValue={v.expectedEndDate} />
         </Field>
-        <Field label="Title (optional)" htmlFor="internshipTitle" error={f.internshipTitle} hint="Defaults to “<Position> internship”.">
+        <Field
+          label="Title (optional)"
+          htmlFor="internshipTitle"
+          error={f.internshipTitle}
+          hint="Defaults to “<Position> internship”."
+        >
           <Input id="internshipTitle" name="internshipTitle" defaultValue={v.internshipTitle} />
         </Field>
         <Field label="Location (optional)" htmlFor="location" error={f.location}>
@@ -221,14 +247,22 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
           <Input id="fieldOfStudy" name="fieldOfStudy" defaultValue={v.fieldOfStudy} />
         </Field>
         <Field label="Level" htmlFor="educationLevel" error={f.educationLevel}>
-          <Input id="educationLevel" name="educationLevel" placeholder="e.g. B.Des, final year" defaultValue={v.educationLevel} />
+          <Input
+            id="educationLevel"
+            name="educationLevel"
+            placeholder="e.g. B.Des, final year"
+            defaultValue={v.educationLevel}
+          />
         </Field>
         <Field label="Graduation year" htmlFor="graduationYear" error={f.graduationYear}>
           <Input id="graduationYear" name="graduationYear" inputMode="numeric" defaultValue={v.graduationYear} />
         </Field>
       </Section>
 
-      <Section title="Emergency contact (optional)" description="If you add one, give the name, relationship and phone.">
+      <Section
+        title="Emergency contact (optional)"
+        description="If you add one, give the name, relationship and phone."
+      >
         <Field label="Name" htmlFor="emergencyName" error={f.emergencyName}>
           <Input id="emergencyName" name="emergencyName" defaultValue={v.emergencyName} />
         </Field>
@@ -260,7 +294,12 @@ export function CreateInternForm({ options, canInvite }: { options: InternFormOp
           </span>
         </label>
         {startOnboarding && (
-          <Field label="Onboarding template" htmlFor="templateId" error={f.templateId} hint="Leave on automatic to pick the best match for the position or department.">
+          <Field
+            label="Onboarding template"
+            htmlFor="templateId"
+            error={f.templateId}
+            hint="Leave on automatic to pick the best match for the position or department."
+          >
             <select id="templateId" name="templateId" defaultValue={v.templateId ?? ''} className={inputClassName}>
               <option value="">Automatic</option>
               {options.templates.map((t) => (

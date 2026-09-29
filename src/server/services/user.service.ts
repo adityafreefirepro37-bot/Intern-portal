@@ -252,7 +252,11 @@ export const userService = {
   },
 }
 
-async function storeAvatar(ctx: RequestContext, userId: string, file: { name: string; type: string; bytes: Uint8Array }) {
+async function storeAvatar(
+  ctx: RequestContext,
+  userId: string,
+  file: { name: string; type: string; bytes: Uint8Array },
+) {
   const storage = getStorageService()
   const stored = await storage.upload({
     organizationId: ctx.organization.id,

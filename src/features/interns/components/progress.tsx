@@ -39,7 +39,10 @@ export function InternshipProgressBar({
       <Progress
         value={progress.percent}
         label={`Internship progress: ${progress.percent}% (${label})`}
-        indicatorClassName={cn(progress.state === 'ended_early' && 'bg-destructive', progress.state === 'finished' && 'bg-success')}
+        indicatorClassName={cn(
+          progress.state === 'ended_early' && 'bg-destructive',
+          progress.state === 'finished' && 'bg-success',
+        )}
       />
       {compact && <span className="text-caption text-muted-foreground">{label}</span>}
     </div>

@@ -55,24 +55,18 @@ test.describe('overview dashboard', () => {
 
   test('marks unbuilt quick actions with their phase instead of faking them', async ({ page }) => {
     await page.goto('/')
-    const createTask = page.getByText('Create task')
-    await expect(createTask).toBeVisible()
-    await expect(page.locator('[aria-disabled="true"]', { hasText: 'Create task' })).toContainText('Phase 04')
+    await expect(page.getByRole('link', { name: 'Create task' })).toBeVisible()
+    await expect(page.locator('[aria-disabled="true"]', { hasText: 'Schedule meeting' })).toContainText('Phase 06')
   })
 })
 
 test.describe('lists', () => {
-  test('filters tasks by status through the URL', async ({ page }) => {
+  test('filters tasks through the URL (saved views)', async ({ page }) => {
     await page.goto('/tasks')
-    await page
-      .getByRole('navigation', { name: 'Filter tasks by status' })
-      .getByRole('link', { name: 'In review' })
-      .click()
-    await expect(page).toHaveURL(/status=IN_REVIEW/)
-    const rows = page.locator('tbody tr')
+    await page.getByRole('navigation', { name: 'Saved views' }).getByRole('link', { name: 'Blocked' }).click()
+    await expect(page).toHaveURL(/status=BLOCKED/)
+    const rows = page.locator('tbody tr:visible, ul[aria-label="Tasks"] > li:visible')
     await expect(rows.first()).toBeVisible()
-    for (const badge of await page.locator('tbody tr td:nth-child(2)').allInnerTexts()) {
-      expect(badge.trim()).toBe('In review')
-    }
+    for (const text of await rows.allInnerTexts()) expect(text).toContain('Blocked')
   })
 })

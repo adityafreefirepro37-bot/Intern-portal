@@ -32,7 +32,12 @@ function refreshIntern(internId: string) {
   revalidatePath('/interns')
 }
 
-export type CreateInternResult = { internId: string; employeeCode: string; inviteUrl: string | null; warnings: string[] }
+export type CreateInternResult = {
+  internId: string
+  employeeCode: string
+  inviteUrl: string | null
+  warnings: string[]
+}
 
 export async function createInternAction(
   _previous: FormState<CreateInternResult>,
@@ -42,7 +47,12 @@ export async function createInternAction(
   try {
     const ctx = await requireApiContext()
     const photo = fileFrom(formData, 'photo')
-    const result = await internService.create(ctx, fields, await getRequestMeta(), photo ? await toUpload(photo) : undefined)
+    const result = await internService.create(
+      ctx,
+      fields,
+      await getRequestMeta(),
+      photo ? await toUpload(photo) : undefined,
+    )
     revalidatePath('/interns')
     revalidatePath('/hr')
     revalidatePath('/onboarding')
@@ -79,7 +89,10 @@ export async function assignInternAction(_previous: FormState, formData: FormDat
     const ctx = await requireApiContext()
     const { changed } = await internService.assign(ctx, fields)
     refreshIntern(fields.internId ?? '')
-    return { status: 'success', message: changed ? `${fields.role === 'mentor' ? 'Mentor' : 'Manager'} updated.` : 'No change.' }
+    return {
+      status: 'success',
+      message: changed ? `${fields.role === 'mentor' ? 'Mentor' : 'Manager'} updated.` : 'No change.',
+    }
   } catch (error) {
     return formError(error)
   }

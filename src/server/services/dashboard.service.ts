@@ -5,6 +5,7 @@ import { authorizationService } from './authorization.service'
 import { internService } from './intern.service'
 import { projectService } from './project.service'
 import { taskService } from './task.service'
+import { workService } from './work.service'
 
 export const UPCOMING_WINDOW_DAYS = 7
 
@@ -34,15 +35,16 @@ export const dashboardService = {
       when(allow('intern.read'), () => internService.countActive(ctx)),
       when(allow('task.read'), () => taskService.countOpen(ctx)),
       when(allow('task.review'), () => taskService.countPendingReviews(ctx)),
-      when(allow('task.read'), () => taskService.countDueWithin(ctx, UPCOMING_WINDOW_DAYS, now)),
-      when(allow('task.read'), () => taskService.listUpcoming(ctx, UPCOMING_WINDOW_DAYS, 6, now)),
+      when(allow('task.read'), () => taskService.countDueWithin(ctx, UPCOMING_WINDOW_DAYS)),
+      when(allow('task.read'), () => taskService.listUpcoming(ctx, UPCOMING_WINDOW_DAYS, 6)),
       when(allow('task.read'), () => taskService.statusBreakdown(ctx)),
       when(allow('project.read'), () =>
-        projectService.list(ctx, { page: 1, pageSize: 4 }, { statuses: ['ACTIVE', 'PLANNED', 'ON_HOLD'] }),
+        projectService.list(ctx, { page: 1, pageSize: 4 }, { statuses: ['ACTIVE', 'PLANNING', 'ON_HOLD'] }),
       ),
       when(allow('announcement.read'), () => announcementService.listActive(ctx, 3, now)),
       when(allow('audit_log.read'), () => auditRepository.listRecent(ctx.organization.id, 6)),
     ])
+    const work = await workService.dashboardSummary(ctx)
 
     return {
       stats: { activeInterns, openTasks, pendingReviews, upcomingDeadlines: upcomingDeadlineCount },
@@ -51,6 +53,7 @@ export const dashboardService = {
       projects: projects?.items ?? null,
       announcements,
       activity,
+      work,
     }
   },
 }

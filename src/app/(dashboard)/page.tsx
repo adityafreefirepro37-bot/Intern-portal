@@ -9,16 +9,22 @@ import { ProjectProgress } from '@/features/dashboard/components/project-progres
 import { QuickActions } from '@/features/dashboard/components/quick-actions'
 import { TaskStatusBreakdown } from '@/features/dashboard/components/task-status-breakdown'
 import { UpcomingTasks } from '@/features/dashboard/components/upcoming-tasks'
+import { MyInternshipCard, RelationSummaryCard } from '@/features/interns/components/dashboard-sections'
+import { DashboardWork } from '@/features/work/components/dashboard-work'
 import { formatDate, greeting } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
 import { dashboardService, UPCOMING_WINDOW_DAYS } from '@/server/services/dashboard.service'
+import { internService } from '@/server/services/intern.service'
 
 export const metadata: Metadata = { title: 'Overview' }
 
 export default async function OverviewPage() {
   const ctx = await requirePageContext()
   const now = new Date()
-  const overview = await dashboardService.getOverview(ctx, now)
+  const [overview, people] = await Promise.all([
+    dashboardService.getOverview(ctx, now),
+    internService.dashboardSummary(ctx),
+  ])
   const { stats } = overview
   const firstName = ctx.actor.displayName.split(' ')[0]
   const timeZone = ctx.organization.timezone
@@ -86,6 +92,14 @@ export default async function OverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
+          {people.self && <MyInternshipCard self={people.self} />}
+          {overview.work && <DashboardWork work={overview.work} />}
+          {(people.managed || people.mentored) && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {people.managed && <RelationSummaryCard kind="managed" summary={people.managed} />}
+              {people.mentored && <RelationSummaryCard kind="mentored" summary={people.mentored} />}
+            </div>
+          )}
           {overview.upcomingTasks && (
             <Card>
               <CardHeader className="flex-row items-center justify-between">

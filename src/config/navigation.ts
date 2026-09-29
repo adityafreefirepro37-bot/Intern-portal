@@ -13,6 +13,7 @@ import {
   GraduationCap,
   HeartHandshake,
   IdCard,
+  Inbox,
   Gauge,
   KeyRound,
   LayoutDashboard,
@@ -71,6 +72,7 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'Work',
     items: [
+      { label: 'My Work', href: '/my-work', icon: Inbox, permission: 'task.read', mobile: true },
       {
         label: 'Tasks',
         scopedLabel: 'My Tasks',
@@ -87,7 +89,8 @@ export const NAVIGATION: NavSection[] = [
         permission: 'project.read',
         mobile: true,
       },
-      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '04' },
+      { label: 'Workload', href: '/workload', icon: Gauge, permission: 'task.review' },
+      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '06' },
     ],
   },
   {
@@ -103,8 +106,20 @@ export const NAVIGATION: NavSection[] = [
         permission: 'intern.read',
         minScope: 'TEAM',
       },
-      { label: 'My Interns', href: '/my-interns', icon: GraduationCap, permission: 'intern.read', when: 'managesInterns' },
-      { label: 'My Mentees', href: '/my-mentees', icon: HeartHandshake, permission: 'intern.read', when: 'mentorsInterns' },
+      {
+        label: 'My Interns',
+        href: '/my-interns',
+        icon: GraduationCap,
+        permission: 'intern.read',
+        when: 'managesInterns',
+      },
+      {
+        label: 'My Mentees',
+        href: '/my-mentees',
+        icon: HeartHandshake,
+        permission: 'intern.read',
+        when: 'mentorsInterns',
+      },
       { label: 'Onboarding', href: '/onboarding', icon: ClipboardList, permission: 'onboarding.manage' },
       { label: 'Teams', href: '/teams', icon: UsersRound, permission: 'team.read' },
     ],

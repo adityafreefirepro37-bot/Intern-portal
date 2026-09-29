@@ -53,14 +53,26 @@ export function scopeCovers(
   if (!scope || record.organization_id !== ctx.organization.id) return false
   const rank = scopeRank(scope)
   if (rank >= scopeRank('ORGANIZATION')) return true
-  if (rank >= scopeRank('DEPARTMENT') && record.department_id && ctx.actor.headedDepartmentIds.includes(record.department_id)) return true
+  if (
+    rank >= scopeRank('DEPARTMENT') &&
+    record.department_id &&
+    ctx.actor.headedDepartmentIds.includes(record.department_id)
+  )
+    return true
   if (rank >= scopeRank('TEAM') && record.team_id && ctx.actor.ledTeamIds.includes(record.team_id)) return true
-  if (rank >= scopeRank('ASSIGNED') && (record.manager_id === ctx.actor.userId || record.mentor_id === ctx.actor.userId)) return true
+  if (
+    rank >= scopeRank('ASSIGNED') &&
+    (record.manager_id === ctx.actor.userId || record.mentor_id === ctx.actor.userId)
+  )
+    return true
   return record.user_id === ctx.actor.userId
 }
 
 export async function resolveInternAccess(ctx: RequestContext, internId: string): Promise<InternAccess> {
-  const readScope = wider(ctx.actor.permissions.get('intern.read') ?? null, ctx.actor.permissions.get('intern_profile.read') ?? null)
+  const readScope = wider(
+    ctx.actor.permissions.get('intern.read') ?? null,
+    ctx.actor.permissions.get('intern_profile.read') ?? null,
+  )
   if (!readScope) throw new ForbiddenError()
   const record = await internRepository.findInScope(internScope(ctx.actor, readScope), internId)
   // Out of scope or another organization: indistinguishable from missing.

@@ -25,12 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input, Textarea } from '@/components/ui/input'
 import { Field, FormMessage, SubmitButton } from '@/features/auth/components/form-bits'
 import { cn, formatDay, fullName, humanizeEnum } from '@/lib/utils'
@@ -120,11 +115,19 @@ export function OnboardingChecklist({
         ))}
       </div>
       {visible.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-6 text-center text-small text-muted-foreground">Nothing here.</p>
+        <p className="rounded-xl border border-dashed p-6 text-center text-small text-muted-foreground">
+          Nothing here.
+        </p>
       ) : (
         <ol className="divide-y rounded-xl border bg-card">
           {visible.map((item) => (
-            <ChecklistRow key={item.id} item={item} internId={internId} isSelf={isSelf} documentTypeLabels={documentTypeLabels} />
+            <ChecklistRow
+              key={item.id}
+              item={item}
+              internId={internId}
+              isSelf={isSelf}
+              documentTypeLabels={documentTypeLabels}
+            />
           ))}
         </ol>
       )}
@@ -176,7 +179,10 @@ function ChecklistRow({
             <p className="text-small text-destructive">Blocked: {item.blocked_reason}</p>
           )}
           {item.document && !item.document.deleted_at && (
-            <a href={`/api/documents/${item.document.id}`} className="inline-flex items-center gap-1 text-small text-primary hover:underline">
+            <a
+              href={`/api/documents/${item.document.id}`}
+              className="inline-flex items-center gap-1 text-small text-primary hover:underline"
+            >
               <FileCheck2 className="size-4" aria-hidden /> {item.document.file_name}
             </a>
           )}
@@ -248,7 +254,12 @@ function ChecklistRow({
 
       {dialog === 'ack' && item.policy && <AcknowledgeDialog item={item} onClose={() => setDialog(null)} />}
       {dialog === 'upload' && (
-        <UploadForItemDialog item={item} internId={internId} documentTypeLabels={documentTypeLabels} onClose={() => setDialog(null)} />
+        <UploadForItemDialog
+          item={item}
+          internId={internId}
+          documentTypeLabels={documentTypeLabels}
+          onClose={() => setDialog(null)}
+        />
       )}
       {(dialog === 'block' || dialog === 'skip') && (
         <ReasonDialog item={item} mode={dialog} onClose={() => setDialog(null)} />
@@ -275,16 +286,26 @@ function AcknowledgeDialog({ item, onClose }: { item: ChecklistItemView; onClose
           <DialogTitle>
             {policy.title} <span className="text-muted-foreground">v{policy.version}</span>
           </DialogTitle>
-          <DialogDescription>Read the policy, then confirm. Your acknowledgement is recorded with the version and time.</DialogDescription>
+          <DialogDescription>
+            Read the policy, then confirm. Your acknowledgement is recorded with the version and time.
+          </DialogDescription>
         </DialogHeader>
-        <div tabIndex={0} className="max-h-[50dvh] overflow-y-auto whitespace-pre-line rounded-lg border bg-muted/40 p-4 text-small">
+        <div
+          tabIndex={0}
+          className="max-h-[50dvh] overflow-y-auto whitespace-pre-line rounded-lg border bg-muted/40 p-4 text-small"
+        >
           {policy.body}
         </div>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="itemId" value={item.id} />
           <label className="flex items-start gap-3 text-small">
-            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} className="mt-1 size-4 accent-primary" />
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(event) => setAgreed(event.target.checked)}
+              className="mt-1 size-4 accent-primary"
+            />
             I have read and agree to the {policy.title} (version {policy.version}).
           </label>
           <DialogFooter>
@@ -317,10 +338,11 @@ function UploadForItemDialog({
         <DialogHeader>
           <DialogTitle>Upload: {item.title}</DialogTitle>
           <DialogDescription>
-            {documentTypeLabels[type] ?? humanizeEnum(type)} · PDF, PNG, JPEG or DOCX. Stored privately; uploading completes this item.
+            {documentTypeLabels[type] ?? humanizeEnum(type)} · PDF, PNG, JPEG or DOCX. Stored privately; uploading
+            completes this item.
           </DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="internId" value={internId} />
           <input type="hidden" name="onboardingItemId" value={item.id} />
@@ -337,21 +359,35 @@ function UploadForItemDialog({
   )
 }
 
-function ReasonDialog({ item, mode, onClose }: { item: ChecklistItemView; mode: 'block' | 'skip'; onClose: () => void }) {
+function ReasonDialog({
+  item,
+  mode,
+  onClose,
+}: {
+  item: ChecklistItemView
+  mode: 'block' | 'skip'
+  onClose: () => void
+}) {
   const [state, action] = useFormAction(setOnboardingItemStatusAction, { onSuccess: onClose })
   const reasonRequired = mode === 'block' || item.required
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{mode === 'block' ? 'Mark as blocked' : item.required ? 'Waive required item' : 'Skip item'}</DialogTitle>
+          <DialogTitle>
+            {mode === 'block' ? 'Mark as blocked' : item.required ? 'Waive required item' : 'Skip item'}
+          </DialogTitle>
           <DialogDescription>{item.title}</DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="itemId" value={item.id} />
           <input type="hidden" name="action" value={mode} />
-          <Field label={reasonRequired ? 'Reason' : 'Reason (optional)'} htmlFor={`reason-${item.id}`} error={state.fields?.reason}>
+          <Field
+            label={reasonRequired ? 'Reason' : 'Reason (optional)'}
+            htmlFor={`reason-${item.id}`}
+            error={state.fields?.reason}
+          >
             <Textarea id={`reason-${item.id}`} name="reason" rows={3} required={reasonRequired} />
           </Field>
           <DialogFooter>

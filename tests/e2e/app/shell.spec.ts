@@ -37,10 +37,10 @@ test.describe('desktop shell', () => {
     const input = page.getByRole('combobox', { name: 'Search or jump to' })
     await expect(input).toBeFocused()
     await input.fill('website')
-    const option = page.getByRole('option', { name: /Ayava Website Revamp/ })
+    const option = page.getByRole('option', { name: /^Ayava Website Redesign/ })
     await expect(option).toBeVisible()
-    await page.keyboard.press('Enter')
-    await expect(page).toHaveURL(/\/projects\?highlight=/)
+    await option.click()
+    await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/)
   })
 })
 
@@ -65,7 +65,18 @@ test.describe('mobile shell', () => {
   })
 
   test('has no horizontal page overflow', async ({ page }) => {
-    for (const path of ['/', '/tasks', '/interns', '/projects', '/audit-logs']) {
+    for (const path of [
+      '/',
+      '/tasks',
+      '/tasks?view=board',
+      '/my-work',
+      '/interns',
+      '/projects',
+      '/workload',
+      '/audit-logs',
+      '/hr',
+      '/onboarding',
+    ]) {
       await page.goto(path)
       await page.getByRole('heading', { level: 1 }).waitFor()
       const overflow = await page.evaluate(

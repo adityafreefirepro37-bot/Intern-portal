@@ -4,8 +4,13 @@ The intern management and work operating system for **Ayava Creatives** — inte
 attendance, leave, documents, learning, performance, AI assistance, certificates and analytics in one place.
 
 Implemented so far: **Phase 01 — Foundation** (architecture, database, design system, shell, read-only views of real data)
-and **Phase 02 — Authentication, RBAC & security** (Supabase sign-in, sessions, scoped permissions, user management,
-invitations, audit log). Features are delivered in later phases (see
+**Phase 02 — Authentication, RBAC & security** (Supabase sign-in, sessions, scoped permissions, user management,
+invitations, audit log) and **Phase 03 — Intern management & onboarding** (HR directory, add-intern workflow, tabbed
+profiles, status lifecycle, onboarding templates and checklists, policy acknowledgements, private documents, HR /
+manager / mentor dashboards) and **Phase 04 — Tasks, projects & work management** (projects with members, milestones,
+files and activity; tasks with a server-enforced lifecycle, priorities, deadlines, subtasks, checklists, dependencies,
+comments and attachments; submissions with versioned reviews; list, board, My Work and workload views; in-app
+notifications). Features are delivered in later phases (see
 [Roadmap](#roadmap)); pages for unbuilt features say so plainly instead of pretending to work.
 
 ## Tech stack
@@ -101,10 +106,21 @@ page redirects to a sign-in page that explains sign-in isn't configured.
 | mentor@ayavacreatives.com    | Mentor      |
 | intern@ayavacreatives.com    | Intern      |
 
-Plus six fictional demo interns (`*@demo.ayavacreatives.com`). No passwords exist in this database: with
+Plus fictional demo people (`*@demo.ayavacreatives.com`, profiles only): Vikram Rao (Development manager), Priya
+Kulkarni (Development mentor) and six interns — one per lifecycle state. The seeded intern (Aanya) is **onboarding**
+(Development template, 3 of 14 required items done); Ishaan, Zara and Neel are **active**; Tara is **ending soon**;
+Diya **completed**; Kabir is **selected**. Arjun (manager@) manages Marketing/Design interns, Rohan (mentor@) mentors
+them. Employee codes run AYV-INT-0001…0007; the next created intern gets 0008. No passwords exist in this database: with
 `SEED_DEV_PASSWORD` and the Supabase service-role key set, the seed creates matching Supabase Auth users with that
 password (development only). Demo data and accounts are skipped entirely when `NODE_ENV=production`; production starts
 with `npm run admin:invite` (below).
+
+Work demo data: five projects (Ayava Website Redesign, Social Media Campaign, Intern Onboarding System, SEO Growth
+Initiative — on hold, Brand Identity Refresh) with members, milestones and ~30 tasks in every status, including
+subtasks, checklists, dependencies, overdue and blocked work, submissions awaiting review, a changes-requested →
+resubmitted → approved history, comments with mentions, time entries, project activity and a few notifications.
+Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages Social, SEO and Brand; Rohan
+(mentor@) mentors Social and Brand.
 
 ## Commands
 
@@ -125,6 +141,7 @@ with `npm run admin:invite` (below).
 | `npm run db:reset`          | Drop, re-migrate and re-seed the development database          |
 | `npm run db:studio`         | Prisma Studio                                                  |
 | `npm run admin:invite`      | Print a one-time Super Admin invitation link (bootstrap)       |
+| `npm run jobs:daily`        | Daily jobs: ending-soon status, overdue onboarding events      |
 
 ## Testing
 
@@ -133,9 +150,14 @@ with `npm run admin:invite` (below).
 - **Integration** (`tests/integration`): real PostgreSQL. Global setup drops the test database, applies every migration
   and seeds it. Covers schema, constraints, RLS, isolation, the sign-in/logout/reset/verification flows and account
   states (with an in-memory auth provider), the spec's authorization matrix, privilege escalation, IDOR, invitations,
-  sessions, rate limiting and audit. Refuses any database whose name lacks `test`.
+  sessions, rate limiting and audit; Phase 03 intern creation (transaction, rollback, concurrent codes), editing,
+  assignment, status engine, ending-soon idempotency, onboarding, document visibility and scope; Phase 04 project →
+  task → submit → changes → resubmit → approve flow, dependencies, bulk actions, mentions, workload, deadline jobs and
+  the work security matrix. Refuses any database whose name lacks `test`.
 - **End-to-end** (`tests/e2e`): public checks always run (route protection, 401s, auth pages, accessibility, CSP and
-  headers). Signed-in checks (navigation, roles, logout/back button, multi-tab, profile, security, users) run once
+  headers). Signed-in checks (navigation, roles, logout/back button, multi-tab, profile, security, users, HR adds an
+  intern, intern completes onboarding, manager scope, intern denials, manager creates a project and assigns a task,
+  intern starts and submits, review → changes → resubmit → approve) run once
   Supabase keys and `SEED_DEV_PASSWORD` are set; otherwise they are reported as skipped.
   Use `npx playwright install chromium` or `PLAYWRIGHT_CHANNEL=msedge`.
 
@@ -150,6 +172,8 @@ with `npm run admin:invite` (below).
    reference data in production). Works on Vercel, Railway, Render or any Node host.
 4. Create the first Super Admin: `npm run admin:invite -- --email you@company.com --first Name --last Surname`, open
    the printed link, set a password. Invite everyone else from **Users**.
+5. Schedule the daily job: `POST /api/jobs/daily` with `Authorization: Bearer $CRON_SECRET` once a day (e.g. Vercel
+   Cron). Set `CRON_SECRET` (24+ characters); without it the endpoint is disabled.
 
 ## Security
 
@@ -165,10 +189,10 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | ------ | ------------------------------------------------------------------------- |
 | 01     | **Foundation** — done                                                     |
 | 02     | **Authentication, RBAC & security** — done                                |
-| 03     | Intern management: profiles, onboarding, offboarding, departments, teams  |
-| 04     | Projects, tasks, submissions and reviews, calendar                         |
+| 03     | **Intern management, HR directory & onboarding** — done                   |
+| 04     | **Tasks, projects & work management** — done (calendar moves to 06)       |
 | 05     | HR operations: attendance, leave, documents, learning                     |
-| 06     | Communication and performance: announcements, messages, notifications, reviews |
+| 06     | Communication and performance: messages, notification delivery, calendar, reviews |
 | 07     | AYAVA AI and knowledge base (RAG)                                         |
 | 08     | Analytics and certificates                                                |
 | 09     | System administration: audit log tools, settings, role editor             |
@@ -177,6 +201,8 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 ## Documentation
 
 [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Authentication](docs/authentication.md) ·
-[Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md)
+[Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md) ·
+[Intern management](docs/intern-management.md) · [Onboarding](docs/onboarding.md) ·
+[Work management](docs/work-management.md)
 
 Internal use only — Ayava Creatives.

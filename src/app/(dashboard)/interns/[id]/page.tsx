@@ -136,17 +136,25 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
                     graduationYear: profile.education.graduationYear,
                   }
                 : null,
-              onboardingComplete: profile.internship?.onboarding ? Boolean(profile.internship.onboarding.completed_at) : null,
+              onboardingComplete: profile.internship?.onboarding
+                ? Boolean(profile.internship.onboarding.completed_at)
+                : null,
               accountInvited: profile.accountStatus === 'INVITED',
             }}
             options={options}
-            can={{ edit: can.editDetails, assign: can.assignPeople, transition: can.transition, close: can.close, invite: canInvite }}
+            can={{
+              edit: can.editDetails,
+              assign: can.assignPeople,
+              transition: can.transition,
+              close: can.close,
+              invite: canInvite,
+            }}
           />
         )}
       </header>
 
       <Card className="mb-6">
-        <CardContent className="grid gap-4 pt-6 sm:grid-cols-[1fr_auto] sm:items-center">
+        <CardContent className="grid grid-cols-1 gap-4 pt-6 sm:grid-cols-[1fr_auto] sm:items-center">
           <InternshipProgressBar progress={profile.progress} />
           <p className="text-small text-muted-foreground sm:text-right">
             {formatDay(profile.joiningDate)} – {formatDay(profile.actualEndDate ?? profile.expectedEndDate)}
@@ -157,13 +165,13 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       <ProfileTabs tabs={tabs} active={tab} basePath={basePath} />
 
       {tab === 'overview' && (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2">
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Email" value={profile.email} />
                 <Detail label="Phone" value={profile.phone} />
                 <Detail label="Department" value={profile.department?.name} />
@@ -182,7 +190,7 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
                   <CardTitle>Education</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <dl className="grid gap-4">
+                  <dl className="grid grid-cols-1 gap-4">
                     <Detail label="Institution" value={profile.education.institution} />
                     <Detail label="Field of study" value={profile.education.fieldOfStudy} />
                     <Detail
@@ -191,7 +199,9 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
                     />
                     <Detail
                       label="Location"
-                      value={[profile.education.city, profile.education.state, profile.education.country].filter(Boolean).join(', ')}
+                      value={[profile.education.city, profile.education.state, profile.education.country]
+                        .filter(Boolean)
+                        .join(', ')}
                     />
                   </dl>
                 </CardContent>
@@ -203,13 +213,18 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
                   <CardTitle>Emergency contacts</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {profile.emergencyContacts.length === 0 && <p className="text-small text-muted-foreground">None recorded.</p>}
+                  {profile.emergencyContacts.length === 0 && (
+                    <p className="text-small text-muted-foreground">None recorded.</p>
+                  )}
                   {profile.emergencyContacts.map((contact) => (
                     <div key={contact.id} className="text-small">
                       <p className="font-medium">
-                        {contact.name} <span className="font-normal text-muted-foreground">({contact.relationship})</span>
+                        {contact.name}{' '}
+                        <span className="font-normal text-muted-foreground">({contact.relationship})</span>
                       </p>
-                      <p className="text-muted-foreground">{[contact.phone, contact.email].filter(Boolean).join(' · ')}</p>
+                      <p className="text-muted-foreground">
+                        {[contact.phone, contact.email].filter(Boolean).join(' · ')}
+                      </p>
                     </div>
                   ))}
                 </CardContent>
@@ -230,7 +245,9 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
             <Card className="lg:col-span-3">
               <CardHeader>
                 <CardTitle>Your contact details</CardTitle>
-                <CardDescription>You can update these. HR manages your placement, dates and other records.</CardDescription>
+                <CardDescription>
+                  You can update these. HR manages your placement, dates and other records.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <OwnInternProfileForm
@@ -252,19 +269,30 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
         <Card>
           <CardHeader>
             <CardTitle>{profile.internship?.title ?? 'Internship'}</CardTitle>
-            {profile.internship?.description && <CardDescription className="whitespace-pre-line">{profile.internship.description}</CardDescription>}
+            {profile.internship?.description && (
+              <CardDescription className="whitespace-pre-line">{profile.internship.description}</CardDescription>
+            )}
           </CardHeader>
           <CardContent>
-            <dl className="grid gap-4 sm:grid-cols-3">
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Detail label="Status" value={<StatusBadge status={profile.status} />} />
               <Detail label="Joining date" value={formatDay(profile.joiningDate)} />
               <Detail label="Expected end" value={formatDay(profile.expectedEndDate)} />
               <Detail label="Actual end" value={profile.actualEndDate ? formatDay(profile.actualEndDate) : null} />
-              <Detail label="Work mode" value={profile.internship?.workMode ? humanizeEnum(profile.internship.workMode) : null} />
+              <Detail
+                label="Work mode"
+                value={profile.internship?.workMode ? humanizeEnum(profile.internship.workMode) : null}
+              />
               <Detail label="Location" value={profile.internship?.location} />
               <Detail label="Total days" value={profile.progress.totalDays || null} />
-              <Detail label="Current day" value={profile.progress.state === 'in_progress' ? profile.progress.day : null} />
-              <Detail label="Days remaining" value={profile.progress.state === 'in_progress' ? profile.progress.daysRemaining : null} />
+              <Detail
+                label="Current day"
+                value={profile.progress.state === 'in_progress' ? profile.progress.day : null}
+              />
+              <Detail
+                label="Days remaining"
+                value={profile.progress.state === 'in_progress' ? profile.progress.daysRemaining : null}
+              />
             </dl>
           </CardContent>
         </Card>
@@ -276,16 +304,36 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       {tab === 'projects' && <WorkTab ctx={ctx} internId={profile.id} kind="projects" />}
 
       {tab === 'attendance' && (
-        <ModuleComingSoon icon={Clock} title="Attendance" phase="05" description="Daily check-ins, attendance history and corrections." />
+        <ModuleComingSoon
+          icon={Clock}
+          title="Attendance"
+          phase="05"
+          description="Daily check-ins, attendance history and corrections."
+        />
       )}
       {tab === 'leave' && (
-        <ModuleComingSoon icon={Palmtree} title="Leave" phase="05" description="Leave requests, approvals and balances." />
+        <ModuleComingSoon
+          icon={Palmtree}
+          title="Leave"
+          phase="05"
+          description="Leave requests, approvals and balances."
+        />
       )}
       {tab === 'learning' && (
-        <ModuleComingSoon icon={BookOpen} title="Learning progress" phase="07" description="Course enrolments, progress and completions." />
+        <ModuleComingSoon
+          icon={BookOpen}
+          title="Learning progress"
+          phase="07"
+          description="Course enrolments, progress and completions."
+        />
       )}
       {tab === 'performance' && (
-        <ModuleComingSoon icon={Gauge} title="Performance" phase="06" description="Reviews, feedback and check-ins from manager and mentor." />
+        <ModuleComingSoon
+          icon={Gauge}
+          title="Performance"
+          phase="06"
+          description="Reviews, feedback and check-ins from manager and mentor."
+        />
       )}
 
       {tab === 'documents' && <DocumentsTab ctx={ctx} internId={profile.id} />}
@@ -319,7 +367,10 @@ async function OnboardingTab({ ctx, internId, isSelf }: { ctx: Ctx; internId: st
                 : `Started ${formatDay(checklist.onboarding.started_at)}`}
             </CardDescription>
           </div>
-          <Link href={`/interns/${internId}/onboarding`} className="shrink-0 text-small font-medium text-primary hover:underline">
+          <Link
+            href={`/interns/${internId}/onboarding`}
+            className="shrink-0 text-small font-medium text-primary hover:underline"
+          >
             Full checklist
           </Link>
         </CardHeader>
@@ -327,7 +378,12 @@ async function OnboardingTab({ ctx, internId, isSelf }: { ctx: Ctx; internId: st
           <OnboardingProgressBar progress={checklist.progress} />
         </CardContent>
       </Card>
-      <OnboardingChecklist internId={internId} items={checklist.items} isSelf={isSelf} documentTypeLabels={DOCUMENT_TYPE_LABELS} />
+      <OnboardingChecklist
+        internId={internId}
+        items={checklist.items}
+        isSelf={isSelf}
+        documentTypeLabels={DOCUMENT_TYPE_LABELS}
+      />
     </div>
   )
 }

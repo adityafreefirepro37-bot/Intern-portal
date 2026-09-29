@@ -11,7 +11,13 @@ import { useUnsavedChanges } from './use-unsaved-changes'
 export function OwnInternProfileForm({
   initial,
 }: {
-  initial: { phone: string | null; bio: string | null; city: string | null; state: string | null; country: string | null }
+  initial: {
+    phone: string | null
+    bio: string | null
+    city: string | null
+    state: string | null
+    country: string | null
+  }
 }) {
   const [dirty, setDirty] = React.useState(false)
   const [state, action] = useFormAction(updateOwnInternProfileAction, { onSuccess: () => setDirty(false) })
@@ -19,7 +25,7 @@ export function OwnInternProfileForm({
   const v = state.values
   const f = state.fields ?? {}
   return (
-    <form action={action} onChange={() => setDirty(true)} className="grid gap-4 sm:grid-cols-2" noValidate>
+    <form action={action} onChange={() => setDirty(true)} className="grid grid-cols-1 gap-4 sm:grid-cols-2" noValidate>
       <div className="sm:col-span-2">
         <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
       </div>

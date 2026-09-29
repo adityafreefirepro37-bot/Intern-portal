@@ -1,14 +1,8 @@
-import type {
-  InternStatus,
-  PrismaClient,
-  ProjectStatus,
-  SubmissionStatus,
-  TaskPriority,
-  TaskStatus,
-} from '@prisma/client'
+import type { InternStatus, PrismaClient } from '@prisma/client'
 import type { SystemRoleSlug } from '../../src/lib/permissions/catalog'
 import { dateFrom, daysFrom, seedId } from './ids'
 import type { ReferenceData } from './reference'
+import { seedWork } from './work'
 
 /**
  * DEVELOPMENT / DEMO DATA — never run in production.
@@ -34,6 +28,18 @@ export const DEV_ACCOUNTS: PersonSeed[] = [
   { key: 'intern', email: 'intern@ayavacreatives.com', first: 'Aanya', last: 'Sharma', role: 'intern' },
 ]
 
+/** Additional staff (profiles only — no sign-in): the development manager and mentor. */
+const DEMO_STAFF: PersonSeed[] = [
+  { key: 'devManager', email: 'vikram.rao@demo.ayavacreatives.com', first: 'Vikram', last: 'Rao', role: 'manager' },
+  {
+    key: 'devMentor',
+    email: 'priya.kulkarni@demo.ayavacreatives.com',
+    first: 'Priya',
+    last: 'Kulkarni',
+    role: 'mentor',
+  },
+]
+
 const DEMO_INTERNS: PersonSeed[] = [
   { key: 'ishaan', email: 'ishaan.verma@demo.ayavacreatives.com', first: 'Ishaan', last: 'Verma', role: 'intern' },
   { key: 'zara', email: 'zara.khan@demo.ayavacreatives.com', first: 'Zara', last: 'Khan', role: 'intern' },
@@ -48,7 +54,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
   const userIds: Record<string, string> = {}
 
   // ── People ────────────────────────────────────────────────────────────────
-  for (const person of [...DEV_ACCOUNTS, ...DEMO_INTERNS]) {
+  for (const person of [...DEV_ACCOUNTS, ...DEMO_STAFF, ...DEMO_INTERNS]) {
     const user = await prisma.user.upsert({
       where: { organization_id_email: { organization_id: orgId, email: person.email } },
       update: { first_name: person.first, last_name: person.last, status: 'ACTIVE', deleted_at: null },
@@ -71,9 +77,14 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
   }
 
   // ── Structure: department heads and teams ─────────────────────────────────
+  // Arjun (manager@) runs Marketing; Vikram runs Development; Kavya (hr@) runs HR.
+  await prisma.department.update({
+    where: { id: ref.departmentIds.marketing },
+    data: { head_user_id: userIds.manager },
+  })
   await prisma.department.update({
     where: { id: ref.departmentIds.development },
-    data: { head_user_id: userIds.manager },
+    data: { head_user_id: userIds.devManager },
   })
   await prisma.department.update({ where: { id: ref.departmentIds.hr }, data: { head_user_id: userIds.hr } })
 
@@ -83,7 +94,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       slug: 'web-squad',
       name: 'Web Squad',
       department: 'development',
-      lead: 'manager',
+      lead: 'devManager',
       description: 'Builds and maintains client and in-house websites.',
     },
     {
@@ -121,6 +132,8 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
   }
 
   // ── Interns and internships ───────────────────────────────────────────────
+  // One intern per lifecycle state. Onboarding checklists are generated from
+  // the templates exactly as the app does it (snapshot copy, due = start + offset).
   const internSeeds: {
     key: string
     code: string
@@ -130,76 +143,109 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     position: string
     department: string
     team: string
+    manager: string | null
+    mentor: string | null
+    template: string | null
+    /** Indexes of template items already done (null = all). */
+    done: number[] | null
   }[] = [
     {
       key: 'intern',
-      code: 'AYV-INT-001',
-      status: 'ACTIVE',
-      joinedDaysAgo: 30,
+      code: 'AYV-INT-0001',
+      status: 'ONBOARDING',
+      joinedDaysAgo: 2,
       weeks: 12,
       position: 'web-development-intern',
       department: 'development',
       team: 'web',
+      manager: 'devManager',
+      mentor: 'devMentor',
+      template: 'Development Intern Onboarding',
+      done: [3, 5, 6],
     },
     {
       key: 'ishaan',
-      code: 'AYV-INT-002',
+      code: 'AYV-INT-0002',
       status: 'ACTIVE',
       joinedDaysAgo: 45,
       weeks: 12,
       position: 'social-media-intern',
       department: 'marketing',
       team: 'social',
+      manager: 'manager',
+      mentor: 'mentor',
+      template: 'Marketing Intern Onboarding',
+      done: null,
     },
     {
       key: 'zara',
-      code: 'AYV-INT-003',
+      code: 'AYV-INT-0003',
       status: 'ACTIVE',
       joinedDaysAgo: 20,
       weeks: 12,
       position: 'graphic-design-intern',
       department: 'design',
       team: 'brand',
+      manager: 'manager',
+      mentor: 'mentor',
+      template: 'Design Intern Onboarding',
+      done: null,
     },
     {
       key: 'neel',
-      code: 'AYV-INT-004',
-      status: 'ONBOARDING',
-      joinedDaysAgo: 2,
+      code: 'AYV-INT-0004',
+      status: 'ACTIVE',
+      joinedDaysAgo: 12,
       weeks: 16,
       position: 'ai-ml-intern',
       department: 'development',
       team: 'web',
+      manager: 'devManager',
+      mentor: 'devMentor',
+      template: 'Development Intern Onboarding',
+      done: null,
     },
     {
       key: 'tara',
-      code: 'AYV-INT-005',
+      code: 'AYV-INT-0005',
       status: 'ENDING_SOON',
       joinedDaysAgo: 78,
       weeks: 12,
       position: 'content-writing-intern',
       department: 'marketing',
       team: 'social',
+      manager: 'manager',
+      mentor: 'mentor',
+      template: 'Marketing Intern Onboarding',
+      done: null,
     },
     {
       key: 'diya',
-      code: 'AYV-INT-006',
-      status: 'ACTIVE',
-      joinedDaysAgo: 15,
+      code: 'AYV-INT-0006',
+      status: 'COMPLETED',
+      joinedDaysAgo: 100,
       weeks: 12,
       position: 'ui-ux-intern',
       department: 'design',
       team: 'brand',
+      manager: 'manager',
+      mentor: 'mentor',
+      template: 'Design Intern Onboarding',
+      done: null,
     },
     {
       key: 'kabir',
-      code: 'AYV-INT-007',
+      code: 'AYV-INT-0007',
       status: 'SELECTED',
       joinedDaysAgo: -10,
       weeks: 12,
       position: 'digital-marketing-intern',
       department: 'marketing',
       team: 'social',
+      manager: 'manager',
+      mentor: null,
+      template: null,
+      done: null,
     },
   ]
 
@@ -208,6 +254,9 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
   for (const seed of internSeeds) {
     const joining = dateFrom(now, -seed.joinedDaysAgo)
     const expectedEnd = dateFrom(joining, seed.weeks * 7)
+    const ended = seed.status === 'COMPLETED' ? expectedEnd : null
+    const managerId = seed.manager ? userIds[seed.manager] : null
+    const mentorId = seed.mentor ? userIds[seed.mentor] : null
     const data = {
       organization_id: orgId,
       user_id: userIds[seed.key],
@@ -215,11 +264,13 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       status: seed.status,
       joining_date: joining,
       expected_end_date: expectedEnd,
+      actual_end_date: ended,
       department_id: ref.departmentIds[seed.department],
       team_id: teamIds[seed.team],
       position_id: ref.positionIds[seed.position],
-      manager_id: userIds.manager,
-      mentor_id: userIds.mentor,
+      manager_id: managerId,
+      mentor_id: mentorId,
+      deleted_at: null,
     }
     const intern = await prisma.intern.upsert({
       where: { user_id: userIds[seed.key] },
@@ -237,11 +288,17 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       position_id: ref.positionIds[seed.position],
       start_date: joining,
       expected_end_date: expectedEnd,
-      status: seed.status === 'SELECTED' ? ('PLANNED' as const) : ('ACTIVE' as const),
+      actual_end_date: ended,
+      status:
+        seed.status === 'SELECTED' || seed.status === 'ONBOARDING'
+          ? ('PLANNED' as const)
+          : seed.status === 'COMPLETED'
+            ? ('COMPLETED' as const)
+            : ('ACTIVE' as const),
       work_mode: seed.key === 'zara' ? ('ONSITE' as const) : ('HYBRID' as const),
       location: 'Bengaluru',
-      manager_id: userIds.manager,
-      mentor_id: userIds.mentor,
+      manager_id: managerId,
+      mentor_id: mentorId,
     }
     await prisma.internship.upsert({
       where: { id: internshipId },
@@ -249,355 +306,202 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       create: { id: internshipId, ...internshipData },
     })
     internshipIds[seed.key] = internshipId
-  }
 
-  await prisma.internProfile.upsert({
-    where: { intern_id: internIds.intern },
-    update: {},
-    create: {
-      intern_id: internIds.intern,
-      city: 'Bengaluru',
-      state: 'Karnataka',
-      country: 'India',
-      education_level: 'Undergraduate',
-      institution: 'Demo Institute of Technology',
-      field_of_study: 'Computer Science',
-      graduation_year: now.getUTCFullYear() + 1,
-      bio: 'Front-end developer interested in design systems and accessibility.',
-    },
-  })
-
-  // Onboarding checklist for the newest intern
-  const onboardingSeeds = [
-    { title: 'Sign NDA and offer letter', type: 'DOCUMENT', status: 'COMPLETED', due: -1 },
-    { title: 'Set up workspace accounts', type: 'ACCOUNT_SETUP', status: 'COMPLETED', due: 0 },
-    { title: 'Complete Ayava Orientation course', type: 'TRAINING', status: 'IN_PROGRESS', due: 3 },
-    { title: 'Intro call with mentor', type: 'MEETING', status: 'PENDING', due: 2 },
-    { title: 'Ship first starter task', type: 'TASK', status: 'PENDING', due: 7 },
-  ] as const
-  for (const [index, item] of onboardingSeeds.entries()) {
-    const id = seedId(`onboarding:neel:${index}`)
-    const data = {
-      organization_id: orgId,
-      internship_id: internshipIds.neel,
-      title: item.title,
-      item_type: item.type,
-      status: item.status,
-      due_date: dateFrom(now, item.due),
-      assigned_to: userIds.neel,
-      completed_at: item.status === 'COMPLETED' ? daysFrom(now, item.due) : null,
-      completed_by: item.status === 'COMPLETED' ? userIds.neel : null,
-      sort_order: index,
-    }
-    await prisma.onboardingItem.upsert({ where: { id }, update: data, create: { id, ...data } })
-  }
-
-  // ── Projects, milestones, tasks ───────────────────────────────────────────
-  const projectSeeds: {
-    key: string
-    slug: string
-    name: string
-    description: string
-    status: ProjectStatus
-    start: number
-    end: number
-    owner: string
-    members: string[]
-  }[] = [
-    {
-      key: 'website',
-      slug: 'ayava-website-revamp',
-      name: 'Ayava Website Revamp',
-      description: 'Redesign and rebuild ayavacreatives.com with a new case-study system.',
-      status: 'ACTIVE',
-      start: -28,
-      end: 35,
-      owner: 'manager',
-      members: ['intern', 'diya', 'neel', 'mentor'],
-    },
-    {
-      key: 'social',
-      slug: 'social-media-growth-campaign',
-      name: 'Social Media Growth Campaign',
-      description: 'Quarter-long Instagram and LinkedIn growth push with weekly reporting.',
-      status: 'ACTIVE',
-      start: -40,
-      end: 50,
-      owner: 'manager',
-      members: ['ishaan', 'tara', 'kabir'],
-    },
-    {
-      key: 'brand',
-      slug: 'brand-content-system',
-      name: 'Brand Content System',
-      description: 'Reusable templates and guidelines for campaign and social content.',
-      status: 'PLANNED',
-      start: 7,
-      end: 60,
-      owner: 'mentor',
-      members: ['zara', 'diya'],
-    },
-  ]
-  const projectIds: Record<string, string> = {}
-  for (const seed of projectSeeds) {
-    const data = {
-      organization_id: orgId,
-      name: seed.name,
-      description: seed.description,
-      status: seed.status,
-      start_date: dateFrom(now, seed.start),
-      target_end_date: dateFrom(now, seed.end),
-      owner_id: userIds[seed.owner],
-      deleted_at: null,
-    }
-    const project = await prisma.project.upsert({
-      where: { organization_id_slug: { organization_id: orgId, slug: seed.slug } },
-      update: data,
-      create: { id: seedId(`project:${seed.key}`), slug: seed.slug, ...data },
-    })
-    projectIds[seed.key] = project.id
-    await prisma.projectMember.createMany({
-      data: [
-        { project_id: project.id, user_id: userIds[seed.owner], role: 'OWNER' as const },
-        ...seed.members.map((member) => ({
-          project_id: project.id,
-          user_id: userIds[member],
-          role: 'MEMBER' as const,
-        })),
-      ],
-      skipDuplicates: true,
-    })
-  }
-
-  const milestoneSeeds = [
-    { key: 'website-design', project: 'website', name: 'Design sign-off', due: 5, status: 'IN_PROGRESS' },
-    { key: 'website-build', project: 'website', name: 'Build and content migration', due: 28, status: 'PLANNED' },
-    { key: 'social-q-plan', project: 'social', name: 'Quarterly content plan', due: -10, status: 'COMPLETED' },
-    { key: 'social-mid', project: 'social', name: 'Mid-campaign report', due: 9, status: 'PLANNED' },
-  ] as const
-  const milestoneIds: Record<string, string> = {}
-  for (const seed of milestoneSeeds) {
-    const id = seedId(`milestone:${seed.key}`)
-    const data = {
-      project_id: projectIds[seed.project],
-      name: seed.name,
-      due_date: dateFrom(now, seed.due),
-      status: seed.status,
-    }
-    await prisma.milestone.upsert({ where: { id }, update: data, create: { id, ...data } })
-    milestoneIds[seed.key] = id
-  }
-
-  const taskSeeds: {
-    key: string
-    project: string
-    milestone?: string
-    title: string
-    status: TaskStatus
-    priority: TaskPriority
-    due: number | null
-    assignees: string[]
-    estimate?: number
-    submission?: SubmissionStatus
-  }[] = [
-    {
-      key: 'hero',
-      project: 'website',
-      milestone: 'website-design',
-      title: 'Design homepage hero variations',
-      status: 'IN_REVIEW',
-      priority: 'HIGH',
-      due: 1,
-      assignees: ['diya'],
-      estimate: 360,
-      submission: 'SUBMITTED',
-    },
-    {
-      key: 'nav',
-      project: 'website',
-      milestone: 'website-design',
-      title: 'Build responsive navigation component',
-      status: 'IN_PROGRESS',
-      priority: 'HIGH',
-      due: 3,
-      assignees: ['intern'],
-      estimate: 480,
-    },
-    {
-      key: 'case-study',
-      project: 'website',
-      milestone: 'website-build',
-      title: 'Case study page template',
-      status: 'ASSIGNED',
-      priority: 'MEDIUM',
-      due: 6,
-      assignees: ['intern', 'diya'],
-      estimate: 600,
-    },
-    {
-      key: 'audit',
-      project: 'website',
-      milestone: 'website-design',
-      title: 'Accessibility audit of current site',
-      status: 'COMPLETED',
-      priority: 'MEDIUM',
-      due: -5,
-      assignees: ['intern'],
-      estimate: 240,
-      submission: 'APPROVED',
-    },
-    {
-      key: 'analytics',
-      project: 'website',
-      milestone: 'website-build',
-      title: 'Set up privacy-friendly analytics',
-      status: 'BACKLOG',
-      priority: 'LOW',
-      due: null,
-      assignees: [],
-    },
-    {
-      key: 'chatbot',
-      project: 'website',
-      title: 'Prototype FAQ assistant for contact page',
-      status: 'BLOCKED',
-      priority: 'MEDIUM',
-      due: 12,
-      assignees: ['neel'],
-      estimate: 720,
-    },
-    {
-      key: 'reels',
-      project: 'social',
-      milestone: 'social-mid',
-      title: 'Plan October reels calendar',
-      status: 'IN_PROGRESS',
-      priority: 'URGENT',
-      due: 0,
-      assignees: ['ishaan'],
-      estimate: 180,
-    },
-    {
-      key: 'captions',
-      project: 'social',
-      title: 'Write captions for client spotlight series',
-      status: 'IN_REVIEW',
-      priority: 'MEDIUM',
-      due: 2,
-      assignees: ['tara'],
-      estimate: 150,
-      submission: 'UNDER_REVIEW',
-    },
-    {
-      key: 'report',
-      project: 'social',
-      milestone: 'social-mid',
-      title: 'Compile weekly engagement report',
-      status: 'CHANGES_REQUESTED',
-      priority: 'HIGH',
-      due: -1,
-      assignees: ['ishaan'],
-      estimate: 90,
-      submission: 'CHANGES_REQUESTED',
-    },
-    {
-      key: 'linkedin',
-      project: 'social',
-      title: 'LinkedIn carousel: agency process',
-      status: 'ASSIGNED',
-      priority: 'MEDIUM',
-      due: 8,
-      assignees: ['tara', 'kabir'],
-      estimate: 240,
-    },
-    {
-      key: 'hashtags',
-      project: 'social',
-      milestone: 'social-q-plan',
-      title: 'Hashtag and competitor research',
-      status: 'COMPLETED',
-      priority: 'LOW',
-      due: -12,
-      assignees: ['ishaan'],
-      estimate: 120,
-    },
-    {
-      key: 'templates',
-      project: 'brand',
-      title: 'Moodboard for brand template refresh',
-      status: 'IN_REVIEW',
-      priority: 'MEDIUM',
-      due: 4,
-      assignees: ['zara'],
-      estimate: 200,
-      submission: 'SUBMITTED',
-    },
-    {
-      key: 'type-scale',
-      project: 'brand',
-      title: 'Define typography scale for templates',
-      status: 'BACKLOG',
-      priority: 'LOW',
-      due: 20,
-      assignees: [],
-    },
-  ]
-  for (const seed of taskSeeds) {
-    const id = seedId(`task:${seed.key}`)
-    const due = seed.due === null ? null : daysFrom(now, seed.due)
-    const data = {
-      organization_id: orgId,
-      project_id: projectIds[seed.project],
-      milestone_id: seed.milestone ? milestoneIds[seed.milestone] : null,
-      title: seed.title,
-      status: seed.status,
-      priority: seed.priority,
-      created_by: userIds.manager,
-      due_date: due,
-      estimated_minutes: seed.estimate ?? null,
-      completed_at: seed.status === 'COMPLETED' && due ? due : null,
-      deleted_at: null,
-    }
-    await prisma.task.upsert({ where: { id }, update: data, create: { id, ...data } })
-    await prisma.taskAssignee.createMany({
-      data: seed.assignees.map((assignee) => ({
-        task_id: id,
-        user_id: userIds[assignee],
-        assigned_by: userIds.manager,
-      })),
-      skipDuplicates: true,
-    })
-
-    if (seed.submission && seed.assignees[0]) {
-      const submissionId = seedId(`submission:${seed.key}`)
-      const reviewed = ['APPROVED', 'CHANGES_REQUESTED', 'REJECTED'].includes(seed.submission)
-      const submissionData = {
-        task_id: id,
-        submitted_by: userIds[seed.assignees[0]],
-        status: seed.submission,
-        description: 'Submitted for review.',
-        submitted_at: daysFrom(now, (seed.due ?? 0) - 2),
-        reviewed_at: reviewed ? daysFrom(now, (seed.due ?? 0) - 1) : null,
-        reviewed_by: reviewed ? userIds.manager : null,
-        review_comment: seed.submission === 'CHANGES_REQUESTED' ? 'Please add week-over-week comparison.' : null,
-      }
-      await prisma.taskSubmission.upsert({
-        where: { id: submissionId },
-        update: submissionData,
-        create: { id: submissionId, ...submissionData },
+    // Onboarding: regenerate each run so relative due dates stay realistic.
+    await prisma.onboardingItem.deleteMany({ where: { internship_id: internshipId } })
+    await prisma.onboarding.deleteMany({ where: { internship_id: internshipId } })
+    await prisma.documentAcknowledgement.deleteMany({ where: { user_id: userIds[seed.key] } })
+    if (seed.template) {
+      const templateId = ref.templateIds[seed.template]
+      const template = await prisma.onboardingTemplate.findUniqueOrThrow({
+        where: { id: templateId },
+        select: { name: true, items: { orderBy: { sort_order: 'asc' } } },
       })
-      await prisma.submissionVersion.upsert({
-        where: { submission_id_version_number: { submission_id: submissionId, version_number: 1 } },
-        update: {},
-        create: {
-          submission_id: submissionId,
-          version_number: 1,
-          description: 'Initial submission',
-          created_by: submissionData.submitted_by,
+      const complete = seed.done === null
+      const onboarding = await prisma.onboarding.create({
+        data: {
+          id: seedId(`onboarding:${seed.key}`),
+          organization_id: orgId,
+          internship_id: internshipId,
+          template_id: templateId,
+          template_name: template.name,
+          started_at: daysFrom(joining, -3),
+          completed_at: complete ? daysFrom(joining, 6) : null,
+          created_by: userIds.hr,
+        },
+      })
+      const assigneeFor = (role: string, fixed: string | null) =>
+        role === 'INTERN' ? userIds[seed.key] : role === 'MANAGER' ? managerId : role === 'MENTOR' ? mentorId : fixed
+      for (const [index, item] of template.items.entries()) {
+        const done = seed.done === null || seed.done.includes(index)
+        const assignee = assigneeFor(item.assigned_role, item.assigned_user_id)
+        const due = dateFrom(joining, item.due_days_after_start)
+        await prisma.onboardingItem.create({
+          data: {
+            id: seedId(`onboarding-item:${seed.key}:${index}`),
+            organization_id: orgId,
+            internship_id: internshipId,
+            onboarding_id: onboarding.id,
+            template_item_id: item.id,
+            title: item.title,
+            description: item.description,
+            item_type: item.category,
+            required: item.required,
+            due_date: due,
+            assigned_role: item.assigned_role,
+            assigned_to: assignee,
+            required_document_type: item.required_document_type,
+            policy_id: item.policy_id,
+            status: done ? 'COMPLETED' : 'PENDING',
+            completed_at: done ? daysFrom(due, 0) : null,
+            completed_by: done ? assignee : null,
+            sort_order: index,
+          },
+        })
+        if (done && item.policy_id) {
+          const policy = await prisma.policy.findUniqueOrThrow({
+            where: { id: item.policy_id },
+            select: { version: true },
+          })
+          await prisma.documentAcknowledgement.create({
+            data: {
+              organization_id: orgId,
+              user_id: userIds[seed.key],
+              policy_id: item.policy_id,
+              policy_version: policy.version,
+              acknowledged_at: daysFrom(due, 0),
+            },
+          })
+        }
+      }
+    }
+
+    // Lifecycle timeline (deterministic keys, refreshed each run).
+    const events: {
+      type: 'CREATED' | 'ONBOARDING_STARTED' | 'ONBOARDING_COMPLETED' | 'STATUS_CHANGED'
+      at: Date
+      text: string
+      meta?: object
+    }[] = [{ type: 'CREATED', at: daysFrom(joining, -10), text: 'Intern created' }]
+    if (seed.template)
+      events.push({
+        type: 'ONBOARDING_STARTED',
+        at: daysFrom(joining, -3),
+        text: `Onboarding started (${seed.template})`,
+      })
+    if (seed.template && seed.done === null) {
+      events.push({
+        type: 'ONBOARDING_COMPLETED',
+        at: daysFrom(joining, 6),
+        text: 'All required onboarding items are complete',
+      })
+      events.push({
+        type: 'STATUS_CHANGED',
+        at: daysFrom(joining, 7),
+        text: 'Onboarding → Active',
+        meta: { from: 'ONBOARDING', to: 'ACTIVE' },
+      })
+    }
+    if (seed.status === 'ENDING_SOON') {
+      events.push({
+        type: 'STATUS_CHANGED',
+        at: daysFrom(expectedEnd, -14),
+        text: 'Active → Ending soon',
+        meta: { from: 'ACTIVE', to: 'ENDING_SOON', automated: true },
+      })
+    }
+    if (seed.status === 'COMPLETED') {
+      events.push({
+        type: 'STATUS_CHANGED',
+        at: daysFrom(expectedEnd, 0),
+        text: 'Active → Completed',
+        meta: { from: 'ACTIVE', to: 'COMPLETED' },
+      })
+    }
+    await prisma.internLifecycleEvent.deleteMany({
+      where: { intern_id: intern.id, idempotency_key: { startsWith: 'seed:' } },
+    })
+    for (const [index, event] of events.entries()) {
+      await prisma.internLifecycleEvent.create({
+        data: {
+          organization_id: orgId,
+          intern_id: intern.id,
+          event_type: event.type,
+          description: event.text,
+          actor_user_id:
+            event.type === 'STATUS_CHANGED' && (event.meta as { automated?: boolean })?.automated ? null : userIds.hr,
+          metadata: { source: 'seed', ...(event.meta ?? {}) },
+          idempotency_key: `seed:${seed.key}:${index}`,
+          created_at: event.at,
         },
       })
     }
   }
+
+  // Next generated code continues after the highest existing one (AYV-INT-0008 on a fresh database).
+  // Never move the counter backwards: re-seeding a database that already has created interns must not
+  // hand out codes that are taken.
+  const codes = await prisma.intern.findMany({
+    where: { organization_id: orgId, employee_code: { startsWith: 'AYV-INT-' } },
+    select: { employee_code: true },
+  })
+  const highest = codes.reduce((max, row) => Math.max(max, Number(row.employee_code.slice(8)) || 0), 0)
+  await prisma.$executeRaw`
+    INSERT INTO "code_counters" ("organization_id", "key", "value", "updated_at")
+    VALUES (${orgId}::uuid, 'intern.employee_code', ${highest}, now())
+    ON CONFLICT ("organization_id", "key")
+    DO UPDATE SET "value" = GREATEST("code_counters"."value", EXCLUDED."value"), "updated_at" = now()`
+
+  const profileSeeds: Record<string, { institution: string; field: string; bio: string }> = {
+    intern: {
+      institution: 'Demo Institute of Technology',
+      field: 'Computer Science',
+      bio: 'Front-end developer interested in design systems and accessibility.',
+    },
+    ishaan: {
+      institution: 'Demo College of Commerce',
+      field: 'Marketing',
+      bio: 'Loves short-form video and community building.',
+    },
+    zara: {
+      institution: 'Demo School of Design',
+      field: 'Communication Design',
+      bio: 'Illustrator and brand identity enthusiast.',
+    },
+    neel: { institution: 'Demo Institute of Technology', field: 'Data Science', bio: 'Exploring applied NLP.' },
+  }
+  for (const [key, profile] of Object.entries(profileSeeds)) {
+    await prisma.internProfile.upsert({
+      where: { intern_id: internIds[key] },
+      update: {},
+      create: {
+        intern_id: internIds[key],
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        education_level: 'Undergraduate',
+        institution: profile.institution,
+        field_of_study: profile.field,
+        graduation_year: now.getUTCFullYear() + 1,
+        bio: profile.bio,
+      },
+    })
+  }
+  const contactId = seedId('emergency:intern')
+  await prisma.emergencyContact.upsert({
+    where: { id: contactId },
+    update: {},
+    create: {
+      id: contactId,
+      intern_id: internIds.intern,
+      name: 'Ravi Sharma',
+      relationship: 'Parent',
+      phone: '+91 90000 00001',
+    },
+  })
+
+  // ── Projects, milestones, tasks, submissions (prisma/seed/work.ts) ────────
+  const { projectIds } = await seedWork(prisma, orgId, userIds, now)
 
   // ── Learning ──────────────────────────────────────────────────────────────
   const courseSeeds = [
@@ -707,16 +611,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       id: projectIds.website,
       hoursAgo: 72,
     },
-    { key: 'neel', actor: 'hr', action: 'intern.onboarding_started', type: 'intern', id: internIds.neel, hoursAgo: 48 },
-    { key: 'hero', actor: 'diya', action: 'task.submitted', type: 'task', id: seedId('task:hero'), hoursAgo: 20 },
-    {
-      key: 'report',
-      actor: 'manager',
-      action: 'task.changes_requested',
-      type: 'task',
-      id: seedId('task:report'),
-      hoursAgo: 6,
-    },
+    { key: 'neel', actor: 'hr', action: 'intern.status_changed', type: 'intern', id: internIds.intern, hoursAgo: 48 },
     {
       key: 'welcome',
       actor: 'hr',
@@ -726,6 +621,8 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
       hoursAgo: 24,
     },
   ]
+  // Phase 01 entries replaced by project activity in prisma/seed/work.ts.
+  await prisma.auditLog.deleteMany({ where: { id: { in: [seedId('audit:hero'), seedId('audit:report')] } } })
   for (const entry of auditSeeds) {
     const id = seedId(`audit:${entry.key}`)
     const data = {

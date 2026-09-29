@@ -6,6 +6,7 @@ import {
   type PermissionScope,
   type SystemRoleSlug,
 } from '../../src/lib/permissions/catalog'
+import { seedOnboardingReference } from './onboarding'
 import { AYAVA_ORGANIZATION_ID } from './ids'
 
 /**
@@ -154,6 +155,8 @@ export async function seedReference(prisma: PrismaClient) {
     { key: 'work_week', value: { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] } },
     { key: 'attendance.late_after', value: { time: '10:15' } },
     { key: 'internship.default_duration_weeks', value: { weeks: 12 } },
+    { key: 'internship.ending_soon_days', value: { days: 14 } },
+    { key: 'intern.employee_code_prefix', value: { prefix: 'AYV-INT-' } },
   ]
   for (const setting of settingSeeds) {
     await prisma.setting.upsert({
@@ -163,8 +166,12 @@ export async function seedReference(prisma: PrismaClient) {
     })
   }
 
+  const onboarding = await seedOnboardingReference(prisma, { organizationId: orgId, departmentIds })
+
   return {
     organizationId: orgId,
+    policyIds: onboarding.policyIds,
+    templateIds: onboarding.templateIds,
     roleIds,
     departmentIds,
     positionIds,

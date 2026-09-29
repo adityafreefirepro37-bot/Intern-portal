@@ -2,8 +2,7 @@
 
 import { useTransition } from 'react'
 import Link from 'next/link'
-import { Bell, KeyRound, LogOut, Menu, Search, UserRound } from 'lucide-react'
-import { PhaseBadge } from '@/components/common/badges'
+import { KeyRound, LogOut, Menu, Search, UserRound } from 'lucide-react'
 import { UserAvatar } from '@/components/common/user-avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,6 +16,7 @@ import {
 import { Kbd } from '@/components/ui/misc'
 import { signOutAction } from '@/server/actions/auth'
 import { Brand } from './brand'
+import { NotificationBell, type ShellNotification } from './notification-bell'
 
 export interface ShellUser {
   displayName: string
@@ -30,8 +30,10 @@ export function Topbar({
   organizationName,
   onOpenMenu,
   onOpenSearch,
+  notifications,
 }: {
   user: ShellUser
+  notifications: { items: ShellNotification[]; unread: number }
   organizationName: string
   onOpenMenu: () => void
   onOpenSearch: () => void
@@ -70,21 +72,7 @@ export function Topbar({
       </button>
 
       <div className="flex items-center gap-1 md:ml-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Notifications">
-              <Bell aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              Notifications <PhaseBadge phase="06" />
-            </DropdownMenuLabel>
-            <p className="px-2 pb-3 pt-1 text-small text-muted-foreground">
-              In-app notifications arrive in Phase 06. Nothing is being missed in the meantime.
-            </p>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationBell items={notifications.items} unread={notifications.unread} />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

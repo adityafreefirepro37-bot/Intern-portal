@@ -8,7 +8,11 @@ export const EMPLOYEE_CODE_COUNTER_KEY = 'intern.employee_code'
 export const DEFAULT_EMPLOYEE_CODE_PREFIX = 'AYV-INT-'
 export const EMPLOYEE_CODE_WIDTH = 4
 
-export function formatEmployeeCode(value: number, prefix = DEFAULT_EMPLOYEE_CODE_PREFIX, width = EMPLOYEE_CODE_WIDTH): string {
+export function formatEmployeeCode(
+  value: number,
+  prefix = DEFAULT_EMPLOYEE_CODE_PREFIX,
+  width = EMPLOYEE_CODE_WIDTH,
+): string {
   if (!Number.isInteger(value) || value < 1) throw new Error('Employee code number must be a positive integer')
   return `${prefix}${String(value).padStart(width, '0')}`
 }

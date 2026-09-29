@@ -25,7 +25,7 @@ export interface ProfileTab {
 export function ProfileTabs({ tabs, active, basePath }: { tabs: ProfileTab[]; active: string; basePath: string }) {
   return (
     <nav aria-label="Profile sections" className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <ul className="flex w-max gap-1 rounded-lg bg-muted p-1">
+      <ul className="flex w-max gap-1 rounded-lg bg-muted p-1 lg:w-auto lg:flex-wrap">
         {tabs.map((tab) => {
           const current = tab.key === active
           return (
@@ -50,7 +50,17 @@ export function ProfileTabs({ tabs, active, basePath }: { tabs: ProfileTab[]; ac
 }
 
 /** A later-phase module shown honestly as not available yet. */
-export function ModuleComingSoon({ icon: Icon, title, phase, description }: { icon: LucideIcon; title: string; phase: string; description: string }) {
+export function ModuleComingSoon({
+  icon: Icon,
+  title,
+  phase,
+  description,
+}: {
+  icon: LucideIcon
+  title: string
+  phase: string
+  description: string
+}) {
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
@@ -72,9 +82,17 @@ type Person = { first_name: string; last_name: string; display_name: string | nu
 export function TasksList({
   tasks,
 }: {
-  tasks: { id: string; title: string; status: string; priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'; due_date: Date | null; project: { name: string } | null }[]
+  tasks: {
+    id: string
+    title: string
+    status: string
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+    due_date: Date | null
+    project: { name: string } | null
+  }[]
 }) {
-  if (tasks.length === 0) return <EmptyState title="No tasks" description="Tasks assigned to this intern appear here." compact />
+  if (tasks.length === 0)
+    return <EmptyState title="No tasks" description="Tasks assigned to this intern appear here." compact />
   return (
     <ul className="divide-y rounded-xl border bg-card">
       {tasks.map((task) => (
@@ -96,8 +114,13 @@ export function TasksList({
   )
 }
 
-export function ProjectsList({ projects }: { projects: { id: string; name: string; status: string; target_end_date: Date | null }[] }) {
-  if (projects.length === 0) return <EmptyState title="No projects" description="Projects this intern is a member of appear here." compact />
+export function ProjectsList({
+  projects,
+}: {
+  projects: { id: string; name: string; status: string; target_end_date: Date | null }[]
+}) {
+  if (projects.length === 0)
+    return <EmptyState title="No projects" description="Projects this intern is a member of appear here." compact />
   return (
     <ul className="divide-y rounded-xl border bg-card">
       {projects.map((project) => (
@@ -132,7 +155,10 @@ export function ActivityTimeline({
         <ol className="relative space-y-5 border-l pl-5">
           {events.map((event) => (
             <li key={event.id} className="relative">
-              <span className="absolute -left-[1.6rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-card" aria-hidden />
+              <span
+                className="absolute -left-[1.6rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-card"
+                aria-hidden
+              />
               <p className="text-small">{event.description}</p>
               <p className="text-caption text-muted-foreground">
                 <time dateTime={event.created_at.toISOString()} title={event.created_at.toISOString()}>

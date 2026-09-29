@@ -11,18 +11,24 @@ type Action<T> = (previous: FormState<T>, formData: FormData) => Promise<FormSta
  * useActionState + success toast + router refresh. Errors stay in the returned
  * state so forms can show field messages next to the inputs.
  */
-export function useFormAction<T = undefined>(action: Action<T>, options: { onSuccess?: (state: FormState<T>) => void; toast?: boolean } = {}) {
+export function useFormAction<T = undefined>(
+  action: Action<T>,
+  options: { onSuccess?: (state: FormState<T>) => void; toast?: boolean } = {},
+) {
   const router = useRouter()
   const { toast } = useToast()
-  return useActionState<FormState<T>, FormData>(async (previous, formData) => {
-    const result = await action(previous, formData)
-    if (result.status === 'success') {
-      if (options.toast !== false) toast({ title: result.message ?? 'Saved', variant: 'success' })
-      options.onSuccess?.(result)
-      router.refresh()
-    } else if (result.status === 'error' && !result.fields) {
-      toast({ title: result.message ?? 'Something went wrong', variant: 'error' })
-    }
-    return result
-  }, { status: 'idle' } as FormState<T>)
+  return useActionState<FormState<T>, FormData>(
+    async (previous, formData) => {
+      const result = await action(previous, formData)
+      if (result.status === 'success') {
+        if (options.toast !== false) toast({ title: result.message ?? 'Saved', variant: 'success' })
+        options.onSuccess?.(result)
+        router.refresh()
+      } else if (result.status === 'error' && !result.fields) {
+        toast({ title: result.message ?? 'Something went wrong', variant: 'error' })
+      }
+      return result
+    },
+    { status: 'idle' } as FormState<T>,
+  )
 }

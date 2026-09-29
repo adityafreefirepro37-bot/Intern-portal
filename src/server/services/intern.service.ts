@@ -22,7 +22,7 @@ import { auditService } from './audit.service'
 import { authorizationService } from './authorization.service'
 import { resolveInternAccess } from './intern-access'
 import { invitationIssuer } from './invitation.service'
-import { generateOnboarding } from './onboarding.service'
+import { emitItemAssignments, generateOnboarding } from './onboarding.service'
 import { skipTake, toPage } from './pagination'
 import { settingsService } from './settings.service'
 import { userService } from './user.service'
@@ -59,7 +59,10 @@ const checkbox = z.preprocess((value) => value === true || value === 'on' || val
 
 export const directoryQuerySchema = z.object({
   q: z.string().trim().max(100).optional().catch(undefined),
-  status: z.enum(INTERN_STATUSES as [InternStatus, ...InternStatus[]]).optional().catch(undefined),
+  status: z
+    .enum(INTERN_STATUSES as [InternStatus, ...InternStatus[]])
+    .optional()
+    .catch(undefined),
   department: z.uuid().optional().catch(undefined),
   team: z.uuid().optional().catch(undefined),
   position: z.uuid().optional().catch(undefined),
@@ -72,7 +75,11 @@ export const directoryQuerySchema = z.object({
   sort: z.enum(INTERN_SORTS).default('name').catch('name'),
   dir: z.enum(['asc', 'desc']).default('asc').catch('asc'),
   page: z.coerce.number().int().min(1).max(10_000).default(1).catch(1),
-  pageSize: z.coerce.number().pipe(z.union([z.literal(25), z.literal(50), z.literal(100)])).default(25).catch(25),
+  pageSize: z.coerce
+    .number()
+    .pipe(z.union([z.literal(25), z.literal(50), z.literal(100)]))
+    .default(25)
+    .catch(25),
 })
 export type DirectoryQuery = z.infer<typeof directoryQuerySchema>
 
@@ -98,7 +105,8 @@ const placementFields = {
     .pipe(z.number().int().min(1950).max(2100).optional()),
 }
 
-const datesInOrder = (value: { joiningDate: string; expectedEndDate: string }) => value.expectedEndDate >= value.joiningDate
+const datesInOrder = (value: { joiningDate: string; expectedEndDate: string }) =>
+  value.expectedEndDate >= value.joiningDate
 const datesMessage = { message: 'The end date must be on or after the joining date', path: ['expectedEndDate'] }
 
 export const createInternSchema = z
@@ -150,10 +158,19 @@ async function assertPlacement(
   input: { positionId: string; departmentId: string; teamId?: string },
 ): Promise<{ positionTitle: string }> {
   const [position, department, team] = await Promise.all([
-    prisma.position.findFirst({ where: { id: input.positionId, organization_id: organizationId, is_active: true }, select: { title: true } }),
-    prisma.department.findFirst({ where: { id: input.departmentId, organization_id: organizationId, is_active: true }, select: { id: true } }),
+    prisma.position.findFirst({
+      where: { id: input.positionId, organization_id: organizationId, is_active: true },
+      select: { title: true },
+    }),
+    prisma.department.findFirst({
+      where: { id: input.departmentId, organization_id: organizationId, is_active: true },
+      select: { id: true },
+    }),
     input.teamId
-      ? prisma.team.findFirst({ where: { id: input.teamId, organization_id: organizationId, is_active: true }, select: { department_id: true } })
+      ? prisma.team.findFirst({
+          where: { id: input.teamId, organization_id: organizationId, is_active: true },
+          select: { department_id: true },
+        })
       : Promise.resolve(null),
   ])
   if (!position) throw new ValidationError('Choose a valid position', { positionId: 'Not found' })
@@ -228,7 +245,10 @@ export const internService = {
 
   async list(ctx: RequestContext, pagination: Pagination, filter: { status?: InternStatus } = {}) {
     const scope = authorizationService.require(ctx, 'intern.read')
-    const [items, total] = await internRepository.listPage(internScope(ctx.actor, scope), { ...skipTake(pagination), status: filter.status })
+    const [items, total] = await internRepository.listPage(internScope(ctx.actor, scope), {
+      ...skipTake(pagination),
+      status: filter.status,
+    })
     return toPage(items, total, pagination)
   },
 
@@ -261,7 +281,12 @@ export const internService = {
       employeeCode: r.employee_code,
       status: r.status,
       name: fullName(r.user),
-      person: { first_name: r.user.first_name, last_name: r.user.last_name, display_name: r.user.display_name, avatar_url: r.user.avatar_url },
+      person: {
+        first_name: r.user.first_name,
+        last_name: r.user.last_name,
+        display_name: r.user.display_name,
+        avatar_url: r.user.avatar_url,
+      },
       accountStatus: r.user.status,
       email: r.user.email,
       phone: access.can.seeContact ? r.user.phone : maskValue(r.user.phone),
@@ -287,21 +312,27 @@ export const internService = {
             onboarding: internship.onboarding,
           }
         : null,
-      education: access.can.seePersonal && profile
-        ? {
-            level: profile.education_level,
-            institution: profile.institution,
-            fieldOfStudy: profile.field_of_study,
-            graduationYear: profile.graduation_year,
-            bio: profile.bio,
-            city: profile.city,
-            state: profile.state,
-            country: profile.country,
-          }
-        : null,
+      education:
+        access.can.seePersonal && profile
+          ? {
+              level: profile.education_level,
+              institution: profile.institution,
+              fieldOfStudy: profile.field_of_study,
+              graduationYear: profile.graduation_year,
+              bio: profile.bio,
+              city: profile.city,
+              state: profile.state,
+              country: profile.country,
+            }
+          : null,
       emergencyContacts: access.can.seeSensitive ? r.emergency_contacts : null,
       can: access.can,
-      relation: { isSelf: access.isSelf, isManager: access.isManager, isMentor: access.isMentor, orgWide: access.orgWide },
+      relation: {
+        isSelf: access.isSelf,
+        isManager: access.isManager,
+        isMentor: access.isMentor,
+        orgWide: access.orgWide,
+      },
     }
   },
 
@@ -316,7 +347,11 @@ export const internService = {
     if (!authorizationService.canAny(ctx, ['intern.create', 'intern.update', 'intern.read'])) throw new ForbiddenError()
     const org = ctx.organization.id
     const [departments, teams, positions, staff, templates] = await Promise.all([
-      prisma.department.findMany({ where: { organization_id: org, is_active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+      prisma.department.findMany({
+        where: { organization_id: org, is_active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      }),
       prisma.team.findMany({
         where: { organization_id: org, is_active: true },
         orderBy: { name: 'asc' },
@@ -330,7 +365,13 @@ export const internService = {
       prisma.user.findMany({
         where: { organization_id: org, status: 'ACTIVE', deleted_at: null, intern: { is: null } },
         orderBy: [{ first_name: 'asc' }, { last_name: 'asc' }],
-        select: { id: true, first_name: true, last_name: true, display_name: true, user_roles: { select: { role: { select: { name: true } } } } },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          display_name: true,
+          user_roles: { select: { role: { select: { name: true } } } },
+        },
       }),
       templateRepository.list(org),
     ])
@@ -338,8 +379,20 @@ export const internService = {
       departments,
       teams,
       positions,
-      staff: staff.map((user) => ({ id: user.id, name: fullName(user), roles: user.user_roles.map(({ role }) => role.name).join(', ') })),
-      templates: templates.filter((t) => t.is_active).map((t) => ({ id: t.id, name: t.name, isDefault: t.is_default, departmentId: t.department?.id ?? null, positionId: t.position?.id ?? null })),
+      staff: staff.map((user) => ({
+        id: user.id,
+        name: fullName(user),
+        roles: user.user_roles.map(({ role }) => role.name).join(', '),
+      })),
+      templates: templates
+        .filter((t) => t.is_active)
+        .map((t) => ({
+          id: t.id,
+          name: t.name,
+          isDefault: t.is_default,
+          departmentId: t.department?.id ?? null,
+          positionId: t.position?.id ?? null,
+        })),
     }
   },
 
@@ -348,7 +401,12 @@ export const internService = {
    * transaction (no partial interns). The invitation email is sent after
    * commit; if delivery fails the intern still exists and HR can resend it.
    */
-  async create(ctx: RequestContext, input: unknown, meta: RequestMeta, avatar?: { name: string; type: string; bytes: Uint8Array }) {
+  async create(
+    ctx: RequestContext,
+    input: unknown,
+    meta: RequestMeta,
+    avatar?: { name: string; type: string; bytes: Uint8Array },
+  ) {
     authorizationService.require(ctx, 'intern.create')
     const data = parseInput(createInternSchema, input)
     if (data.sendInvitation) authorizationService.require(ctx, 'user.invite')
@@ -358,12 +416,20 @@ export const internService = {
     await assertStaff(org, data.mentorId, 'mentorId')
     const deliverByEmail = data.sendInvitation ? invitationIssuer.assertDeliveryAvailable() : false
 
-    const internRole = await prisma.role.findFirst({ where: { organization_id: org, slug: 'intern' }, select: { id: true, name: true, slug: true } })
+    const internRole = await prisma.role.findFirst({
+      where: { organization_id: org, slug: 'intern' },
+      select: { id: true, name: true, slug: true },
+    })
     if (!internRole) throw new ValidationError('The Intern role is missing; run the seed')
 
     const existing = await prisma.user.findUnique({
       where: { organization_id_email: { organization_id: org, email: data.email } },
-      select: { id: true, status: true, deleted_at: true, intern: { select: { id: true, employee_code: true, deleted_at: true } } },
+      select: {
+        id: true,
+        status: true,
+        deleted_at: true,
+        intern: { select: { id: true, employee_code: true, deleted_at: true } },
+      },
     })
     if (existing?.intern && !existing.intern.deleted_at) {
       throw new ConflictError(`This person is already an intern (${existing.intern.employee_code})`)
@@ -373,9 +439,11 @@ export const internService = {
     }
 
     const templateId = data.startOnboarding
-      ? (data.templateId ?? (await templateRepository.pickFor(org, { departmentId: data.departmentId, positionId: data.positionId })))
+      ? (data.templateId ??
+        (await templateRepository.pickFor(org, { departmentId: data.departmentId, positionId: data.positionId })))
       : null
-    if (data.startOnboarding && !templateId) throw new ValidationError('Choose an onboarding template', { templateId: 'Required' })
+    if (data.startOnboarding && !templateId)
+      throw new ValidationError('Choose an onboarding template', { templateId: 'Required' })
 
     const prefix = await settingsService.employeeCodePrefix(org)
     const startDate = parseDateOnly(data.joiningDate)
@@ -386,11 +454,25 @@ export const internService = {
         const user = existing
           ? await tx.user.update({
               where: { id: existing.id },
-              data: { first_name: data.firstName, last_name: data.lastName, phone: data.phone ?? null, status: 'INVITED', deleted_at: null },
+              data: {
+                first_name: data.firstName,
+                last_name: data.lastName,
+                phone: data.phone ?? null,
+                status: 'INVITED',
+                deleted_at: null,
+              },
               select: { id: true, email: true },
             })
           : await tx.user.create({
-              data: { organization_id: org, email: data.email, first_name: data.firstName, last_name: data.lastName, phone: data.phone ?? null, status: 'INVITED', timezone: ctx.organization.timezone },
+              data: {
+                organization_id: org,
+                email: data.email,
+                first_name: data.firstName,
+                last_name: data.lastName,
+                phone: data.phone ?? null,
+                status: 'INVITED',
+                timezone: ctx.organization.timezone,
+              },
               select: { id: true, email: true },
             })
         await tx.userRole.deleteMany({ where: { user_id: user.id } })
@@ -424,7 +506,13 @@ export const internService = {
         })
         if (data.emergencyName && data.emergencyRelationship && data.emergencyPhone) {
           await tx.emergencyContact.create({
-            data: { intern_id: intern.id, name: data.emergencyName, relationship: data.emergencyRelationship, phone: data.emergencyPhone, email: data.emergencyEmail ?? null },
+            data: {
+              intern_id: intern.id,
+              name: data.emergencyName,
+              relationship: data.emergencyRelationship,
+              phone: data.emergencyPhone,
+              email: data.emergencyEmail ?? null,
+            },
           })
         }
         const internship = await tx.internship.create({
@@ -454,7 +542,13 @@ export const internService = {
           metadata: { employeeCode },
         })
         const onboarding = templateId
-          ? await generateOnboarding(tx, { organizationId: org, internship, intern, templateId, actorUserId: ctx.actor.userId })
+          ? await generateOnboarding(tx, {
+              organizationId: org,
+              internship,
+              intern,
+              templateId,
+              actorUserId: ctx.actor.userId,
+            })
           : null
         const issued = data.sendInvitation ? await invitationIssuer.createRecord(tx, ctx, user, internRole.id) : null
         if (issued) {
@@ -473,16 +567,58 @@ export const internService = {
 
     // ── After commit: audit, events, external side effects ──
     const warnings: string[] = []
-    const base = { resourceType: 'intern', resourceId: result.intern.id, ipAddress: meta.ipAddress, userAgent: meta.userAgent }
-    await auditService.logForContext(ctx, { ...base, action: AUDIT_ACTIONS.INTERN_CREATED, metadata: { employeeCode: result.employeeCode, reusedUser: result.reusedUser } })
-    await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.INTERNSHIP_CREATED, resourceType: 'internship', resourceId: result.internship.id, metadata: { internId: result.intern.id } })
-    if (data.managerId) await auditService.logForContext(ctx, { ...base, action: AUDIT_ACTIONS.MANAGER_ASSIGNED, metadata: { managerId: data.managerId } })
-    if (data.mentorId) await auditService.logForContext(ctx, { ...base, action: AUDIT_ACTIONS.MENTOR_ASSIGNED, metadata: { mentorId: data.mentorId } })
-    if (result.onboarding) {
-      await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.ONBOARDING_CREATED, resourceType: 'onboarding', resourceId: result.onboarding.onboardingId, metadata: { internId: result.intern.id, template: result.onboarding.templateName } })
-      await domainEvents.emit('onboarding.created', { organizationId: org, actorUserId: ctx.actor.userId, payload: { internId: result.intern.id, onboardingId: result.onboarding.onboardingId, itemCount: result.onboarding.itemCount } })
+    const base = {
+      resourceType: 'intern',
+      resourceId: result.intern.id,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
     }
-    await domainEvents.emit('intern.created', { organizationId: org, actorUserId: ctx.actor.userId, payload: { internId: result.intern.id, userId: result.user.id, invited: Boolean(result.issued) } })
+    await auditService.logForContext(ctx, {
+      ...base,
+      action: AUDIT_ACTIONS.INTERN_CREATED,
+      metadata: { employeeCode: result.employeeCode, reusedUser: result.reusedUser },
+    })
+    await auditService.logForContext(ctx, {
+      action: AUDIT_ACTIONS.INTERNSHIP_CREATED,
+      resourceType: 'internship',
+      resourceId: result.internship.id,
+      metadata: { internId: result.intern.id },
+    })
+    if (data.managerId)
+      await auditService.logForContext(ctx, {
+        ...base,
+        action: AUDIT_ACTIONS.MANAGER_ASSIGNED,
+        metadata: { managerId: data.managerId },
+      })
+    if (data.mentorId)
+      await auditService.logForContext(ctx, {
+        ...base,
+        action: AUDIT_ACTIONS.MENTOR_ASSIGNED,
+        metadata: { mentorId: data.mentorId },
+      })
+    if (result.onboarding) {
+      await auditService.logForContext(ctx, {
+        action: AUDIT_ACTIONS.ONBOARDING_CREATED,
+        resourceType: 'onboarding',
+        resourceId: result.onboarding.onboardingId,
+        metadata: { internId: result.intern.id, template: result.onboarding.templateName },
+      })
+      await domainEvents.emit('onboarding.created', {
+        organizationId: org,
+        actorUserId: ctx.actor.userId,
+        payload: {
+          internId: result.intern.id,
+          onboardingId: result.onboarding.onboardingId,
+          itemCount: result.onboarding.itemCount,
+        },
+      })
+      await emitItemAssignments(ctx, result.onboarding.onboardingId, result.intern.id)
+    }
+    await domainEvents.emit('intern.created', {
+      organizationId: org,
+      actorUserId: ctx.actor.userId,
+      payload: { internId: result.intern.id, userId: result.user.id, invited: Boolean(result.issued) },
+    })
 
     let invitation: { delivery: 'email' | 'link'; inviteUrl: string | null } | null = null
     if (result.issued) {
@@ -498,7 +634,9 @@ export const internService = {
       } catch (error) {
         // Compensation: the intern exists; HR can resend the invitation from the profile.
         logger.error('Invitation delivery failed after intern creation', { internId: result.intern.id, error })
-        warnings.push('The intern was created, but the invitation email could not be sent. Use “Resend invitation” on their profile.')
+        warnings.push(
+          'The intern was created, but the invitation email could not be sent. Use “Resend invitation” on their profile.',
+        )
       }
     }
     if (avatar && avatar.bytes.byteLength > 0) {
@@ -525,15 +663,35 @@ export const internService = {
       r.joining_date?.getTime() !== start.getTime() || r.expected_end_date?.getTime() !== end.getTime()
 
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: r.user_id }, data: { first_name: data.firstName, last_name: data.lastName, phone: data.phone ?? null } })
+      await tx.user.update({
+        where: { id: r.user_id },
+        data: { first_name: data.firstName, last_name: data.lastName, phone: data.phone ?? null },
+      })
       await tx.intern.update({
         where: { id: r.id },
-        data: { position_id: data.positionId, department_id: data.departmentId, team_id: data.teamId ?? null, joining_date: start, expected_end_date: end },
+        data: {
+          position_id: data.positionId,
+          department_id: data.departmentId,
+          team_id: data.teamId ?? null,
+          joining_date: start,
+          expected_end_date: end,
+        },
       })
       await tx.internProfile.upsert({
         where: { intern_id: r.id },
-        update: { education_level: data.educationLevel ?? null, institution: data.institution ?? null, field_of_study: data.fieldOfStudy ?? null, graduation_year: data.graduationYear ?? null },
-        create: { intern_id: r.id, education_level: data.educationLevel, institution: data.institution, field_of_study: data.fieldOfStudy, graduation_year: data.graduationYear },
+        update: {
+          education_level: data.educationLevel ?? null,
+          institution: data.institution ?? null,
+          field_of_study: data.fieldOfStudy ?? null,
+          graduation_year: data.graduationYear ?? null,
+        },
+        create: {
+          intern_id: r.id,
+          education_level: data.educationLevel,
+          institution: data.institution,
+          field_of_study: data.fieldOfStudy,
+          graduation_year: data.graduationYear,
+        },
       })
       if (internship) {
         await tx.internship.update({
@@ -567,9 +725,18 @@ export const internService = {
       metadata: { fields: Object.keys(data), datesChanged },
     })
     if (internship) {
-      await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.INTERNSHIP_UPDATED, resourceType: 'internship', resourceId: internship.id, metadata: { datesChanged } })
+      await auditService.logForContext(ctx, {
+        action: AUDIT_ACTIONS.INTERNSHIP_UPDATED,
+        resourceType: 'internship',
+        resourceId: internship.id,
+        metadata: { datesChanged },
+      })
     }
-    await domainEvents.emit('intern.updated', { organizationId: ctx.organization.id, actorUserId: ctx.actor.userId, payload: { internId: r.id, fields: Object.keys(data) } })
+    await domainEvents.emit('intern.updated', {
+      organizationId: ctx.organization.id,
+      actorUserId: ctx.actor.userId,
+      payload: { internId: r.id, fields: Object.keys(data) },
+    })
   },
 
   /** Assigns (or clears) the manager or mentor. Audited and recorded on the timeline. */
@@ -595,7 +762,12 @@ export const internService = {
     const field = data.role === 'manager' ? 'manager_id' : 'mentor_id'
     const internship = r.internships[0]
     const newName = data.userId
-      ? fullName(await prisma.user.findUniqueOrThrow({ where: { id: data.userId }, select: { first_name: true, last_name: true, display_name: true } }))
+      ? fullName(
+          await prisma.user.findUniqueOrThrow({
+            where: { id: data.userId },
+            select: { first_name: true, last_name: true, display_name: true },
+          }),
+        )
       : null
     await prisma.$transaction(async (tx) => {
       await tx.intern.update({ where: { id: r.id }, data: { [field]: data.userId } })
@@ -603,7 +775,11 @@ export const internService = {
       // Open onboarding items owned by the old manager/mentor move to the new one.
       if (internship) {
         await tx.onboardingItem.updateMany({
-          where: { internship_id: internship.id, assigned_role: data.role === 'manager' ? 'MANAGER' : 'MENTOR', status: { notIn: ['COMPLETED', 'SKIPPED'] } },
+          where: {
+            internship_id: internship.id,
+            assigned_role: data.role === 'manager' ? 'MANAGER' : 'MENTOR',
+            status: { notIn: ['COMPLETED', 'SKIPPED'] },
+          },
           data: { assigned_to: data.userId },
         })
       }
@@ -611,7 +787,9 @@ export const internService = {
         organizationId: ctx.organization.id,
         internId: r.id,
         type: data.role === 'manager' ? 'MANAGER_ASSIGNED' : 'MENTOR_ASSIGNED',
-        description: newName ? `${data.role === 'manager' ? 'Manager' : 'Mentor'} set to ${newName}` : `${data.role === 'manager' ? 'Manager' : 'Mentor'} removed`,
+        description: newName
+          ? `${data.role === 'manager' ? 'Manager' : 'Mentor'} set to ${newName}`
+          : `${data.role === 'manager' ? 'Manager' : 'Mentor'} removed`,
         actorUserId: ctx.actor.userId,
         metadata: { from: previous, to: data.userId },
       })
@@ -644,11 +822,21 @@ export const internService = {
       prisma.user.update({ where: { id: ctx.actor.userId }, data: { phone: data.phone ?? null } }),
       prisma.internProfile.upsert({
         where: { intern_id: internId },
-        update: { bio: data.bio ?? null, city: data.city ?? null, state: data.state ?? null, country: data.country ?? null },
+        update: {
+          bio: data.bio ?? null,
+          city: data.city ?? null,
+          state: data.state ?? null,
+          country: data.country ?? null,
+        },
         create: { intern_id: internId, bio: data.bio, city: data.city, state: data.state, country: data.country },
       }),
     ])
-    await auditService.logForContext(ctx, { action: AUDIT_ACTIONS.INTERN_UPDATED, resourceType: 'intern', resourceId: internId, metadata: { fields: Object.keys(data), self: true } })
+    await auditService.logForContext(ctx, {
+      action: AUDIT_ACTIONS.INTERN_UPDATED,
+      resourceType: 'intern',
+      resourceId: internId,
+      metadata: { fields: Object.keys(data), self: true },
+    })
   },
 
   /** Interns the viewer manages or mentors, with progress summaries. */
@@ -663,7 +851,13 @@ export const internService = {
       const internship = internships[0]
       return {
         ...row,
-        progress: internshipProgress({ start: internship?.start_date ?? row.joining_date, expectedEnd: internship?.expected_end_date ?? row.expected_end_date, actualEnd: internship?.actual_end_date, status: row.status, today }),
+        progress: internshipProgress({
+          start: internship?.start_date ?? row.joining_date,
+          expectedEnd: internship?.expected_end_date ?? row.expected_end_date,
+          actualEnd: internship?.actual_end_date,
+          status: row.status,
+          today,
+        }),
         onboarding: internship?.onboarding ? onboardingProgress(internship.onboarding_items, today) : null,
       }
     })
@@ -689,15 +883,29 @@ export const internService = {
     const [tasks, projects] = await Promise.all([
       taskGrant
         ? prisma.task.findMany({
-            where: { AND: [taskScope(ctx.actor, taskGrant), { deleted_at: null, assignees: { some: { user_id: userId } } }] },
+            where: {
+              AND: [taskScope(ctx.actor, taskGrant), { deleted_at: null, assignees: { some: { user_id: userId } } }],
+            },
             orderBy: [{ due_date: { sort: 'asc', nulls: 'last' } }],
             take: 50,
-            select: { id: true, title: true, status: true, priority: true, due_date: true, project: { select: { name: true } } },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              priority: true,
+              due_date: true,
+              project: { select: { name: true } },
+            },
           })
         : null,
       projectGrant
         ? prisma.project.findMany({
-            where: { AND: [projectScope(ctx.actor, projectGrant), { deleted_at: null, members: { some: { user_id: userId } } }] },
+            where: {
+              AND: [
+                projectScope(ctx.actor, projectGrant),
+                { deleted_at: null, members: { some: { user_id: userId } } },
+              ],
+            },
             orderBy: { created_at: 'desc' },
             take: 50,
             select: { id: true, name: true, status: true, target_end_date: true },
@@ -722,6 +930,58 @@ export const internService = {
       internRepository.countUnassigned(scope, ['SELECTED', 'ONBOARDING', 'ACTIVE', 'ENDING_SOON']),
     ])
     return { byStatus, endingSoon, joining, recent, unassigned }
+  },
+
+  /**
+   * Role-aware overview blocks for the main dashboard: the intern's own
+   * internship, and summaries of interns the viewer manages or mentors.
+   */
+  async dashboardSummary(ctx: RequestContext) {
+    const today = todayIn(ctx.organization.timezone)
+    const own = await internRepository.findByUserId(ctx.organization.id, ctx.actor.userId)
+    let self = null
+    if (own) {
+      const access = await resolveInternAccess(ctx, own.id).catch(() => null)
+      const internship = access?.record.internships[0]
+      if (access) {
+        const items = internship?.onboarding
+          ? await prisma.onboardingItem.findMany({
+              where: { internship_id: internship.id },
+              select: { required: true, status: true, due_date: true },
+            })
+          : []
+        self = {
+          id: access.record.id,
+          status: access.record.status,
+          title: internship?.title ?? null,
+          manager: access.record.manager ? fullName(access.record.manager) : null,
+          mentor: access.record.mentor ? fullName(access.record.mentor) : null,
+          progress: internshipProgress({
+            start: internship?.start_date ?? access.record.joining_date,
+            expectedEnd: internship?.expected_end_date ?? access.record.expected_end_date,
+            actualEnd: internship?.actual_end_date ?? access.record.actual_end_date,
+            status: access.record.status,
+            today,
+          }),
+          onboarding: internship?.onboarding ? onboardingProgress(items, today) : null,
+        }
+      }
+    }
+    const canRead = ctx.actor.permissions.has('intern.read')
+    const [managed, mentored] = canRead
+      ? await Promise.all([this.related(ctx, 'managed'), this.related(ctx, 'mentored')])
+      : [[], []]
+    const summarize = (rows: Awaited<ReturnType<typeof this.related>>) => ({
+      total: rows.length,
+      onboarding: rows.filter((r) => r.status === 'ONBOARDING').length,
+      endingSoon: rows.filter((r) => r.status === 'ENDING_SOON').length,
+      overdueOnboarding: rows.filter((r) => (r.onboarding?.overdue ?? 0) > 0).length,
+    })
+    return {
+      self,
+      managed: managed.length ? summarize(managed) : null,
+      mentored: mentored.length ? summarize(mentored) : null,
+    }
   },
 
   async relationCounts(ctx: RequestContext) {

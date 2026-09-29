@@ -56,7 +56,8 @@ export default async function HrDashboardPage() {
     canOnboarding ? onboardingService.dashboard(ctx) : Promise.resolve(null),
   ])
   const count = (status: string) => overview.byStatus[status as keyof typeof overview.byStatus] ?? 0
-  const attention = onboarding?.rows.filter((row) => row.state === 'OVERDUE' || row.state === 'BLOCKED').slice(0, 6) ?? []
+  const attention =
+    onboarding?.rows.filter((row) => row.state === 'OVERDUE' || row.state === 'BLOCKED').slice(0, 6) ?? []
 
   return (
     <>
@@ -79,8 +80,19 @@ export default async function HrDashboardPage() {
 
       <section aria-label="Programme totals" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Active" value={count('ACTIVE')} icon={UserRoundCheck} href="/interns?status=ACTIVE" />
-        <StatCard label="Onboarding" value={count('ONBOARDING')} icon={ClipboardList} href="/interns?status=ONBOARDING" />
-        <StatCard label="Selected" value={count('SELECTED')} icon={UsersRound} href="/interns?status=SELECTED" hint="Not yet onboarding" />
+        <StatCard
+          label="Onboarding"
+          value={count('ONBOARDING')}
+          icon={ClipboardList}
+          href="/interns?status=ONBOARDING"
+        />
+        <StatCard
+          label="Selected"
+          value={count('SELECTED')}
+          icon={UsersRound}
+          href="/interns?status=SELECTED"
+          hint="Not yet onboarding"
+        />
         <StatCard
           label="Ending soon"
           value={count('ENDING_SOON')}
@@ -97,7 +109,7 @@ export default async function HrDashboardPage() {
         />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {onboarding && (
           <Card>
             <CardHeader className="flex-row items-start justify-between gap-4">
@@ -106,7 +118,8 @@ export default async function HrDashboardPage() {
                   <OctagonAlert className="size-4 text-warning" aria-hidden /> Onboarding needing attention
                 </CardTitle>
                 <CardDescription>
-                  {onboarding.stats.inProgress} in progress · {onboarding.stats.overdue} overdue · {onboarding.stats.blocked} blocked
+                  {onboarding.stats.inProgress} in progress · {onboarding.stats.overdue} overdue ·{' '}
+                  {onboarding.stats.blocked} blocked
                 </CardDescription>
               </div>
               <Link href="/onboarding" className="shrink-0 text-small font-medium text-primary hover:underline">
@@ -122,7 +135,10 @@ export default async function HrDashboardPage() {
                     <li key={row.id} className="flex items-center gap-3 py-2.5">
                       <UserAvatar person={row.internship.intern.user} className="size-8" />
                       <div className="min-w-0 flex-1">
-                        <Link href={`/interns/${row.internship.intern.id}/onboarding`} className="block truncate text-small font-medium hover:underline">
+                        <Link
+                          href={`/interns/${row.internship.intern.id}/onboarding`}
+                          className="block truncate text-small font-medium hover:underline"
+                        >
                           {fullName(row.internship.intern.user)}
                         </Link>
                         <p className="text-caption text-muted-foreground">
@@ -146,7 +162,11 @@ export default async function HrDashboardPage() {
             <CardDescription>Plan completion letters and certificates.</CardDescription>
           </CardHeader>
           <CardContent>
-            <InternList rows={overview.endingSoon} empty="No internships ending soon." meta={(row) => `Ends ${formatDay(row.expected_end_date)}`} />
+            <InternList
+              rows={overview.endingSoon}
+              empty="No internships ending soon."
+              meta={(row) => `Ends ${formatDay(row.expected_end_date)}`}
+            />
           </CardContent>
         </Card>
 

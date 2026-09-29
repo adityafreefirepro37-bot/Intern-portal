@@ -51,10 +51,16 @@ export function visibleLevels(ctx: RequestContext, access: InternAccess): Docume
   if (access.isSelf) return ['INTERN']
   const orgWide = ctx.actor.permissions.get('document.read') === 'ORGANIZATION'
   if (!orgWide) return ['INTERN', 'MANAGER']
-  return ctx.actor.permissions.has('document.restricted') ? ['INTERN', 'MANAGER', 'HR', 'ADMIN'] : ['INTERN', 'MANAGER', 'HR']
+  return ctx.actor.permissions.has('document.restricted')
+    ? ['INTERN', 'MANAGER', 'HR', 'ADMIN']
+    : ['INTERN', 'MANAGER', 'HR']
 }
 
-function canSee(ctx: RequestContext, levels: DocumentVisibility[], doc: Pick<DocumentRecord, 'visibility' | 'uploaded_by'>) {
+function canSee(
+  ctx: RequestContext,
+  levels: DocumentVisibility[],
+  doc: Pick<DocumentRecord, 'visibility' | 'uploaded_by'>,
+) {
   return doc.uploaded_by === ctx.actor.userId || levels.includes(doc.visibility)
 }
 
@@ -209,7 +215,10 @@ export const documentService = {
     if (!canSee(ctx, visibleLevels(ctx, access), doc)) throw new NotFoundError('Document')
     if (!access.can.deleteDocuments) throw new ForbiddenError('You can’t delete documents')
 
-    const linked = await prisma.onboardingItem.findMany({ where: { document_id: doc.id }, select: { id: true, onboarding_id: true } })
+    const linked = await prisma.onboardingItem.findMany({
+      where: { document_id: doc.id },
+      select: { id: true, onboarding_id: true },
+    })
     await prisma.$transaction([
       prisma.internshipDocument.update({ where: { id: doc.id }, data: { deleted_at: new Date() } }),
       prisma.onboardingItem.updateMany({

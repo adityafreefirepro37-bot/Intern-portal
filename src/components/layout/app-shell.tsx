@@ -9,6 +9,7 @@ import { SITE } from '@/config/site'
 import { Brand } from './brand'
 import { MobileNav } from './mobile-nav'
 import { Sidebar } from './sidebar'
+import type { ShellNotification } from './notification-bell'
 import { Topbar, type ShellUser } from './topbar'
 
 /**
@@ -23,12 +24,14 @@ export function AppShell({
   organizationName,
   nav,
   initialCollapsed,
+  notifications,
   children,
 }: {
   user: ShellUser
   organizationName: string
   nav: VisibleNavItem[]
   initialCollapsed: boolean
+  notifications: { items: ShellNotification[]; unread: number }
   children: React.ReactNode
 }) {
   const [collapsed, setCollapsed] = React.useState(initialCollapsed)
@@ -67,6 +70,7 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
+          notifications={notifications}
           user={user}
           organizationName={organizationName}
           onOpenMenu={() => setMenuOpen(true)}

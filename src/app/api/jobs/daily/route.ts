@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { config } from '@/lib/config'
 import { jsonError, jsonSuccess } from '@/lib/http/response'
 import { internLifecycleService } from '@/server/services/intern-lifecycle.service'
+import { workJobsService } from '@/server/services/work-jobs.service'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ function authorized(request: NextRequest): boolean {
  * service such as Vercel Cron or GitHub Actions):
  *   1. ACTIVE → ENDING_SOON for internships inside the threshold
  *   2. `onboarding.item_overdue` events for items that became overdue
+ *   3. task due-soon / overdue and milestone due-soon events (notifications)
  * Both steps are idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
@@ -27,7 +29,8 @@ export async function POST(request: NextRequest) {
   try {
     const endingSoon = await internLifecycleService.markEndingSoon()
     const overdue = await internLifecycleService.emitOverdueOnboarding()
-    return jsonSuccess({ endingSoon: endingSoon.marked, overdueEvents: overdue.emitted })
+    const deadlines = await workJobsService.emitTaskDeadlines()
+    return jsonSuccess({ endingSoon: endingSoon.marked, overdueEvents: overdue.emitted, ...deadlines })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })
   }

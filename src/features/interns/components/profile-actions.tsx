@@ -43,7 +43,12 @@ export interface EditableIntern {
   location: string | null
   internshipTitle: string | null
   description: string | null
-  education: { level: string | null; institution: string | null; fieldOfStudy: string | null; graduationYear: number | null } | null
+  education: {
+    level: string | null
+    institution: string | null
+    fieldOfStudy: string | null
+    graduationYear: number | null
+  } | null
   onboardingComplete: boolean | null
   accountInvited: boolean
 }
@@ -96,13 +101,23 @@ export function ProfileActions({
       {(open === 'manager' || open === 'mentor') && (
         <AssignDialog intern={intern} role={open} staff={options.staff} onClose={close} />
       )}
-      {open === 'status' && <StatusDialog intern={intern} targets={nextStatuses} templates={options.templates} onClose={close} />}
+      {open === 'status' && (
+        <StatusDialog intern={intern} targets={nextStatuses} templates={options.templates} onClose={close} />
+      )}
       {open === 'invite' && <InviteDialog intern={intern} onClose={close} />}
     </div>
   )
 }
 
-function EditDialog({ intern, options, onClose }: { intern: EditableIntern; options: InternFormOptions; onClose: () => void }) {
+function EditDialog({
+  intern,
+  options,
+  onClose,
+}: {
+  intern: EditableIntern
+  options: InternFormOptions
+  onClose: () => void
+}) {
   const [state, action] = useFormAction(updateInternAction, { onSuccess: onClose })
   const [dirty, setDirty] = React.useState(false)
   useUnsavedChanges(dirty)
@@ -122,7 +137,12 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
           <DialogTitle>Edit {intern.name}</DialogTitle>
           <DialogDescription>Changes to dates are recorded on the timeline.</DialogDescription>
         </DialogHeader>
-        <form action={action} onChange={() => setDirty(true)} className="grid gap-4 sm:grid-cols-2" noValidate>
+        <form
+          action={action}
+          onChange={() => setDirty(true)}
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          noValidate
+        >
           <div className="sm:col-span-2">
             <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           </div>
@@ -137,14 +157,25 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
             <Input id="e-phone" name="phone" type="tel" defaultValue={v?.phone ?? intern.phone ?? ''} />
           </Field>
           <Field label="Work mode" htmlFor="e-mode" error={f.workMode}>
-            <select id="e-mode" name="workMode" defaultValue={v?.workMode ?? intern.workMode ?? 'HYBRID'} className={inputClassName}>
+            <select
+              id="e-mode"
+              name="workMode"
+              defaultValue={v?.workMode ?? intern.workMode ?? 'HYBRID'}
+              className={inputClassName}
+            >
               <option value="ONSITE">On-site</option>
               <option value="HYBRID">Hybrid</option>
               <option value="REMOTE">Remote</option>
             </select>
           </Field>
           <Field label="Department" htmlFor="e-dept" error={f.departmentId}>
-            <select id="e-dept" name="departmentId" defaultValue={v?.departmentId ?? intern.departmentId ?? ''} className={inputClassName} required>
+            <select
+              id="e-dept"
+              name="departmentId"
+              defaultValue={v?.departmentId ?? intern.departmentId ?? ''}
+              className={inputClassName}
+              required
+            >
               <option value="" disabled>
                 Choose
               </option>
@@ -156,7 +187,13 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
             </select>
           </Field>
           <Field label="Position" htmlFor="e-pos" error={f.positionId}>
-            <select id="e-pos" name="positionId" defaultValue={v?.positionId ?? intern.positionId ?? ''} className={inputClassName} required>
+            <select
+              id="e-pos"
+              name="positionId"
+              defaultValue={v?.positionId ?? intern.positionId ?? ''}
+              className={inputClassName}
+              required
+            >
               <option value="" disabled>
                 Choose
               </option>
@@ -168,7 +205,12 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
             </select>
           </Field>
           <Field label="Team" htmlFor="e-team" error={f.teamId}>
-            <select id="e-team" name="teamId" defaultValue={v?.teamId ?? intern.teamId ?? ''} className={inputClassName}>
+            <select
+              id="e-team"
+              name="teamId"
+              defaultValue={v?.teamId ?? intern.teamId ?? ''}
+              className={inputClassName}
+            >
               <option value="">No team</option>
               {options.teams.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -181,19 +223,40 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
             <Input id="e-loc" name="location" defaultValue={v?.location ?? intern.location ?? ''} />
           </Field>
           <Field label="Joining date" htmlFor="e-join" error={f.joiningDate}>
-            <Input id="e-join" name="joiningDate" type="date" defaultValue={v?.joiningDate ?? intern.joiningDate} required />
+            <Input
+              id="e-join"
+              name="joiningDate"
+              type="date"
+              defaultValue={v?.joiningDate ?? intern.joiningDate}
+              required
+            />
           </Field>
           <Field label="Expected end date" htmlFor="e-end" error={f.expectedEndDate}>
-            <Input id="e-end" name="expectedEndDate" type="date" defaultValue={v?.expectedEndDate ?? intern.expectedEndDate} required />
+            <Input
+              id="e-end"
+              name="expectedEndDate"
+              type="date"
+              defaultValue={v?.expectedEndDate ?? intern.expectedEndDate}
+              required
+            />
           </Field>
           <div className="sm:col-span-2">
             <Field label="Internship title" htmlFor="e-title" error={f.internshipTitle}>
-              <Input id="e-title" name="internshipTitle" defaultValue={v?.internshipTitle ?? intern.internshipTitle ?? ''} />
+              <Input
+                id="e-title"
+                name="internshipTitle"
+                defaultValue={v?.internshipTitle ?? intern.internshipTitle ?? ''}
+              />
             </Field>
           </div>
           <div className="sm:col-span-2">
             <Field label="Description" htmlFor="e-desc" error={f.description}>
-              <Textarea id="e-desc" name="description" rows={3} defaultValue={v?.description ?? intern.description ?? ''} />
+              <Textarea
+                id="e-desc"
+                name="description"
+                rows={3}
+                defaultValue={v?.description ?? intern.description ?? ''}
+              />
             </Field>
           </div>
           <Field label="Institution" htmlFor="e-inst" error={f.institution}>
@@ -206,7 +269,12 @@ function EditDialog({ intern, options, onClose }: { intern: EditableIntern; opti
             <Input id="e-level" name="educationLevel" defaultValue={v?.educationLevel ?? e?.level ?? ''} />
           </Field>
           <Field label="Graduation year" htmlFor="e-grad" error={f.graduationYear}>
-            <Input id="e-grad" name="graduationYear" inputMode="numeric" defaultValue={v?.graduationYear ?? e?.graduationYear?.toString() ?? ''} />
+            <Input
+              id="e-grad"
+              name="graduationYear"
+              inputMode="numeric"
+              defaultValue={v?.graduationYear ?? e?.graduationYear?.toString() ?? ''}
+            />
           </Field>
           <DialogFooter className="sm:col-span-2">
             <SubmitButton pendingLabel="Saving…">Save changes</SubmitButton>
@@ -243,7 +311,7 @@ function AssignDialog({
             Open onboarding items owned by the previous {label.toLowerCase()} move to the new one.
           </DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="internId" value={intern.id} />
           <input type="hidden" name="role" value={role} />
@@ -296,7 +364,7 @@ function StatusDialog({
             {intern.name} is currently <strong>{STATUS_LABELS[intern.status]}</strong>.
           </DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="internId" value={intern.id} />
           <Field label="New status" htmlFor="status-to" error={state.fields?.to}>
@@ -318,7 +386,12 @@ function StatusDialog({
             </select>
           </Field>
           {intern.status === 'SELECTED' && to === 'ONBOARDING' && (
-            <Field label="Onboarding template" htmlFor="status-template" error={state.fields?.templateId} hint="Used only if no checklist exists yet.">
+            <Field
+              label="Onboarding template"
+              htmlFor="status-template"
+              error={state.fields?.templateId}
+              hint="Used only if no checklist exists yet."
+            >
               <select id="status-template" name="templateId" defaultValue="" className={inputClassName}>
                 <option value="">Automatic</option>
                 {templates.map((t) => (
@@ -384,11 +457,16 @@ function InviteDialog({ intern, onClose }: { intern: EditableIntern; onClose: ()
           <DialogDescription>Any earlier invitation link stops working.</DialogDescription>
         </DialogHeader>
         {state.status === 'success' ? (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <FormMessage status="success" message={state.message} />
             {state.data?.inviteUrl && (
               <div className="flex gap-2">
-                <Input readOnly value={state.data.inviteUrl} aria-label="Invitation link" className="font-mono text-caption" />
+                <Input
+                  readOnly
+                  value={state.data.inviteUrl}
+                  aria-label="Invitation link"
+                  className="font-mono text-caption"
+                />
                 <Button
                   variant="outline"
                   size="icon"
@@ -407,7 +485,7 @@ function InviteDialog({ intern, onClose }: { intern: EditableIntern; onClose: ()
             </DialogFooter>
           </div>
         ) : (
-          <form action={action} className="grid gap-4">
+          <form action={action} className="grid grid-cols-1 gap-4">
             <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
             <input type="hidden" name="internId" value={intern.id} />
             <DialogFooter>

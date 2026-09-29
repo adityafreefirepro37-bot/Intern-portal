@@ -17,7 +17,7 @@ import { authorizationService } from './authorization.service'
  * do simple case-insensitive matching; ranking, full-text search and document
  * content search can replace a provider without touching callers or the UI.
  */
-export type SearchEntityType = 'intern' | 'task' | 'project' | 'course' | 'announcement' | 'document'
+export type SearchEntityType = 'intern' | 'task' | 'project' | 'milestone' | 'course' | 'announcement' | 'document'
 
 export interface SearchResult {
   id: string
@@ -69,7 +69,7 @@ const providers: SearchProvider[] = [
         type: 'task',
         title: row.title,
         subtitle: [row.project?.name, humanizeEnum(row.status)].filter(Boolean).join(' · '),
-        href: `/tasks?highlight=${row.id}`,
+        href: `/tasks/${row.id}`,
       }))
     },
   },
@@ -85,7 +85,23 @@ const providers: SearchProvider[] = [
         type: 'project',
         title: row.name,
         subtitle: humanizeEnum(row.status),
-        href: `/projects?highlight=${row.id}`,
+        href: `/projects/${row.id}`,
+      }))
+    },
+  },
+  {
+    type: 'milestone',
+    label: 'Milestones',
+    permission: 'project.read',
+    async search(ctx, term, limit) {
+      const scope = authorizationService.require(ctx, 'project.read')
+      const rows = await projectRepository.searchMilestones(projectScope(ctx.actor, scope), term, limit)
+      return rows.map((row) => ({
+        id: row.id,
+        type: 'milestone',
+        title: row.name,
+        subtitle: [row.project.name, humanizeEnum(row.status)].join(' · '),
+        href: `/projects/${row.project.id}/milestones`,
       }))
     },
   },

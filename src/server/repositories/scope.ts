@@ -46,13 +46,25 @@ export function internScope(actor: AuthorizationActor, scope: PermissionScope): 
   return { ...base, OR: [{ user_id: actor.userId }, ...internPlacementConditions(actor, scope)] }
 }
 
-/** Tasks within scope: created by or assigned to an in-scope user. */
+/**
+ * Tasks within scope: created by or assigned to an in-scope user, or (ASSIGNED
+ * and wider) in a project the actor belongs to or leads.
+ */
 export function taskScope(actor: AuthorizationActor, scope: PermissionScope): Prisma.TaskWhereInput {
   const base = { organization_id: actor.organizationId }
   if (atLeast(scope, 'ORGANIZATION')) return base
+  const conditions: Prisma.TaskWhereInput[] = [
+    { created_by: actor.userId },
+    { assignees: { some: { user: userScope(actor, scope) } } },
+  ]
+  if (atLeast(scope, 'ASSIGNED')) conditions.push({ project: projectMembership(actor) })
+  return { ...base, OR: conditions }
+}
+
+/** Projects the actor owns, manages or is a member of. */
+function projectMembership(actor: AuthorizationActor): Prisma.ProjectWhereInput {
   return {
-    ...base,
-    OR: [{ created_by: actor.userId }, { assignees: { some: { user: userScope(actor, scope) } } }],
+    OR: [{ owner_id: actor.userId }, { manager_id: actor.userId }, { members: { some: { user_id: actor.userId } } }],
   }
 }
 
@@ -62,6 +74,10 @@ export function projectScope(actor: AuthorizationActor, scope: PermissionScope):
   if (atLeast(scope, 'ORGANIZATION')) return base
   return {
     ...base,
-    OR: [{ owner_id: actor.userId }, { members: { some: { user: userScope(actor, scope) } } }],
+    OR: [
+      { owner_id: actor.userId },
+      { manager_id: actor.userId },
+      { members: { some: { user: userScope(actor, scope) } } },
+    ],
   }
 }

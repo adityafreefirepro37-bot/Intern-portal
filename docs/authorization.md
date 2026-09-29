@@ -41,7 +41,7 @@ Additions: `user.invite`, `user.suspend`, `user.assign_role`, `task.comment`, `l
 | Users (invite, suspend, assign role) | ✔ | ✔ | ✔ (below HR) | — | — | — |
 | Interns, profiles, internships, onboarding | org | org | org | assigned (read) | assigned (read) | own profile |
 | Attendance, leave (approve), documents | org | org | org | assigned | — | own |
-| Projects & tasks | org | org | read | org (manage) | assigned (read/review) | assigned (read/submit) |
+| Projects & tasks | org | org | org (manage/review) | read org; manage/assign/review in projects they lead | create/assign/review where they mentor | own & member projects (work/submit) |
 | Feedback, check-ins | org | org | org | assigned | assigned | own |
 | Performance reviews | org | org | org (read/sign-off) | assigned (write) | — | own (read) |
 | Courses | ✔ | ✔ | ✔ (author) | read | read | read / track own |
@@ -49,6 +49,9 @@ Additions: `user.invite`, `user.suspend`, `user.assign_role`, `task.comment`, `l
 | Analytics | ✔ | ✔ | ✔ | — | — | — |
 | Audit & security logs | ✔ | ✔ | — | — | — | — |
 | Organization settings (edit) | ✔ | ✔ | view | — | — | — |
+
+Work permissions combine the grant with project membership (lead/mentor/member) — see
+[work-management.md](work-management.md#authorization).
 
 The exact grants are in `DEFAULT_ROLE_GRANTS` and on **Settings → Roles & permissions** in the app. Managers do not
 get organization-wide HR data; mentors don't see performance or documents; interns don't see anyone else's records.

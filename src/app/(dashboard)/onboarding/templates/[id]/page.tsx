@@ -9,7 +9,11 @@ import { idSchema } from '@/lib/validation'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
 import { DOCUMENT_TYPE_LABELS } from '@/server/services/document.service'
-import { ITEM_TYPE_LABELS, ONBOARDING_ITEM_TYPES, onboardingTemplateService } from '@/server/services/onboarding-template.service'
+import {
+  ITEM_TYPE_LABELS,
+  ONBOARDING_ITEM_TYPES,
+  onboardingTemplateService,
+} from '@/server/services/onboarding-template.service'
 
 export const metadata: Metadata = { title: 'Edit template' }
 
@@ -43,7 +47,7 @@ export default async function TemplatePage({ params }: PageProps<'/onboarding/te
           { label: template.name },
         ]}
       />
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 gap-6">
         <Card>
           <CardHeader>
             <CardTitle>Settings</CardTitle>

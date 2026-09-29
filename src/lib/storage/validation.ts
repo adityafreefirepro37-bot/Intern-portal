@@ -24,7 +24,8 @@ const PDF = [0x25, 0x50, 0x44, 0x46] // %PDF
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const JPEG = [0xff, 0xd8, 0xff]
 const RIFF = [0x52, 0x49, 0x46, 0x46] // WEBP container
-const ZIP = [0x50, 0x4b, 0x03, 0x04] // docx/xlsx/pptx
+const ZIP = [0x50, 0x4b, 0x03, 0x04] // docx/xlsx/pptx/zip
+const GIF = [0x47, 0x49, 0x46, 0x38] // GIF8
 
 export const FILE_TYPES: Record<string, FileTypeRule> = {
   'application/pdf': { extensions: ['.pdf'], signatures: [PDF] },
@@ -40,6 +41,10 @@ export const FILE_TYPES: Record<string, FileTypeRule> = {
     extensions: ['.pptx'],
     signatures: [ZIP],
   },
+  'application/zip': { extensions: ['.zip'], signatures: [ZIP] },
+  'image/gif': { extensions: ['.gif'], signatures: [GIF] },
+  // MP4's signature ('ftyp') sits at offset 4; served as a download with nosniff.
+  'video/mp4': { extensions: ['.mp4'] },
   'text/plain': { extensions: ['.txt'] },
   'text/csv': { extensions: ['.csv'] },
 }

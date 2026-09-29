@@ -120,23 +120,26 @@ enum OnboardingItemStatus {
 }
 
 enum ProjectStatus {
-  PLANNED
+  PLANNING
   ACTIVE
   ON_HOLD
   COMPLETED
   CANCELLED
+  ARCHIVED
 }
 
 enum ProjectMemberRole {
   OWNER
-  LEAD
-  MEMBER
+  MANAGER
+  MENTOR
+  CONTRIBUTOR
   VIEWER
 }
 
+/// OVERDUE is derived from due_date at read time and never stored.
 enum MilestoneStatus {
-  PLANNED
-  IN_PROGRESS
+  UPCOMING
+  ACTIVE
   COMPLETED
   CANCELLED
 }
@@ -164,8 +167,13 @@ enum SubmissionStatus {
   SUBMITTED
   UNDER_REVIEW
   CHANGES_REQUESTED
+  RESUBMITTED
   APPROVED
   REJECTED
+}
+
+enum TaskDependencyType {
+  BLOCKS
 }
 
 enum AttendanceStatus {
@@ -342,6 +350,7 @@ model Organization {
   lifecycle_events     InternLifecycleEvent[]
   code_counters        CodeCounter[]
 
+  project_attachments ProjectAttachment[]
   @@map("organizations")
 }
 
@@ -422,6 +431,16 @@ model User {
   acknowledgements        DocumentAcknowledgement[]
   lifecycle_events_acted  InternLifecycleEvent[]
 
+  managed_projects        Project[]            @relation("ProjectManager")
+  created_projects        Project[]            @relation("ProjectCreator")
+  project_members_added   ProjectMember[]      @relation("ProjectMemberAdder")
+  updated_tasks           Task[]               @relation("TaskUpdater")
+  reviewed_versions       SubmissionVersion[]  @relation("VersionReviewer")
+  comment_mentions        TaskCommentMention[] @relation("CommentMentions")
+  completed_checklist     TaskChecklistItem[]  @relation("ChecklistCompleter")
+  created_dependencies    TaskDependency[]     @relation("DependencyCreator")
+  time_entries            TaskTimeEntry[]      @relation("TimeEntries")
+  uploaded_project_files  ProjectAttachment[]  @relation("ProjectFileUploader")
   @@unique([organization_id, email])
   @@index([organization_id, status])
   @@index([email])
@@ -842,35 +861,46 @@ model Project {
   name            String
   slug            String
   description     String?
-  status          ProjectStatus @default(PLANNED)
-  start_date      DateTime?     @db.Date
-  target_end_date DateTime?     @db.Date
-  completed_at    DateTime?     @db.Timestamptz(3)
-  owner_id        String?       @db.Uuid
-  created_at      DateTime      @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
-  deleted_at      DateTime?     @db.Timestamptz(3)
+  status              ProjectStatus @default(PLANNING)
+  priority            TaskPriority  @default(MEDIUM)
+  start_date          DateTime?     @db.Date
+  target_end_date     DateTime?     @db.Date
+  completed_at        DateTime?     @db.Timestamptz(3)
+  owner_id            String?       @db.Uuid
+  manager_id          String?       @db.Uuid
+  created_by          String?       @db.Uuid
+  /// Cached: completed ÷ non-cancelled top-level tasks, maintained by projectProgressService.
+  progress_percentage Int           @default(0)
+  created_at          DateTime      @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at          DateTime?     @db.Timestamptz(3)
 
-  organization Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  owner        User?           @relation("ProjectOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  organization Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  owner        User?               @relation("ProjectOwner", fields: [owner_id], references: [id], onDelete: SetNull)
+  manager      User?               @relation("ProjectManager", fields: [manager_id], references: [id], onDelete: SetNull)
+  creator      User?               @relation("ProjectCreator", fields: [created_by], references: [id], onDelete: SetNull)
   members      ProjectMember[]
   milestones   Milestone[]
   tasks        Task[]
+  attachments  ProjectAttachment[]
 
   @@unique([organization_id, slug])
   @@index([organization_id, status])
   @@index([owner_id])
+  @@index([manager_id])
   @@map("projects")
 }
 
 model ProjectMember {
   project_id String            @db.Uuid
   user_id    String            @db.Uuid
-  role       ProjectMemberRole @default(MEMBER)
+  role       ProjectMemberRole @default(CONTRIBUTOR)
+  added_by   String?           @db.Uuid
   created_at DateTime          @default(now()) @db.Timestamptz(3)
 
   project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  adder   User?   @relation("ProjectMemberAdder", fields: [added_by], references: [id], onDelete: SetNull)
 
   @@id([project_id, user_id])
   @@index([user_id])
@@ -881,17 +911,21 @@ model Milestone {
   id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   project_id  String          @db.Uuid
   name        String
-  description String?
-  due_date    DateTime?       @db.Date
-  status      MilestoneStatus @default(PLANNED)
-  created_at  DateTime        @default(now()) @db.Timestamptz(3)
-  updated_at  DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+  description  String?
+  start_date   DateTime?       @db.Date
+  due_date     DateTime?       @db.Date
+  status       MilestoneStatus @default(UPCOMING)
+  position     Int             @default(0)
+  completed_at DateTime?       @db.Timestamptz(3)
+  created_at   DateTime        @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
 
   project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
   tasks   Task[]
 
   @@index([project_id])
   @@index([due_date])
+  @@index([project_id, position])
   @@map("milestones")
 }
 
@@ -906,26 +940,44 @@ model Task {
   status            TaskStatus   @default(BACKLOG)
   priority          TaskPriority @default(MEDIUM)
   created_by        String       @db.Uuid
-  due_date          DateTime?    @db.Timestamptz(3)
+  updated_by        String?      @db.Uuid
+  start_date        DateTime?    @db.Date
+  /// Calendar date; deadline states are computed in the organization's timezone.
+  due_date          DateTime?    @db.Date
   estimated_minutes Int?
   actual_minutes    Int?
+  position          Int          @default(0)
+  /// Status before the last transition (e.g. what BLOCKED resumes to).
+  previous_status   TaskStatus?
+  blocked_reason    String?
+  started_at        DateTime?    @db.Timestamptz(3)
   completed_at      DateTime?    @db.Timestamptz(3)
+  /// Foundation only: recurrence is not generated yet.
+  is_recurring      Boolean      @default(false)
+  recurrence_rule   String?
   created_at        DateTime     @default(now()) @db.Timestamptz(3)
   updated_at        DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
   deleted_at        DateTime?    @db.Timestamptz(3)
 
-  organization Organization     @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  project      Project?         @relation(fields: [project_id], references: [id], onDelete: Restrict)
-  milestone    Milestone?       @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
-  parent_task  Task?            @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
-  subtasks     Task[]           @relation("TaskSubtasks")
-  creator      User             @relation("TaskCreator", fields: [created_by], references: [id], onDelete: Restrict)
-  assignees    TaskAssignee[]
-  comments     TaskComment[]
-  attachments  TaskAttachment[]
-  submissions  TaskSubmission[]
+  organization   Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  project        Project?            @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  milestone      Milestone?          @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
+  parent_task    Task?               @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks       Task[]              @relation("TaskSubtasks")
+  creator        User                @relation("TaskCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  updater        User?               @relation("TaskUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  assignees      TaskAssignee[]
+  comments       TaskComment[]
+  attachments    TaskAttachment[]
+  submissions    TaskSubmission[]
+  checklist      TaskChecklistItem[]
+  dependencies   TaskDependency[]    @relation("TaskDependsOn")
+  dependents     TaskDependency[]    @relation("TaskDependents")
+  time_entries   TaskTimeEntry[]
 
   @@index([organization_id, status])
+  @@index([organization_id, priority])
+  @@index([project_id, status, position])
   @@index([organization_id, due_date])
   @@index([project_id])
   @@index([milestone_id])
@@ -953,16 +1005,22 @@ model TaskComment {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   task_id    String    @db.Uuid
   user_id    String    @db.Uuid
+  parent_id  String?   @db.Uuid
   body       String
+  edited_at  DateTime? @db.Timestamptz(3)
   created_at DateTime  @default(now()) @db.Timestamptz(3)
   updated_at DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
   deleted_at DateTime? @db.Timestamptz(3)
 
-  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  task     Task                 @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user     User                 @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  parent   TaskComment?         @relation("CommentReplies", fields: [parent_id], references: [id], onDelete: Cascade)
+  replies  TaskComment[]        @relation("CommentReplies")
+  mentions TaskCommentMention[]
 
   @@index([task_id, created_at])
   @@index([user_id])
+  @@index([parent_id])
   @@map("task_comments")
 }
 
@@ -974,13 +1032,17 @@ model TaskAttachment {
   storage_path String
   mime_type    String
   file_size    Int
+  /// Set when the file was attached to a specific submission version.
+  submission_version_id String?   @db.Uuid
   created_at   DateTime  @default(now()) @db.Timestamptz(3)
   deleted_at   DateTime? @db.Timestamptz(3)
 
-  task     Task  @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  uploader User? @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  task               Task               @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  uploader           User?              @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  submission_version SubmissionVersion? @relation(fields: [submission_version_id], references: [id], onDelete: SetNull)
 
   @@index([task_id])
+  @@index([submission_version_id])
   @@map("task_attachments")
 }
 
@@ -1009,18 +1071,113 @@ model TaskSubmission {
 }
 
 model SubmissionVersion {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  submission_id  String   @db.Uuid
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  submission_id  String           @db.Uuid
   version_number Int
   description    String?
-  created_by     String?  @db.Uuid
-  created_at     DateTime @default(now()) @db.Timestamptz(3)
+  status         SubmissionStatus @default(SUBMITTED)
+  submitted_at   DateTime         @default(now()) @db.Timestamptz(3)
+  reviewed_by    String?          @db.Uuid
+  reviewed_at    DateTime?        @db.Timestamptz(3)
+  review_comment String?
+  created_by     String?          @db.Uuid
+  created_at     DateTime         @default(now()) @db.Timestamptz(3)
 
-  submission TaskSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
-  creator    User?          @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  submission  TaskSubmission   @relation(fields: [submission_id], references: [id], onDelete: Cascade)
+  creator     User?            @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  reviewer    User?            @relation("VersionReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  attachments TaskAttachment[]
 
   @@unique([submission_id, version_number])
   @@map("submission_versions")
+}
+
+model TaskCommentMention {
+  comment_id String @db.Uuid
+  user_id    String @db.Uuid
+
+  comment TaskComment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  user    User        @relation("CommentMentions", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([comment_id, user_id])
+  @@index([user_id])
+  @@map("task_comment_mentions")
+}
+
+model TaskChecklistItem {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id      String    @db.Uuid
+  title        String
+  is_completed Boolean   @default(false)
+  completed_by String?   @db.Uuid
+  completed_at DateTime? @db.Timestamptz(3)
+  position     Int       @default(0)
+  created_at   DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  task      Task  @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  completer User? @relation("ChecklistCompleter", fields: [completed_by], references: [id], onDelete: SetNull)
+
+  @@index([task_id, position])
+  @@map("task_checklist_items")
+}
+
+/// task_id cannot start until depends_on_task_id is completed (BLOCKS).
+model TaskDependency {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id            String             @db.Uuid
+  depends_on_task_id String             @db.Uuid
+  dependency_type    TaskDependencyType @default(BLOCKS)
+  created_by         String?            @db.Uuid
+  created_at         DateTime           @default(now()) @db.Timestamptz(3)
+
+  task       Task  @relation("TaskDependsOn", fields: [task_id], references: [id], onDelete: Cascade)
+  depends_on Task  @relation("TaskDependents", fields: [depends_on_task_id], references: [id], onDelete: Cascade)
+  creator    User? @relation("DependencyCreator", fields: [created_by], references: [id], onDelete: SetNull)
+
+  @@unique([task_id, depends_on_task_id])
+  @@index([depends_on_task_id])
+  @@map("task_dependencies")
+}
+
+model TaskTimeEntry {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id          String    @db.Uuid
+  user_id          String    @db.Uuid
+  started_at       DateTime? @db.Timestamptz(3)
+  ended_at         DateTime? @db.Timestamptz(3)
+  duration_minutes Int
+  description      String?
+  created_at       DateTime  @default(now()) @db.Timestamptz(3)
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user User @relation("TimeEntries", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id])
+  @@index([user_id, created_at])
+  @@map("task_time_entries")
+}
+
+model ProjectAttachment {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String    @db.Uuid
+  project_id      String    @db.Uuid
+  uploaded_by     String?   @db.Uuid
+  file_name       String
+  storage_path    String
+  mime_type       String
+  file_size       Int
+  description     String?
+  created_at      DateTime  @default(now()) @db.Timestamptz(3)
+  deleted_at      DateTime? @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  project      Project      @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  uploader     User?        @relation("ProjectFileUploader", fields: [uploaded_by], references: [id], onDelete: SetNull)
+
+  @@index([organization_id])
+  @@index([project_id])
+  @@map("project_attachments")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

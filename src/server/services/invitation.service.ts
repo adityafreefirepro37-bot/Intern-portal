@@ -129,7 +129,11 @@ export const invitationIssuer = {
     await domainEvents.emit('invitation.created', {
       organizationId: ctx.organization.id,
       actorUserId: ctx.actor.userId,
-      payload: { userId: target.userId, invitationId: issued.invitationId, delivery: deliverByEmail ? 'email' : 'link' },
+      payload: {
+        userId: target.userId,
+        invitationId: issued.invitationId,
+        delivery: deliverByEmail ? 'email' : 'link',
+      },
     })
     return {
       invitationId: issued.invitationId,

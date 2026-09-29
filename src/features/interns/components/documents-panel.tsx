@@ -75,7 +75,12 @@ export function DocumentsPanel({
         </div>
       )}
       {documents.length === 0 ? (
-        <EmptyState icon={FileText} title="No documents" description="Uploaded documents you’re allowed to see appear here." compact />
+        <EmptyState
+          icon={FileText}
+          title="No documents"
+          description="Uploaded documents you’re allowed to see appear here."
+          compact
+        />
       ) : (
         <ul className="divide-y rounded-xl border bg-card">
           {documents.map((doc) => (
@@ -112,7 +117,12 @@ export function DocumentsPanel({
                   <Download className="size-4" aria-hidden />
                 </a>
                 {doc.canDelete && (
-                  <Button variant="ghost" size="icon-sm" aria-label={`Delete ${doc.file_name}`} onClick={() => setDeleting(doc)}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete ${doc.file_name}`}
+                    onClick={() => setDeleting(doc)}
+                  >
                     <Trash2 aria-hidden />
                   </Button>
                 )}
@@ -171,9 +181,11 @@ function UploadDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Upload document</DialogTitle>
-          <DialogDescription>PDF, PNG, JPEG or DOCX. Files are stored privately and never get a public link.</DialogDescription>
+          <DialogDescription>
+            PDF, PNG, JPEG or DOCX. Files are stored privately and never get a public link.
+          </DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        <form action={action} className="grid grid-cols-1 gap-4">
           <FormMessage status={state.status === 'error' ? 'error' : 'idle'} message={state.message} />
           <input type="hidden" name="internId" value={internId} />
           <Field label="Type" htmlFor="doc-type" error={state.fields?.documentType}>
@@ -187,7 +199,12 @@ function UploadDialog({
           </Field>
           {assignable.length > 0 && (
             <Field label="Who can see it" htmlFor="doc-visibility" error={state.fields?.visibility}>
-              <select id="doc-visibility" name="visibility" defaultValue={assignable.includes('HR') ? 'HR' : 'MANAGER'} className={inputClassName}>
+              <select
+                id="doc-visibility"
+                name="visibility"
+                defaultValue={assignable.includes('HR') ? 'HR' : 'MANAGER'}
+                className={inputClassName}
+              >
                 {assignable.map((value) => (
                   <option key={value} value={value}>
                     {visibilityLabels[value] ?? value}

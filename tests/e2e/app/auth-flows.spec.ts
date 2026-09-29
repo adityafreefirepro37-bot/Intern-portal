@@ -60,9 +60,10 @@ test.describe('sessions', () => {
     await expect(page.getByRole('heading', { name: 'You don’t have access' })).toBeVisible()
     await page.goto('/audit-logs')
     await expect(page.getByRole('heading', { name: 'You don’t have access' })).toBeVisible()
-    // Direct API access is enforced server-side too.
+    // Direct API access is enforced server-side too: interns can read only their own intern record, so any
+    // other id is indistinguishable from a missing one (404), and admin APIs are forbidden.
     const response = await page.request.get('/api/interns/00000000-0000-4000-8000-000000000000')
-    expect(response.status()).toBe(403)
+    expect(response.status()).toBe(404)
   })
 
   test('a manager gets 404 for an intern outside their scope (IDOR)', async ({ page }) => {

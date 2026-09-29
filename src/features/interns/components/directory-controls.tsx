@@ -13,7 +13,18 @@ interface Option {
   label: string
 }
 
-const FILTER_KEYS = ['status', 'department', 'team', 'position', 'manager', 'mentor', 'joinedFrom', 'joinedTo', 'endFrom', 'endTo'] as const
+const FILTER_KEYS = [
+  'status',
+  'department',
+  'team',
+  'position',
+  'manager',
+  'mentor',
+  'joinedFrom',
+  'joinedTo',
+  'endFrom',
+  'endTo',
+] as const
 
 /**
  * Directory search, filters, sort and page size. All state lives in the URL,
@@ -100,7 +111,10 @@ export function DirectoryControls({
     <div className="mb-4 space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div role="search" className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
           <input
             type="search"
             value={query}
@@ -110,7 +124,10 @@ export function DirectoryControls({
             className={cn(inputClassName, 'pl-9')}
           />
           {pending && (
-            <Loader2 className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Updating" />
+            <Loader2
+              className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+              aria-label="Updating"
+            />
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -143,19 +160,30 @@ export function DirectoryControls({
             type="button"
             variant="outline"
             size="icon"
-            aria-label={dir === 'asc' ? 'Sorted ascending — switch to descending' : 'Sorted descending — switch to ascending'}
+            aria-label={
+              dir === 'asc' ? 'Sorted ascending — switch to descending' : 'Sorted descending — switch to ascending'
+            }
             onClick={() => update({ dir: dir === 'asc' ? 'desc' : null })}
           >
             {dir === 'asc' ? <ArrowDownAZ aria-hidden /> : <ArrowUpZA aria-hidden />}
           </Button>
-          <Button type="button" variant="outline" aria-expanded={open} aria-controls="intern-filters" onClick={() => setOpen((v) => !v)}>
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={open}
+            aria-controls="intern-filters"
+            onClick={() => setOpen((v) => !v)}
+          >
             <SlidersHorizontal aria-hidden /> Filters{activeFilters > 0 && ` (${activeFilters})`}
           </Button>
         </div>
       </div>
 
       {open && (
-        <div id="intern-filters" className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          id="intern-filters"
+          className="grid grid-cols-1 gap-3 rounded-xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
           {select('department', 'Department', departments)}
           {select('team', 'Team', teams)}
           {select('position', 'Position', positions)}

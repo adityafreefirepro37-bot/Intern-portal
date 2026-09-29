@@ -50,7 +50,9 @@ export default async function InternOnboardingPage({ params }: PageProps<'/inter
           access.isSelf
             ? [{ label: 'My internship', href: `/interns/${id}` }, { label: 'Onboarding' }]
             : [
-                access.orgWide ? { label: 'Onboarding', href: '/onboarding' } : { label: 'Interns', href: `/interns/${id}` },
+                access.orgWide
+                  ? { label: 'Onboarding', href: '/onboarding' }
+                  : { label: 'Interns', href: `/interns/${id}` },
                 { label: name, href: `/interns/${id}` },
                 { label: 'Checklist' },
               ]
@@ -58,7 +60,9 @@ export default async function InternOnboardingPage({ params }: PageProps<'/inter
       />
       {!onboarding ? (
         <Card>
-          <CardContent className="py-10 text-center text-small text-muted-foreground">Onboarding hasn’t started yet.</CardContent>
+          <CardContent className="py-10 text-center text-small text-muted-foreground">
+            Onboarding hasn’t started yet.
+          </CardContent>
         </Card>
       ) : (
         <div className="space-y-6">

@@ -27,6 +27,13 @@ Details: [authentication.md](authentication.md) (identity, sessions) · [authori
 - Privilege-escalation defences: no self role/status changes; role ranks bound what can be assigned and who can be
   managed; the last Super Admin can't be removed; strict schemas reject smuggled `organization_id`, `role_id`,
   `permission_id`, status or manager fields.
+- Intern records (Phase 03): one resolver (`intern-access.ts`) decides per-viewer capabilities; profile responses are
+  purpose-built DTOs (masked phone and no emergency contacts for managers/mentors, no personal data for mentors);
+  intern self-edit is limited to bio/phone/location; status changes go through one guarded service with optimistic
+  concurrency; HR overrides require a reason and are audited.
+- Work (Phase 04): `work-access.ts` combines RBAC with project membership; nobody reviews their own submission;
+  interns can’t assign, approve or open projects they aren’t on; bulk actions authorize each task; mentions only
+  notify task participants; comment text is rendered as text.
 
 ## CSRF
 
@@ -73,6 +80,18 @@ verification resend 5/hour; invitation create 30/hour per admin; invitation acce
 Uploads are validated server-side for type, extension, file signature (magic bytes) and size, stored under generated
 keys (never the user's filename), and re-validated on read/delete. Avatars are served only to signed-in members of
 the same organization, and only the user's current avatar.
+
+Intern documents (Phase 03) are private: there are no public URLs. `GET /api/documents/:id` checks access to the
+intern **and** the document's visibility level (INTERN / MANAGER / HR / ADMIN — ADMIN needs `document.restricted`)
+and answers 404 for anything hidden. Responses are `attachment` by default, `private, no-store`, `nosniff`, with a
+sandboxing CSP. Interns can't choose visibility (ID documents default to HR-only). Deletes are soft and audited.
+
+Task attachments and project files (Phase 04) follow the same rules: validated uploads, private storage, and
+authorized downloads (`/api/tasks/attachments/:id`, `/api/projects/files/:id`) that answer 404 unless the viewer can see
+the task or project. Files submitted for review are part of the permanent history and can’t be deleted.
+
+Scheduled jobs (`POST /api/jobs/daily`) require `Authorization: Bearer $CRON_SECRET` (constant-time comparison) and
+are disabled (404) when the secret isn't set.
 
 ## Audit and logging
 

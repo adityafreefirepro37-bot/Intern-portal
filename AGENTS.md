@@ -13,7 +13,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Project Status
 
 Phase 01 Foundation - COMPLETE
-Phase 02 Authentication, RBAC & security - COMPLETE (next: Prompt 03 — intern management). See README.md and docs/.
+Phase 02 Authentication, RBAC & security - COMPLETE
+Phase 03 Intern management, HR directory & onboarding - COMPLETE
+Phase 04 Tasks, projects & work management - COMPLETE (next: Prompt 05 — HR operations). See README.md and docs/.
 
 ## Quick Start Commands
 
@@ -42,6 +44,9 @@ npm run build
 - Use auditService for important state changes; use the redacting logger (src/lib/logging)
 - Never hard-code data in components — it comes from the database via services
 - UI uses design-system tokens (src/app/globals.css) and shared components (src/components)
+- Intern access rules live in src/server/services/intern-access.ts; status changes only via internLifecycleService
+- Project/task access lives in src/server/services/work-access.ts; task status only via taskLifecycleService
+  (manual) or taskSubmissionService (submit/review); project status only via projectLifecycleService
 - Unbuilt features show a "Phase NN" placeholder or disabled control — no fake functionality
 - `_archive/` holds files from the earlier partial attempt; not compiled — safe to delete once reviewed
 

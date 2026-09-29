@@ -4,6 +4,7 @@ import { visibleNav } from '@/config/navigation'
 import { SITE } from '@/config/site'
 import { requirePageContext } from '@/server/context'
 import { internService } from '@/server/services/intern.service'
+import { notificationService } from '@/server/services/notification.service'
 
 /**
  * Authenticated area. The user is resolved (and every account state checked)
@@ -12,7 +13,11 @@ import { internService } from '@/server/services/intern.service'
  */
 export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
   const ctx = await requirePageContext()
-  const [cookieStore, facts] = await Promise.all([cookies(), internService.navFacts(ctx)])
+  const [cookieStore, facts, notifications] = await Promise.all([
+    cookies(),
+    internService.navFacts(ctx),
+    notificationService.listRecent(ctx),
+  ])
 
   return (
     <AppShell
@@ -24,6 +29,7 @@ export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
       }}
       organizationName={ctx.organization.name}
       nav={visibleNav(ctx.actor.permissions, facts)}
+      notifications={notifications}
       initialCollapsed={cookieStore.get(SITE.sidebarCookie)?.value === 'collapsed'}
     >
       {children}

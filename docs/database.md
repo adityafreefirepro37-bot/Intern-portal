@@ -26,8 +26,9 @@ id (`6f1d3b52-8a4e-4c1f-9b2d-3e7a5c9d0a11`) and slug `ayava-creatives`; nothing 
 | ---------------- | ------ |
 | Identity         | `organizations`, `users`, `roles`, `permissions`, `role_permissions`, `user_roles` |
 | Structure        | `departments`, `teams`, `positions` |
-| Interns          | `interns`, `intern_profiles`, `emergency_contacts`, `internships`, `internship_documents`, `onboarding_items` |
-| Work             | `projects`, `project_members`, `milestones`, `tasks`, `task_assignees`, `task_comments`, `task_attachments`, `task_submissions`, `submission_versions` |
+| Interns          | `interns`, `intern_profiles`, `emergency_contacts`, `internships`, `internship_documents`, `intern_lifecycle_events`, `code_counters` |
+| Onboarding       | `onboarding_templates`, `onboarding_template_items`, `onboardings`, `onboarding_items`, `policies`, `document_acknowledgements` |
+| Work             | `projects`, `project_members`, `project_attachments`, `milestones`, `tasks`, `task_assignees`, `task_checklist_items`, `task_dependencies`, `task_comments`, `task_comment_mentions`, `task_attachments`, `task_submissions`, `submission_versions`, `task_time_entries` |
 | HR               | `attendance`, `attendance_corrections`, `leave_types`, `leave_requests` |
 | Learning         | `courses`, `lessons`, `quizzes`, `quiz_attempts`, `learning_progress` |
 | Calendar         | `meetings`, `calendar_events` |
@@ -49,6 +50,25 @@ Notes:
   `SUCCESS`/`FAILURE`/`DENIED`.
 - **`interns`** is separate from `users`: one intern record per user, with status, dates, placement, manager and mentor.
   **`internships`** records each engagement (an intern can have more than one over time).
+- **Onboarding (Phase 03)**: `onboarding_templates` + `onboarding_template_items` are blueprints; starting onboarding
+  copies them into `onboardings` (one per internship, unique) and `onboarding_items` (snapshot: title, type, due date,
+  assignee role/user, required document type, policy). `policies` are versioned (`UNIQUE (organization, slug, version)`);
+  `document_acknowledgements` records who acknowledged which **version** (`UNIQUE (user, policy, version)`).
+- **`intern_lifecycle_events`** is the intern timeline (created, invitation, onboarding started/completed, status and
+  assignment changes, documents). `idempotency_key` is unique so automated events (e.g. ending soon) are recorded at
+  most once.
+- **`code_counters`** holds per-organization counters for human-readable codes (`AYV-INT-0001`), incremented
+  atomically with `INSERT … ON CONFLICT DO UPDATE … RETURNING`.
+- **Work (Phase 04)**: projects gain `priority`, `manager_id`, `created_by` and a cached `progress_percentage`
+  (0–100); member roles are OWNER/MANAGER/MENTOR/CONTRIBUTOR/VIEWER. Tasks have calendar-date `start_date`/`due_date`
+  (due ≥ start), `position`, `previous_status`, `blocked_reason`, `started_at` and recurrence foundation fields;
+  subtasks via `parent_task_id` (one level, enforced in the service). New tables: `task_checklist_items`,
+  `task_dependencies` (BLOCKS, unique pair, no self-reference; cycles rejected in the service), `task_comment_mentions`,
+  `task_time_entries`, `project_attachments`. `submission_versions` keep status, reviewer, review time and comment per
+  version; `task_attachments.submission_version_id` ties files to the version they were submitted with. Milestone
+  status is UPCOMING/ACTIVE/COMPLETED/CANCELLED (OVERDUE derived). An expression index on `audit_logs
+  (organization_id, metadata->>'projectId', created_at)` serves project timelines. RLS is enabled on the new tables.
+  See [work-management.md](work-management.md).
 - **`learning_progress`**: course-level rows have `lesson_id = NULL`; lesson rows set it.
 - **`performance_reviews`** stores per-dimension scores (1–5) and comments; no overall judgment is computed.
 - **`settings`** holds non-secret configuration as JSON. Secrets belong in environment variables.
@@ -103,8 +123,13 @@ one (used by migrations).
 1. **Reference data** (every environment, idempotent): organization, permission catalog, system roles and their
    grants (kept in sync with `src/lib/permissions/catalog.ts`), departments (Marketing, Design, Development, HR,
    Operations), seven intern positions, leave types, default settings.
-2. **Demo data** (development/test only — skipped when `NODE_ENV=production`): the five development accounts, six
-   fictional interns, teams, internships and onboarding, three projects with milestones, 13 tasks and submissions,
+   Phase 03 adds the Intern Handbook and NDA policies (v1), four onboarding templates (General — default, Marketing,
+   Design, Development; existing templates are never overwritten) and the `internship.ending_soon_days` (14) and
+   `intern.employee_code_prefix` settings.
+2. **Demo data** (development/test only — skipped when `NODE_ENV=production`): the five development accounts, a
+   development manager and mentor, six fictional interns (one per lifecycle state) with codes AYV-INT-0001…0007 and
+   the code counter set after them, teams, internships, onboarding checklists generated from the templates, lifecycle
+   timelines, three projects with milestones, 13 tasks and submissions,
    three courses with lessons, an announcement, a channel and a few audit entries marked `{ source: 'seed' }`. Demo
    rows use deterministic UUIDs, so re-running refreshes them (including relative deadlines) without duplicates.
 3. **Optional Supabase Auth users** for the development accounts when `SEED_DEV_PASSWORD` and Supabase admin keys are
