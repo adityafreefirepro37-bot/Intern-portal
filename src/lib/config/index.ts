@@ -27,6 +27,28 @@ function unquote(value: string): string {
     .trim()
 }
 
+/**
+ * An http(s) address. Quotes and surrounding spaces are removed; anything else
+ * that isn't a plain web address fails at startup (and in the build) with the
+ * value received, instead of crashing later on the first request.
+ */
+function webUrl(expected: string) {
+  return z
+    .string()
+    .optional()
+    .transform((value) =>
+      value === undefined || unquote(value) === '' ? undefined : unquote(value).replace(/\/+$/, ''),
+    )
+    .pipe(
+      z
+        .url({
+          protocol: /^https?$/,
+          error: (issue) => `must be ${expected} (got ${JSON.stringify(issue.input)})`,
+        })
+        .optional(),
+    )
+}
+
 function choice<const T extends readonly [string, ...string[]]>(options: T): z.ZodType<T[number] | undefined>
 function choice<const T extends readonly [string, ...string[]]>(options: T, fallback: T[number]): z.ZodType<T[number]>
 function choice<const T extends readonly [string, ...string[]]>(options: T, fallback?: T[number]) {
@@ -49,14 +71,14 @@ function choice<const T extends readonly [string, ...string[]]>(options: T, fall
 const envSchema = z.object({
   NODE_ENV: choice(['development', 'test', 'production'], 'development'),
   DATABASE_URL: optionalString,
-  NEXT_PUBLIC_APP_URL: z.url().default('http://localhost:3000'),
+  NEXT_PUBLIC_APP_URL: webUrl('your site address, e.g. https://portal.example.com').default('http://localhost:3000'),
   DEFAULT_ORGANIZATION_SLUG: z.string().min(1).default('ayava-creatives'),
 
   AUTH_REQUIRE_EMAIL_VERIFICATION: choice(['true', 'false'], 'true').transform((value) => value === 'true'),
   AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).max(64).default(10),
   INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
 
-  SUPABASE_URL: optionalString,
+  SUPABASE_URL: webUrl('your Supabase project URL, e.g. https://abcd1234.supabase.co'),
   // Legacy names (anon / service_role) and the newer key names (publishable / secret) are both accepted.
   SUPABASE_ANON_KEY: optionalString,
   SUPABASE_PUBLISHABLE_KEY: optionalString,

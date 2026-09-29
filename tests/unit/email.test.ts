@@ -102,6 +102,18 @@ describe('option settings pasted into hosting dashboards', () => {
     )
   })
 
+  it('cleans web addresses and rejects anything that is not one', () => {
+    expect(parseEnv({ SUPABASE_URL: ' "https://abcd.supabase.co/" ' }).SUPABASE_URL).toBe('https://abcd.supabase.co')
+    expect(parseEnv({}).NEXT_PUBLIC_APP_URL).toBe('http://localhost:3000')
+    expect(parseEnv({ SUPABASE_URL: '' }).SUPABASE_URL).toBeUndefined()
+    for (const bad of ['abcd.supabase.co', 'https://abcd.supabase.co # project', 'postgresql://db.example.com']) {
+      expect(() => parseEnv({ SUPABASE_URL: bad })).toThrow(/SUPABASE_URL: must be your Supabase project URL/)
+    }
+    expect(() => parseEnv({ NEXT_PUBLIC_APP_URL: 'not a url' })).toThrow(
+      /NEXT_PUBLIC_APP_URL: must be your site address/,
+    )
+  })
+
   it('explains an invalid value with the allowed options', () => {
     expect(() => parseEnv({ STORAGE_PROVIDER: 's3' })).toThrow(
       'STORAGE_PROVIDER: must be one of local, supabase (got "s3")',
