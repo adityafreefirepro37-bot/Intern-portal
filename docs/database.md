@@ -29,7 +29,7 @@ id (`6f1d3b52-8a4e-4c1f-9b2d-3e7a5c9d0a11`) and slug `ayava-creatives`; nothing 
 | Interns          | `interns`, `intern_profiles`, `emergency_contacts`, `internships`, `internship_documents`, `intern_lifecycle_events`, `code_counters` |
 | Onboarding       | `onboarding_templates`, `onboarding_template_items`, `onboardings`, `onboarding_items`, `policies`, `document_acknowledgements` |
 | Work             | `projects`, `project_members`, `project_attachments`, `milestones`, `tasks`, `task_assignees`, `task_checklist_items`, `task_dependencies`, `task_comments`, `task_comment_mentions`, `task_attachments`, `task_submissions`, `submission_versions`, `task_time_entries` |
-| HR               | `attendance`, `attendance_corrections`, `leave_types`, `leave_requests` |
+| HR               | `attendance`, `attendance_breaks`, `attendance_corrections`, `leave_types`, `leave_balances`, `leave_requests`, `holidays`, `document_types`, `hr_requests`, `hr_request_comments`, `hr_request_attachments`, `offboarding_checklists`, `offboarding_items` |
 | Learning         | `courses`, `lessons`, `quizzes`, `quiz_attempts`, `learning_progress` |
 | Calendar         | `meetings`, `calendar_events` |
 | Performance      | `feedback`, `weekly_checkins`, `performance_reviews` |
@@ -69,6 +69,21 @@ Notes:
   status is UPCOMING/ACTIVE/COMPLETED/CANCELLED (OVERDUE derived). An expression index on `audit_logs
   (organization_id, metadata->>'projectId', created_at)` serves project timelines. RLS is enabled on the new tables.
   See [work-management.md](work-management.md).
+- **HR operations (Phase 05)**: `AttendanceStatus` gains WEEKEND and MISSING (LEAVE renamed ON_LEAVE, rows kept);
+  `attendance` gains `break_minutes`, `is_late`, `late_minutes`, `source` (SELF/CORRECTION/HR) and `updated_by`;
+  `attendance_breaks` allows one open break per record (partial unique index). `attendance_corrections` now carries
+  `organization_id`, `user_id`, `date`, `category` and the **original** check-in/out, and `attendance_id` is optional
+  (existing rows were backfilled). `leave_types` gain `quota_days` (null = unlimited), `requires_attachment`,
+  `sort_order`; `leave_balances` holds per-person allowances (unique user + type); `leave_requests` store working
+  `days`, cancellation and an overlap override (a reason is required by a CHECK). `document_types` are configurable per
+  organization; `internship_documents` gain `document_type_id`, `status`, `version`/`previous_version_id`/`is_current`,
+  verifier, `rejection_reason` (required when REJECTED), `expires_at` and notes. `holidays` are unique per
+  organization + date. `announcements` gain category, status, audience and `audience_ids` (a CHECK requires ids for
+  department/team/specific audiences) plus `notified_at`. `internships` gain stipend fields; `intern_profiles` a
+  preferred name; `emergency_contacts` an alternate phone. RLS is enabled on every new table. HR settings live in
+  `settings` (`attendance.rules`, `leave.policy`, `documents.expiry_warning_days`, `offboarding.default_items`,
+  `internship.default_work_mode`; the unused `work_week` / `attendance.late_after` keys were removed). See
+  [hr-operations.md](hr-operations.md).
 - **`learning_progress`**: course-level rows have `lesson_id = NULL`; lesson rows set it.
 - **`performance_reviews`** stores per-dimension scores (1–5) and comments; no overall judgment is computed.
 - **`settings`** holds non-secret configuration as JSON. Secrets belong in environment variables.

@@ -6,6 +6,14 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "ayava-dev-pooled",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/adity/AppData/Local/Temp/claude/C--Users-adity-Downloads-interimmmm-ayava-ayava-intern-os/9994ca78-2d37-48ff-a76e-06de0d727f98/scratchpad/dev-pooled.cjs"
+      ],
+      "port": 3000
     }
   ]
 }

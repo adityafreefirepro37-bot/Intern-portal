@@ -2,6 +2,8 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { config } from '@/lib/config'
 import { jsonError, jsonSuccess } from '@/lib/http/response'
+import { announcementJobs } from '@/server/services/announcement.service'
+import { documentJobs } from '@/server/services/document.service'
 import { internLifecycleService } from '@/server/services/intern-lifecycle.service'
 import { workJobsService } from '@/server/services/work-jobs.service'
 
@@ -22,7 +24,9 @@ function authorized(request: NextRequest): boolean {
  *   1. ACTIVE → ENDING_SOON for internships inside the threshold
  *   2. `onboarding.item_overdue` events for items that became overdue
  *   3. task due-soon / overdue and milestone due-soon events (notifications)
- * Both steps are idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
+ *   4. documents past their expiry → EXPIRED, expiring-soon reminders
+ *   5. scheduled announcements that are due → published (+ notifications)
+ * Every step is idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ success: false }, { status: 404 })
@@ -30,7 +34,16 @@ export async function POST(request: NextRequest) {
     const endingSoon = await internLifecycleService.markEndingSoon()
     const overdue = await internLifecycleService.emitOverdueOnboarding()
     const deadlines = await workJobsService.emitTaskDeadlines()
-    return jsonSuccess({ endingSoon: endingSoon.marked, overdueEvents: overdue.emitted, ...deadlines })
+    const documents = await documentJobs.run()
+    const announcements = await announcementJobs.publishDue()
+    return jsonSuccess({
+      endingSoon: endingSoon.marked,
+      overdueEvents: overdue.emitted,
+      ...deadlines,
+      documentsExpired: documents.expired,
+      documentReminders: documents.warned,
+      announcementsPublished: announcements.published,
+    })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })
   }

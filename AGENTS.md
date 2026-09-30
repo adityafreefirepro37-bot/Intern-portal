@@ -15,7 +15,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Phase 01 Foundation - COMPLETE
 Phase 02 Authentication, RBAC & security - COMPLETE
 Phase 03 Intern management, HR directory & onboarding - COMPLETE
-Phase 04 Tasks, projects & work management - COMPLETE (next: Prompt 05 — HR operations). See README.md and docs/.
+Phase 04 Tasks, projects & work management - COMPLETE
+Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - COMPLETE (next: Prompt 06). See README.md and docs/hr-operations.md.
 
 ## Quick Start Commands
 

@@ -24,7 +24,7 @@ export default async function LearningPage({ searchParams }: PageProps<'/learnin
     <>
       <PageHeader
         title="Learning Hub"
-        description="Courses for onboarding and skill-building. Lessons, quizzes and progress tracking open in Phase 05."
+        description="Courses for onboarding and skill-building. Lessons, quizzes and progress tracking open in Phase 07."
       />
       {courses.length === 0 ? (
         <EmptyState icon={BookOpen} title="No courses yet" description="Published courses will appear here." />

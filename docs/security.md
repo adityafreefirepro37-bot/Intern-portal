@@ -90,6 +90,13 @@ Task attachments and project files (Phase 04) follow the same rules: validated u
 authorized downloads (`/api/tasks/attachments/:id`, `/api/projects/files/:id`) that answer 404 unless the viewer can see
 the task or project. Files submitted for review are part of the permanent history and can’t be deleted.
 
+HR files (Phase 05) — leave attachments (`/api/leave/:id/attachment`) and HR request files
+(`/api/hr-requests/attachments/:id`) — are served only to the requester and the people who handle them (404 otherwise).
+Document **versions are never overwritten**. **Sensitive document types** (e.g. ID proof) are hidden from anyone
+without `document.sensitive` regardless of visibility level, and staff downloads of them are audited. Stipends are
+returned only with `compensation.read`. CSV exports need an explicit `*.export` permission, respect scope, are
+audited, and neutralize spreadsheet formulas (`= + - @` cells are prefixed with `'`).
+
 Scheduled jobs (`POST /api/jobs/daily`) require `Authorization: Bearer $CRON_SECRET` (constant-time comparison) and
 are disabled (404) when the secret isn't set.
 

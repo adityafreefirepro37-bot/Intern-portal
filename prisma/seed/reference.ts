@@ -125,20 +125,41 @@ export async function seedReference(prisma: PrismaClient) {
     positionIds[position.slug] = record.id
   }
 
+  // quota_days: allowance per internship (null = unlimited, tracked only). Only applied
+  // when a type is first created; HR edits in /hr/settings are never overwritten.
   const leaveTypeSeeds = [
-    { slug: 'casual', name: 'Casual leave', description: 'Personal time off.', requires_approval: true },
-    { slug: 'sick', name: 'Sick leave', description: 'Illness or medical appointments.', requires_approval: true },
+    {
+      slug: 'casual',
+      name: 'Casual leave',
+      description: 'Personal time off.',
+      requires_approval: true,
+      quota_days: 6,
+      sort_order: 1,
+    },
+    {
+      slug: 'sick',
+      name: 'Sick leave',
+      description: 'Illness or medical appointments.',
+      requires_approval: true,
+      quota_days: 6,
+      sort_order: 2,
+    },
     {
       slug: 'academic',
       name: 'Academic leave',
       description: 'Exams and mandatory college work.',
       requires_approval: true,
+      requires_attachment: false,
+      quota_days: null,
+      sort_order: 3,
     },
     {
       slug: 'unpaid',
       name: 'Unpaid leave',
       description: 'Extended time off without stipend.',
       requires_approval: true,
+      quota_days: null,
+      sort_order: 4,
     },
   ]
   const leaveTypeIds: Record<string, string> = {}
@@ -151,9 +172,63 @@ export async function seedReference(prisma: PrismaClient) {
     leaveTypeIds[leaveType.slug] = record.id
   }
 
+  // Configurable document requirements (HR can change these in /hr/settings).
+  const documentTypeSeeds = [
+    {
+      slug: 'offer-letter',
+      name: 'Signed offer letter',
+      legacy_type: 'OFFER_LETTER',
+      is_required: true,
+      default_visibility: 'INTERN',
+    },
+    { slug: 'nda', name: 'Signed NDA', legacy_type: 'NDA', is_required: true, default_visibility: 'INTERN' },
+    {
+      slug: 'id-proof',
+      name: 'Government ID proof',
+      legacy_type: 'ID_DOCUMENT',
+      is_required: true,
+      is_sensitive: true,
+      has_expiry: true,
+      default_visibility: 'HR',
+    },
+    { slug: 'resume', name: 'Résumé / CV', legacy_type: 'RESUME', default_visibility: 'INTERN' },
+    {
+      slug: 'college-noc',
+      name: 'College NOC / letter',
+      legacy_type: 'OTHER',
+      description: 'No-objection certificate or internship letter from the college.',
+      default_visibility: 'HR',
+    },
+    {
+      slug: 'experience-letter',
+      name: 'Experience letter',
+      legacy_type: 'EXPERIENCE_LETTER',
+      default_visibility: 'INTERN',
+    },
+  ] as const
+  for (const [index, type] of documentTypeSeeds.entries()) {
+    await prisma.hrDocumentType.upsert({
+      where: { organization_id_slug: { organization_id: orgId, slug: type.slug } },
+      update: {},
+      create: { organization_id: orgId, sort_order: index + 1, ...type },
+    })
+  }
+
+  // Superseded by attendance.rules (Phase 05).
+  await prisma.setting.deleteMany({
+    where: { organization_id: orgId, key: { in: ['work_week', 'attendance.late_after'] } },
+  })
   const settingSeeds = [
-    { key: 'work_week', value: { days: ['MON', 'TUE', 'WED', 'THU', 'FRI'] } },
-    { key: 'attendance.late_after', value: { time: '10:15' } },
+    {
+      key: 'attendance.rules',
+      value: {
+        workStart: '10:00',
+        graceMinutes: 15,
+        fullDayMinutes: 420,
+        halfDayMinutes: 210,
+        workingDays: [1, 2, 3, 4, 5],
+      },
+    },
     { key: 'internship.default_duration_weeks', value: { weeks: 12 } },
     { key: 'internship.ending_soon_days', value: { days: 14 } },
     { key: 'intern.employee_code_prefix', value: { prefix: 'AYV-INT-' } },

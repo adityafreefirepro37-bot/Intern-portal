@@ -109,6 +109,9 @@ enum LifecycleEventType {
   DATES_CHANGED
   DOCUMENT_UPLOADED
   DOCUMENT_DELETED
+  DOCUMENT_REVIEWED
+  HR_RECORD_UPDATED
+  OFFBOARDING_STARTED
 }
 
 enum OnboardingItemStatus {
@@ -181,8 +184,78 @@ enum AttendanceStatus {
   ABSENT
   LATE
   HALF_DAY
-  LEAVE
+  ON_LEAVE
   HOLIDAY
+  WEEKEND
+  MISSING
+}
+
+enum CorrectionCategory {
+  FORGOT_CHECK_IN
+  FORGOT_CHECK_OUT
+  WRONG_TIME
+  SYSTEM_ISSUE
+  OTHER
+}
+
+enum DocumentStatus {
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum HrRequestCategory {
+  ATTENDANCE_CORRECTION
+  LEAVE
+  DOCUMENT_UPDATE
+  CERTIFICATE
+  EXPERIENCE_LETTER
+  PROFILE_CHANGE
+  OTHER
+}
+
+enum HrRequestStatus {
+  OPEN
+  IN_REVIEW
+  WAITING_FOR_USER
+  APPROVED
+  REJECTED
+  RESOLVED
+  CANCELLED
+}
+
+enum AnnouncementCategory {
+  COMPANY
+  HR
+  HOLIDAY
+  POLICY
+  INTERNSHIP
+  DEADLINE
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AnnouncementAudience {
+  EVERYONE
+  DEPARTMENT
+  TEAM
+  INTERNS
+  MANAGERS
+  MENTORS
+  SPECIFIC
+}
+
+enum OffboardingItemStatus {
+  PENDING
+  DONE
+  SKIPPED
 }
 
 enum CorrectionStatus {
@@ -210,6 +283,66 @@ enum LearningStatus {
   COMPLETED
 }
 
+enum CourseDifficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum LessonContentType {
+  TEXT
+  VIDEO
+  DOCUMENT
+  LINK
+  QUIZ
+  ASSIGNMENT
+}
+
+enum EnrollmentType {
+  SELF_ENROLLED
+  ASSIGNED
+  REQUIRED
+}
+
+/// OVERDUE is derived (due date passed, not completed) — never stored, so history isn't rewritten.
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum LearningPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum RequiredTrainingTarget {
+  EVERYONE
+  DEPARTMENT
+  POSITION
+  INTERN
+  ONBOARDING_TEMPLATE
+}
+
+enum QuizQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+enum QuizAnswerPolicy {
+  NEVER
+  AFTER_SUBMISSION
+  AFTER_PASS
+}
+
+enum QuizAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
 enum CalendarEventType {
   MEETING
   DEADLINE
@@ -230,15 +363,120 @@ enum FeedbackCategory {
 
 enum FeedbackVisibility {
   PRIVATE
-  RECIPIENT
-  MANAGERS
+  SHARED_WITH_INTERN
+  SHARED_WITH_MANAGER
+  HR_ONLY
+}
+
+enum FeedbackContextType {
+  TASK
+  PROJECT
+  LEARNING
+  GOAL
+  WEEKLY_CHECKIN
+  GENERAL
+}
+
+enum FeedbackType {
+  POSITIVE
+  DEVELOPMENTAL
+  GENERAL
+}
+
+enum FeedbackRequestStatus {
+  OPEN
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+enum CheckinStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum GoalCategory {
+  TECHNICAL
+  COMMUNICATION
+  PROJECT
+  LEARNING
+  LEADERSHIP
+  PROCESS
+  OTHER
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AT_RISK
+  COMPLETED
+  CANCELLED
+}
+
+enum GoalEvidenceType {
+  TASK
+  PROJECT
+  SUBMISSION
+  COURSE
+  FEEDBACK
+  DOCUMENT
+  LINK
+  NOTE
+}
+
+enum ReviewCycleType {
+  MIDPOINT
+  FINAL
+  CUSTOM
+}
+
+enum ReviewCycleStatus {
+  DRAFT
+  OPEN
+  IN_REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum ReviewRespondent {
+  SELF
+  MANAGER
+  MENTOR
   HR
 }
 
+enum ReviewQuestionType {
+  TEXT
+  RATING
+  BOOLEAN
+  MULTI_SELECT
+}
+
+enum DevelopmentPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum DevelopmentItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// DRAFT → SELF_REVIEW → MANAGER_REVIEW → MENTOR_REVIEW → HR_REVIEW → COMPLETED (stages can be switched off
+/// per cycle). SUBMITTED / ACKNOWLEDGED are unused Phase 01 values kept for compatibility.
 enum PerformanceReviewStatus {
   DRAFT
   SUBMITTED
   ACKNOWLEDGED
+  SELF_REVIEW
+  MANAGER_REVIEW
+  MENTOR_REVIEW
+  HR_REVIEW
+  COMPLETED
 }
 
 enum AnnouncementPriority {
@@ -351,6 +589,27 @@ model Organization {
   code_counters        CodeCounter[]
 
   project_attachments ProjectAttachment[]
+
+  attendance_corrections AttendanceCorrection[]
+  leave_balances         LeaveBalance[]
+  document_types         HrDocumentType[]
+  holidays               Holiday[]
+  hr_requests            HrRequest[]
+  offboarding_checklists OffboardingChecklist[]
+
+  course_categories      CourseCategory[]
+  course_enrollments     CourseEnrollment[]
+  learning_paths         LearningPath[]
+  learning_plans         LearningPlan[]
+  required_training      RequiredTrainingRule[]
+  assignment_submissions LearningAssignmentSubmission[]
+  feedback_requests      FeedbackRequest[]
+  weekly_checkins        WeeklyCheckin[]
+  performance_goals      PerformanceGoal[]
+  performance_templates  PerformanceTemplate[]
+  performance_cycles     PerformanceCycle[]
+  development_plans      DevelopmentPlan[]
+
   @@map("organizations")
 }
 
@@ -404,7 +663,7 @@ model User {
   corrections_reviewed    AttendanceCorrection[]    @relation("CorrectionReviewer")
   leave_requests          LeaveRequest[]            @relation("LeaveRequester")
   leave_reviews           LeaveRequest[]            @relation("LeaveReviewer")
-  courses_created         Course[]
+  courses_created         Course[]                  @relation("CourseCreator")
   quiz_attempts           QuizAttempt[]
   learning_progress       LearningProgress[]
   meetings_created        Meeting[]
@@ -412,7 +671,7 @@ model User {
   feedback_given          Feedback[]                @relation("FeedbackFrom")
   feedback_received       Feedback[]                @relation("FeedbackTo")
   checkins_reviewed       WeeklyCheckin[]
-  reviews_written         PerformanceReview[]
+  reviews_written         PerformanceReview[]       @relation("ReviewReviewer")
   announcements_published Announcement[]
   notifications           Notification[]
   channels_created        Channel[]
@@ -431,16 +690,60 @@ model User {
   acknowledgements        DocumentAcknowledgement[]
   lifecycle_events_acted  InternLifecycleEvent[]
 
-  managed_projects        Project[]            @relation("ProjectManager")
-  created_projects        Project[]            @relation("ProjectCreator")
-  project_members_added   ProjectMember[]      @relation("ProjectMemberAdder")
-  updated_tasks           Task[]               @relation("TaskUpdater")
-  reviewed_versions       SubmissionVersion[]  @relation("VersionReviewer")
-  comment_mentions        TaskCommentMention[] @relation("CommentMentions")
-  completed_checklist     TaskChecklistItem[]  @relation("ChecklistCompleter")
-  created_dependencies    TaskDependency[]     @relation("DependencyCreator")
-  time_entries            TaskTimeEntry[]      @relation("TimeEntries")
-  uploaded_project_files  ProjectAttachment[]  @relation("ProjectFileUploader")
+  managed_projects       Project[]            @relation("ProjectManager")
+  created_projects       Project[]            @relation("ProjectCreator")
+  project_members_added  ProjectMember[]      @relation("ProjectMemberAdder")
+  updated_tasks          Task[]               @relation("TaskUpdater")
+  reviewed_versions      SubmissionVersion[]  @relation("VersionReviewer")
+  comment_mentions       TaskCommentMention[] @relation("CommentMentions")
+  completed_checklist    TaskChecklistItem[]  @relation("ChecklistCompleter")
+  created_dependencies   TaskDependency[]     @relation("DependencyCreator")
+  time_entries           TaskTimeEntry[]      @relation("TimeEntries")
+  uploaded_project_files ProjectAttachment[]  @relation("ProjectFileUploader")
+
+  attendance_updated      Attendance[]           @relation("AttendanceUpdater")
+  attendance_corrections  AttendanceCorrection[] @relation("CorrectionSubject")
+  leave_created           LeaveRequest[]         @relation("LeaveCreator")
+  leave_cancelled         LeaveRequest[]         @relation("LeaveCanceller")
+  leave_balances          LeaveBalance[]         @relation("LeaveBalanceOwner")
+  leave_balances_updated  LeaveBalance[]         @relation("LeaveBalanceUpdater")
+  documents_verified      InternshipDocument[]   @relation("DocumentVerifier")
+  holidays_created        Holiday[]
+  hr_requests             HrRequest[]            @relation("HrRequester")
+  hr_requests_assigned    HrRequest[]            @relation("HrRequestAssignee")
+  hr_requests_resolved    HrRequest[]            @relation("HrRequestResolver")
+  hr_request_comments     HrRequestComment[]
+  hr_request_attachments  HrRequestAttachment[]
+  announcements_created   Announcement[]         @relation("AnnouncementCreator")
+  offboardings_started    OffboardingChecklist[]
+  offboarding_items_owned OffboardingItem[]      @relation("OffboardingAssignee")
+  offboarding_items_done  OffboardingItem[]      @relation("OffboardingCompleter")
+
+  courses_updated               Course[]                       @relation("CourseUpdater")
+  enrollments                   CourseEnrollment[]             @relation("EnrollmentUser")
+  enrollments_assigned          CourseEnrollment[]             @relation("EnrollmentAssigner")
+  learning_paths_created        LearningPath[]
+  learning_plans                LearningPlan[]                 @relation("PlanUser")
+  learning_plans_assigned       LearningPlan[]                 @relation("PlanAssigner")
+  required_training_created     RequiredTrainingRule[]
+  assignment_submissions        LearningAssignmentSubmission[] @relation("AssignmentSubmitter")
+  assignment_reviews            LearningAssignmentSubmission[] @relation("AssignmentReviewer")
+  learning_versions_submitted   LearningSubmissionVersion[]    @relation("LearningVersionSubmitter")
+  learning_versions_reviewed    LearningSubmissionVersion[]    @relation("LearningVersionReviewer")
+  feedback_requests_made        FeedbackRequest[]              @relation("FeedbackRequester")
+  feedback_requests_received    FeedbackRequest[]              @relation("FeedbackRequestRecipient")
+  goals_owned                   PerformanceGoal[]              @relation("GoalOwner")
+  goals_created                 PerformanceGoal[]              @relation("GoalCreator")
+  goal_evidence_added           GoalEvidence[]
+  performance_templates_created PerformanceTemplate[]
+  performance_cycles_created    PerformanceCycle[]
+  reviews_mentored              PerformanceReview[]            @relation("ReviewMentor")
+  reviews_completed             PerformanceReview[]            @relation("ReviewCompleter")
+  review_answers                PerformanceReviewAnswer[]
+  review_revisions              PerformanceReviewRevision[]
+  development_plans_created     DevelopmentPlan[]
+  development_items_owned       DevelopmentPlanItem[]
+
   @@unique([organization_id, email])
   @@index([organization_id, status])
   @@index([email])
@@ -601,6 +904,9 @@ model Department {
   internships          Internship[]
   onboarding_templates OnboardingTemplate[]
 
+  learning_paths     LearningPath[]
+  performance_cycles PerformanceCycle[]
+
   @@unique([organization_id, slug])
   @@index([organization_id])
   @@map("departments")
@@ -645,6 +951,8 @@ model Position {
   interns              Intern[]
   internships          Internship[]
   onboarding_templates OnboardingTemplate[]
+
+  learning_paths LearningPath[]
 
   @@unique([organization_id, slug])
   @@index([organization_id])
@@ -691,6 +999,11 @@ model Intern {
   performance_reviews PerformanceReview[]
   certificates        Certificate[]
   lifecycle_events    InternLifecycleEvent[]
+  offboarding         OffboardingChecklist?
+
+  feedback_requests FeedbackRequest[]
+  goals             PerformanceGoal[]
+  development_plans DevelopmentPlan[]
 
   @@unique([organization_id, employee_code])
   @@index([organization_id, status])
@@ -705,6 +1018,7 @@ model Intern {
 model InternProfile {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   intern_id       String    @unique @db.Uuid
+  preferred_name  String?
   date_of_birth   DateTime? @db.Date
   gender          String?
   address_line_1  String?
@@ -727,14 +1041,15 @@ model InternProfile {
 }
 
 model EmergencyContact {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  intern_id    String   @db.Uuid
-  name         String
-  relationship String
-  phone        String
-  email        String?
-  created_at   DateTime @default(now()) @db.Timestamptz(3)
-  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  intern_id       String   @db.Uuid
+  name            String
+  relationship    String
+  phone           String
+  alternate_phone String?
+  email           String?
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
   intern Intern @relation(fields: [intern_id], references: [id], onDelete: Cascade)
 
@@ -759,19 +1074,25 @@ model Internship {
   manager_id        String?          @db.Uuid
   mentor_id         String?          @db.Uuid
   description       String?
+  /// Compensation — readable only with compensation.read.
+  stipend_amount    Decimal?         @db.Decimal(12, 2)
+  stipend_currency  String?          @db.Char(3)
+  stipend_frequency String?
+  stipend_notes     String?
   created_at        DateTime         @default(now()) @db.Timestamptz(3)
   updated_at        DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization     Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  intern           Intern               @relation(fields: [intern_id], references: [id], onDelete: Restrict)
-  department       Department?          @relation(fields: [department_id], references: [id], onDelete: SetNull)
-  position         Position?            @relation(fields: [position_id], references: [id], onDelete: SetNull)
-  manager          User?                @relation("InternshipManager", fields: [manager_id], references: [id], onDelete: SetNull)
-  mentor           User?                @relation("InternshipMentor", fields: [mentor_id], references: [id], onDelete: SetNull)
+  organization     Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern           Intern                 @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  department       Department?            @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  position         Position?              @relation(fields: [position_id], references: [id], onDelete: SetNull)
+  manager          User?                  @relation("InternshipManager", fields: [manager_id], references: [id], onDelete: SetNull)
+  mentor           User?                  @relation("InternshipMentor", fields: [mentor_id], references: [id], onDelete: SetNull)
   documents        InternshipDocument[]
   onboarding_items OnboardingItem[]
   onboarding       Onboarding?
   certificates     Certificate[]
+  offboardings     OffboardingChecklist[]
 
   @@index([organization_id, status])
   @@index([intern_id])
@@ -781,31 +1102,74 @@ model Internship {
 }
 
 model InternshipDocument {
-  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String             @db.Uuid
-  intern_id       String             @db.Uuid
-  internship_id   String?            @db.Uuid
-  document_type   DocumentType
-  file_name       String
-  storage_path    String
-  mime_type       String
-  file_size       Int
-  uploaded_by     String?            @db.Uuid
-  visibility      DocumentVisibility @default(HR)
-  created_at      DateTime           @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
-  deleted_at      DateTime?          @db.Timestamptz(3)
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String             @db.Uuid
+  intern_id           String             @db.Uuid
+  internship_id       String?            @db.Uuid
+  document_type       DocumentType
+  file_name           String
+  storage_path        String
+  mime_type           String
+  file_size           Int
+  uploaded_by         String?            @db.Uuid
+  visibility          DocumentVisibility @default(HR)
+  /// Configurable type (document_types); document_type stays as the legacy category.
+  document_type_id    String?            @db.Uuid
+  status              DocumentStatus     @default(UPLOADED)
+  /// Versions are never overwritten: a replacement is a new row pointing at the previous one.
+  version             Int                @default(1)
+  previous_version_id String?            @db.Uuid
+  is_current          Boolean            @default(true)
+  verified_by         String?            @db.Uuid
+  verified_at         DateTime?          @db.Timestamptz(3)
+  rejection_reason    String?
+  expires_at          DateTime?          @db.Date
+  notes               String?
+  created_at          DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at          DateTime?          @db.Timestamptz(3)
 
-  organization     Organization     @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  intern           Intern           @relation(fields: [intern_id], references: [id], onDelete: Restrict)
-  internship       Internship?      @relation(fields: [internship_id], references: [id], onDelete: SetNull)
-  uploader         User?            @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  organization     Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern           Intern               @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  internship       Internship?          @relation(fields: [internship_id], references: [id], onDelete: SetNull)
+  uploader         User?                @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
   onboarding_items OnboardingItem[]
+  type             HrDocumentType?      @relation(fields: [document_type_id], references: [id], onDelete: SetNull)
+  previous_version InternshipDocument?  @relation("DocumentVersions", fields: [previous_version_id], references: [id], onDelete: SetNull)
+  next_versions    InternshipDocument[] @relation("DocumentVersions")
+  verifier         User?                @relation("DocumentVerifier", fields: [verified_by], references: [id], onDelete: SetNull)
 
   @@index([organization_id])
   @@index([intern_id])
   @@index([internship_id])
+  @@index([intern_id, document_type_id, is_current])
+  @@index([organization_id, status])
+  @@index([expires_at])
   @@map("internship_documents")
+}
+
+/// Configurable document requirements (per organization).
+model HrDocumentType {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id    String             @db.Uuid
+  name               String
+  slug               String
+  description        String?
+  is_required        Boolean            @default(false)
+  is_sensitive       Boolean            @default(false)
+  has_expiry         Boolean            @default(false)
+  legacy_type        DocumentType       @default(OTHER)
+  default_visibility DocumentVisibility @default(HR)
+  is_active          Boolean            @default(true)
+  sort_order         Int                @default(0)
+  created_at         DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at         DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  documents    InternshipDocument[]
+
+  @@unique([organization_id, slug])
+  @@map("document_types")
 }
 
 model OnboardingItem {
@@ -856,11 +1220,11 @@ model OnboardingItem {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Project {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String        @db.Uuid
-  name            String
-  slug            String
-  description     String?
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String        @db.Uuid
+  name                String
+  slug                String
+  description         String?
   status              ProjectStatus @default(PLANNING)
   priority            TaskPriority  @default(MEDIUM)
   start_date          DateTime?     @db.Date
@@ -908,9 +1272,9 @@ model ProjectMember {
 }
 
 model Milestone {
-  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  project_id  String          @db.Uuid
-  name        String
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  project_id   String          @db.Uuid
+  name         String
   description  String?
   start_date   DateTime?       @db.Date
   due_date     DateTime?       @db.Date
@@ -959,21 +1323,21 @@ model Task {
   updated_at        DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
   deleted_at        DateTime?    @db.Timestamptz(3)
 
-  organization   Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  project        Project?            @relation(fields: [project_id], references: [id], onDelete: Restrict)
-  milestone      Milestone?          @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
-  parent_task    Task?               @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
-  subtasks       Task[]              @relation("TaskSubtasks")
-  creator        User                @relation("TaskCreator", fields: [created_by], references: [id], onDelete: Restrict)
-  updater        User?               @relation("TaskUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
-  assignees      TaskAssignee[]
-  comments       TaskComment[]
-  attachments    TaskAttachment[]
-  submissions    TaskSubmission[]
-  checklist      TaskChecklistItem[]
-  dependencies   TaskDependency[]    @relation("TaskDependsOn")
-  dependents     TaskDependency[]    @relation("TaskDependents")
-  time_entries   TaskTimeEntry[]
+  organization Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  project      Project?            @relation(fields: [project_id], references: [id], onDelete: Restrict)
+  milestone    Milestone?          @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
+  parent_task  Task?               @relation("TaskSubtasks", fields: [parent_task_id], references: [id], onDelete: SetNull)
+  subtasks     Task[]              @relation("TaskSubtasks")
+  creator      User                @relation("TaskCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  updater      User?               @relation("TaskUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  assignees    TaskAssignee[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+  submissions  TaskSubmission[]
+  checklist    TaskChecklistItem[]
+  dependencies TaskDependency[]    @relation("TaskDependsOn")
+  dependents   TaskDependency[]    @relation("TaskDependents")
+  time_entries TaskTimeEntry[]
 
   @@index([organization_id, status])
   @@index([organization_id, priority])
@@ -1025,17 +1389,17 @@ model TaskComment {
 }
 
 model TaskAttachment {
-  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task_id      String    @db.Uuid
-  uploaded_by  String?   @db.Uuid
-  file_name    String
-  storage_path String
-  mime_type    String
-  file_size    Int
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id               String    @db.Uuid
+  uploaded_by           String?   @db.Uuid
+  file_name             String
+  storage_path          String
+  mime_type             String
+  file_size             Int
   /// Set when the file was attached to a specific submission version.
   submission_version_id String?   @db.Uuid
-  created_at   DateTime  @default(now()) @db.Timestamptz(3)
-  deleted_at   DateTime? @db.Timestamptz(3)
+  created_at            DateTime  @default(now()) @db.Timestamptz(3)
+  deleted_at            DateTime? @db.Timestamptz(3)
 
   task               Task               @relation(fields: [task_id], references: [id], onDelete: Cascade)
   uploader           User?              @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
@@ -1194,12 +1558,20 @@ model Attendance {
   total_minutes   Int?
   status          AttendanceStatus @default(PRESENT)
   notes           String?
+  break_minutes   Int              @default(0)
+  is_late         Boolean          @default(false)
+  late_minutes    Int?
+  /// SELF (check-in/out), CORRECTION (approved correction) or HR (manual entry).
+  source          String           @default("SELF")
+  updated_by      String?          @db.Uuid
   created_at      DateTime         @default(now()) @db.Timestamptz(3)
   updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
 
   organization Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   user         User                   @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  updater      User?                  @relation("AttendanceUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
   corrections  AttendanceCorrection[]
+  breaks       AttendanceBreak[]
 
   @@unique([user_id, date])
   @@index([organization_id, date])
@@ -1207,73 +1579,262 @@ model Attendance {
   @@map("attendance")
 }
 
-model AttendanceCorrection {
-  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  attendance_id       String           @db.Uuid
-  requested_by        String           @db.Uuid
-  reason              String
-  requested_check_in  DateTime?        @db.Timestamptz(3)
-  requested_check_out DateTime?        @db.Timestamptz(3)
-  status              CorrectionStatus @default(PENDING)
-  reviewed_by         String?          @db.Uuid
-  reviewed_at         DateTime?        @db.Timestamptz(3)
-  review_comment      String?
-  created_at          DateTime         @default(now()) @db.Timestamptz(3)
-  updated_at          DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+model AttendanceBreak {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attendance_id String    @db.Uuid
+  started_at    DateTime  @db.Timestamptz(3)
+  ended_at      DateTime? @db.Timestamptz(3)
+  created_at    DateTime  @default(now()) @db.Timestamptz(3)
 
-  attendance Attendance @relation(fields: [attendance_id], references: [id], onDelete: Restrict)
-  requester  User       @relation("CorrectionRequester", fields: [requested_by], references: [id], onDelete: Restrict)
-  reviewer   User?      @relation("CorrectionReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  attendance Attendance @relation(fields: [attendance_id], references: [id], onDelete: Cascade)
 
   @@index([attendance_id])
+  @@map("attendance_breaks")
+}
+
+model AttendanceCorrection {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String             @db.Uuid
+  /// Whose attendance is corrected (requested_by may be HR acting for them).
+  user_id             String             @db.Uuid
+  date                DateTime           @db.Date
+  attendance_id       String?            @db.Uuid
+  category            CorrectionCategory @default(OTHER)
+  /// Values before the correction — kept for the audit trail.
+  original_check_in   DateTime?          @db.Timestamptz(3)
+  original_check_out  DateTime?          @db.Timestamptz(3)
+  requested_by        String             @db.Uuid
+  reason              String
+  requested_check_in  DateTime?          @db.Timestamptz(3)
+  requested_check_out DateTime?          @db.Timestamptz(3)
+  status              CorrectionStatus   @default(PENDING)
+  reviewed_by         String?            @db.Uuid
+  reviewed_at         DateTime?          @db.Timestamptz(3)
+  review_comment      String?
+  created_at          DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation("CorrectionSubject", fields: [user_id], references: [id], onDelete: Restrict)
+  attendance   Attendance?  @relation(fields: [attendance_id], references: [id], onDelete: Restrict)
+  requester    User         @relation("CorrectionRequester", fields: [requested_by], references: [id], onDelete: Restrict)
+  reviewer     User?        @relation("CorrectionReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+
+  @@index([attendance_id])
+  @@index([organization_id, status])
+  @@index([user_id, date])
   @@index([requested_by])
   @@index([status])
   @@map("attendance_corrections")
 }
 
 model LeaveType {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id   String   @db.Uuid
-  name              String
-  slug              String
-  description       String?
-  requires_approval Boolean  @default(true)
-  is_active         Boolean  @default(true)
-  created_at        DateTime @default(now()) @db.Timestamptz(3)
-  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String   @db.Uuid
+  name                String
+  slug                String
+  description         String?
+  requires_approval   Boolean  @default(true)
+  is_active           Boolean  @default(true)
+  /// Days allowed per internship; null = unlimited (tracked, not capped).
+  quota_days          Int?
+  requires_attachment Boolean  @default(false)
+  sort_order          Int      @default(0)
+  created_at          DateTime @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
   organization   Organization   @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   leave_requests LeaveRequest[]
+  balances       LeaveBalance[]
 
   @@unique([organization_id, slug])
   @@map("leave_types")
 }
 
 model LeaveRequest {
-  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String      @db.Uuid
-  user_id         String      @db.Uuid
-  leave_type_id   String      @db.Uuid
-  start_date      DateTime    @db.Date
-  end_date        DateTime    @db.Date
-  reason          String?
-  attachment_path String?
-  status          LeaveStatus @default(PENDING)
-  reviewed_by     String?     @db.Uuid
-  reviewed_at     DateTime?   @db.Timestamptz(3)
-  review_comment  String?
-  created_at      DateTime    @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+  id               String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id  String      @db.Uuid
+  user_id          String      @db.Uuid
+  leave_type_id    String      @db.Uuid
+  start_date       DateTime    @db.Date
+  end_date         DateTime    @db.Date
+  reason           String?
+  attachment_path  String?
+  status           LeaveStatus @default(PENDING)
+  reviewed_by      String?     @db.Uuid
+  reviewed_at      DateTime?   @db.Timestamptz(3)
+  review_comment   String?
+  /// Working days covered (weekends and holidays excluded), fixed at request time.
+  days             Int         @default(0)
+  created_by       String?     @db.Uuid
+  cancelled_at     DateTime?   @db.Timestamptz(3)
+  cancelled_by     String?     @db.Uuid
+  overlap_override Boolean     @default(false)
+  override_reason  String?
+  created_at       DateTime    @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   user         User         @relation("LeaveRequester", fields: [user_id], references: [id], onDelete: Restrict)
   leave_type   LeaveType    @relation(fields: [leave_type_id], references: [id], onDelete: Restrict)
   reviewer     User?        @relation("LeaveReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  creator      User?        @relation("LeaveCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  canceller    User?        @relation("LeaveCanceller", fields: [cancelled_by], references: [id], onDelete: SetNull)
 
   @@index([organization_id, status])
   @@index([user_id, start_date])
   @@index([leave_type_id])
+  @@index([organization_id, start_date, end_date])
   @@map("leave_requests")
+}
+
+model LeaveBalance {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  user_id         String   @db.Uuid
+  leave_type_id   String   @db.Uuid
+  allocated_days  Int
+  notes           String?
+  updated_by      String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation("LeaveBalanceOwner", fields: [user_id], references: [id], onDelete: Cascade)
+  leave_type   LeaveType    @relation(fields: [leave_type_id], references: [id], onDelete: Cascade)
+  updater      User?        @relation("LeaveBalanceUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@unique([user_id, leave_type_id])
+  @@index([organization_id])
+  @@map("leave_balances")
+}
+
+model Holiday {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  date            DateTime @db.Date
+  name            String
+  description     String?
+  is_optional     Boolean  @default(false)
+  created_by      String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator      User?        @relation(fields: [created_by], references: [id], onDelete: SetNull)
+
+  @@unique([organization_id, date])
+  @@map("holidays")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HR REQUESTS & OFFBOARDING
+// ─────────────────────────────────────────────────────────────────────────────
+
+model HrRequest {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String            @db.Uuid
+  requester_id    String            @db.Uuid
+  category        HrRequestCategory
+  subject         String
+  description     String
+  status          HrRequestStatus   @default(OPEN)
+  assigned_to     String?           @db.Uuid
+  resolution      String?
+  resolved_at     DateTime?         @db.Timestamptz(3)
+  resolved_by     String?           @db.Uuid
+  created_at      DateTime          @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at      DateTime?         @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  requester    User                  @relation("HrRequester", fields: [requester_id], references: [id], onDelete: Restrict)
+  assignee     User?                 @relation("HrRequestAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+  resolver     User?                 @relation("HrRequestResolver", fields: [resolved_by], references: [id], onDelete: SetNull)
+  comments     HrRequestComment[]
+  attachments  HrRequestAttachment[]
+
+  @@index([organization_id, status])
+  @@index([requester_id])
+  @@index([assigned_to])
+  @@map("hr_requests")
+}
+
+model HrRequestComment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  request_id String   @db.Uuid
+  author_id  String   @db.Uuid
+  body       String
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+
+  request HrRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [author_id], references: [id], onDelete: Restrict)
+
+  @@index([request_id, created_at])
+  @@map("hr_request_comments")
+}
+
+model HrRequestAttachment {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  request_id   String    @db.Uuid
+  uploaded_by  String?   @db.Uuid
+  file_name    String
+  storage_path String
+  mime_type    String
+  file_size    Int
+  created_at   DateTime  @default(now()) @db.Timestamptz(3)
+  deleted_at   DateTime? @db.Timestamptz(3)
+
+  request  HrRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  uploader User?     @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+
+  @@index([request_id])
+  @@map("hr_request_attachments")
+}
+
+/// Offboarding preparation (foundation — certificates/exit feedback arrive later).
+model OffboardingChecklist {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String    @db.Uuid
+  intern_id       String    @unique @db.Uuid
+  internship_id   String?   @db.Uuid
+  started_by      String?   @db.Uuid
+  started_at      DateTime  @default(now()) @db.Timestamptz(3)
+  completed_at    DateTime? @db.Timestamptz(3)
+  notes           String?
+
+  organization Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern       Intern            @relation(fields: [intern_id], references: [id], onDelete: Cascade)
+  internship   Internship?       @relation(fields: [internship_id], references: [id], onDelete: SetNull)
+  starter      User?             @relation(fields: [started_by], references: [id], onDelete: SetNull)
+  items        OffboardingItem[]
+
+  @@index([organization_id])
+  @@map("offboarding_checklists")
+}
+
+model OffboardingItem {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  checklist_id String                 @db.Uuid
+  title        String
+  description  String?
+  owner_role   OnboardingAssigneeRole @default(HR)
+  assigned_to  String?                @db.Uuid
+  due_date     DateTime?              @db.Date
+  status       OffboardingItemStatus  @default(PENDING)
+  completed_by String?                @db.Uuid
+  completed_at DateTime?              @db.Timestamptz(3)
+  note         String?
+  sort_order   Int                    @default(0)
+  created_at   DateTime               @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+
+  checklist OffboardingChecklist @relation(fields: [checklist_id], references: [id], onDelete: Cascade)
+  assignee  User?                @relation("OffboardingAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+  completer User?                @relation("OffboardingCompleter", fields: [completed_by], references: [id], onDelete: SetNull)
+
+  @@index([checklist_id, sort_order])
+  @@map("offboarding_items")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1281,79 +1842,223 @@ model LeaveRequest {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Course {
-  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String       @db.Uuid
-  title           String
-  slug            String
-  description     String?
-  thumbnail_url   String?
-  status          CourseStatus @default(DRAFT)
-  created_by      String?      @db.Uuid
-  created_at      DateTime     @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String           @db.Uuid
+  title               String
+  slug                String
+  description         String?
+  thumbnail_url       String?
+  status              CourseStatus     @default(DRAFT)
+  category_id         String?          @db.Uuid
+  difficulty          CourseDifficulty @default(BEGINNER)
+  estimated_minutes   Int?
+  /// REQUIRED vs OPTIONAL training (who must take it is set by required_training_rules).
+  is_required         Boolean          @default(false)
+  /// Lessons unlock in order (a lesson can't be completed before the previous required one).
+  is_sequential       Boolean          @default(false)
+  /// Completion rule: required lessons AND (if set) required quizzes passed AND required assignments approved.
+  require_quizzes     Boolean          @default(true)
+  require_assignments Boolean          @default(true)
+  published_at        DateTime?        @db.Timestamptz(3)
+  created_by          String?          @db.Uuid
+  updated_by          String?          @db.Uuid
+  created_at          DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at          DateTime?        @db.Timestamptz(3)
 
-  organization      Organization       @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  creator           User?              @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  organization      Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator           User?                  @relation("CourseCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  updater           User?                  @relation("CourseUpdater", fields: [updated_by], references: [id], onDelete: SetNull)
+  category          CourseCategory?        @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  modules           CourseModule[]
   lessons           Lesson[]
+  quizzes           Quiz[]
+  assignments       LearningAssignment[]
+  enrollments       CourseEnrollment[]
   learning_progress LearningProgress[]
+  path_courses      LearningPathCourse[]
+  plan_items        LearningPlanItem[]     @relation("PlanItemCourse")
+  prerequisite_for  LearningPlanItem[]     @relation("PlanItemPrerequisite")
+  required_rules    RequiredTrainingRule[]
+  development_items DevelopmentPlanItem[]
 
   @@unique([organization_id, slug])
   @@index([organization_id, status])
+  @@index([category_id])
   @@map("courses")
 }
 
+model CourseCategory {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  name            String
+  slug            String
+  description     String?
+  sort_order      Int      @default(0)
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  courses      Course[]
+
+  @@unique([organization_id, slug])
+  @@map("course_categories")
+}
+
+model CourseModule {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id   String   @db.Uuid
+  title       String
+  description String?
+  position    Int      @default(0)
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  course      Course               @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+  quizzes     Quiz[]
+  assignments LearningAssignment[]
+
+  @@index([course_id, position])
+  @@map("course_modules")
+}
+
 model Lesson {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  course_id         String   @db.Uuid
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id         String            @db.Uuid
+  module_id         String            @db.Uuid
   title             String
   description       String?
+  content_type      LessonContentType @default(TEXT)
+  /// Plain text (rendered as paragraphs / simple lists — never as HTML).
   content           String?
   video_url         String?
-  sort_order        Int      @default(0)
+  document_url      String?
+  link_url          String?
+  /// Position within the module.
+  sort_order        Int               @default(0)
   estimated_minutes Int?
-  created_at        DateTime @default(now()) @db.Timestamptz(3)
-  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  is_required       Boolean           @default(true)
+  created_at        DateTime          @default(now()) @db.Timestamptz(3)
+  updated_at        DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
 
   course            Course             @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  module            CourseModule       @relation(fields: [module_id], references: [id], onDelete: Cascade)
   quizzes           Quiz[]
   learning_progress LearningProgress[]
 
   @@index([course_id, sort_order])
+  @@index([module_id, sort_order])
   @@map("lessons")
 }
 
 model Quiz {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lesson_id     String   @db.Uuid
-  title         String
-  passing_score Int      @default(70)
-  created_at    DateTime @default(now()) @db.Timestamptz(3)
-  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id          String           @db.Uuid
+  module_id          String?          @db.Uuid
+  lesson_id          String?          @db.Uuid
+  title              String
+  description        String?
+  /// Passing percentage (0–100).
+  passing_score      Int              @default(70)
+  attempt_limit      Int?
+  time_limit_minutes Int?
+  answer_policy      QuizAnswerPolicy @default(AFTER_SUBMISSION)
+  status             CourseStatus     @default(DRAFT)
+  is_required        Boolean          @default(true)
+  position           Int              @default(0)
+  created_at         DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at         DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
 
-  lesson   Lesson        @relation(fields: [lesson_id], references: [id], onDelete: Cascade)
-  attempts QuizAttempt[]
+  course    Course         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  module    CourseModule?  @relation(fields: [module_id], references: [id], onDelete: SetNull)
+  lesson    Lesson?        @relation(fields: [lesson_id], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
 
   @@index([lesson_id])
+  @@index([course_id])
   @@map("quizzes")
 }
 
+model QuizQuestion {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quiz_id          String           @db.Uuid
+  question         String
+  question_type    QuizQuestionType
+  points           Int              @default(1)
+  position         Int              @default(0)
+  explanation      String?
+  /// SHORT_ANSWER accepted answers — server-only.
+  accepted_answers String[]         @default([])
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+
+  quiz    Quiz         @relation(fields: [quiz_id], references: [id], onDelete: Cascade)
+  options QuizOption[]
+  answers QuizAnswer[]
+
+  @@index([quiz_id, position])
+  @@map("quiz_questions")
+}
+
+model QuizOption {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question_id String  @db.Uuid
+  option_text String
+  /// Server-only until the answer policy allows it.
+  is_correct  Boolean @default(false)
+  position    Int     @default(0)
+
+  question QuizQuestion @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@index([question_id])
+  @@map("quiz_options")
+}
+
+model QuizAnswer {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attempt_id          String   @db.Uuid
+  question_id         String   @db.Uuid
+  selected_option_ids String[] @default([]) @db.Uuid
+  text_answer         String?
+  is_correct          Boolean  @default(false)
+  points_awarded      Int      @default(0)
+
+  attempt  QuizAttempt  @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([attempt_id, question_id])
+  @@map("quiz_answers")
+}
+
 model QuizAttempt {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  quiz_id      String   @db.Uuid
-  user_id      String   @db.Uuid
-  score        Int
-  passed       Boolean
-  attempted_at DateTime @default(now()) @db.Timestamptz(3)
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quiz_id        String            @db.Uuid
+  user_id        String            @db.Uuid
+  attempt_number Int               @default(1)
+  status         QuizAttemptStatus @default(IN_PROGRESS)
+  /// Points earned and available — always calculated on the server.
+  score          Int?
+  max_score      Int?
+  percentage     Int?
+  passed         Boolean?
+  started_at     DateTime          @default(now()) @db.Timestamptz(3)
+  submitted_at   DateTime?         @db.Timestamptz(3)
+  attempted_at   DateTime          @default(now()) @db.Timestamptz(3)
 
-  quiz Quiz @relation(fields: [quiz_id], references: [id], onDelete: Restrict)
-  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  quiz    Quiz         @relation(fields: [quiz_id], references: [id], onDelete: Restrict)
+  user    User         @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  answers QuizAnswer[]
 
+  @@unique([quiz_id, user_id, attempt_number])
   @@index([quiz_id])
   @@index([user_id])
   @@map("quiz_attempts")
 }
 
 /// Course-level progress rows have lesson_id = NULL; lesson-level rows set it.
+/// Lesson progress (one row per person and lesson). Course-level progress lives on course_enrollments.
 model LearningProgress {
   id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id          String         @db.Uuid
@@ -1361,7 +2066,10 @@ model LearningProgress {
   lesson_id        String?        @db.Uuid
   status           LearningStatus @default(NOT_STARTED)
   progress_percent Int            @default(0)
+  started_at       DateTime?      @db.Timestamptz(3)
   completed_at     DateTime?      @db.Timestamptz(3)
+  last_accessed_at DateTime?      @db.Timestamptz(3)
+  created_at       DateTime       @default(now()) @db.Timestamptz(3)
   updated_at       DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
 
   user   User    @relation(fields: [user_id], references: [id], onDelete: Restrict)
@@ -1370,7 +2078,237 @@ model LearningProgress {
 
   @@unique([user_id, course_id, lesson_id])
   @@index([course_id])
+  @@index([user_id, course_id])
   @@map("learning_progress")
+}
+
+model CourseEnrollment {
+  id                  String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String           @db.Uuid
+  course_id           String           @db.Uuid
+  user_id             String           @db.Uuid
+  enrollment_type     EnrollmentType
+  status              EnrollmentStatus @default(NOT_STARTED)
+  progress_percentage Int              @default(0)
+  assigned_by         String?          @db.Uuid
+  assigned_at         DateTime         @default(now()) @db.Timestamptz(3)
+  due_date            DateTime?        @db.Date
+  started_at          DateTime?        @db.Timestamptz(3)
+  completed_at        DateTime?        @db.Timestamptz(3)
+  cancelled_at        DateTime?        @db.Timestamptz(3)
+  learning_plan_id    String?          @db.Uuid
+  required_rule_id    String?          @db.Uuid
+  created_at          DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization  Organization          @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  course        Course                @relation(fields: [course_id], references: [id], onDelete: Restrict)
+  user          User                  @relation("EnrollmentUser", fields: [user_id], references: [id], onDelete: Cascade)
+  assigner      User?                 @relation("EnrollmentAssigner", fields: [assigned_by], references: [id], onDelete: SetNull)
+  learning_plan LearningPlan?         @relation(fields: [learning_plan_id], references: [id], onDelete: SetNull)
+  required_rule RequiredTrainingRule? @relation(fields: [required_rule_id], references: [id], onDelete: SetNull)
+
+  @@unique([course_id, user_id])
+  @@index([organization_id, status])
+  @@index([user_id, status])
+  @@index([due_date])
+  @@map("course_enrollments")
+}
+
+model LearningPath {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String       @db.Uuid
+  name            String
+  slug            String
+  description     String?
+  department_id   String?      @db.Uuid
+  /// "Role" the path is for (an intern position, e.g. Web development intern).
+  position_id     String?      @db.Uuid
+  status          CourseStatus @default(DRAFT)
+  created_by      String?      @db.Uuid
+  created_at      DateTime     @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at      DateTime?    @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  department   Department?          @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  position     Position?            @relation(fields: [position_id], references: [id], onDelete: SetNull)
+  creator      User?                @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  courses      LearningPathCourse[]
+  plans        LearningPlan[]
+
+  @@unique([organization_id, slug])
+  @@map("learning_paths")
+}
+
+model LearningPathCourse {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  learning_path_id  String  @db.Uuid
+  course_id         String  @db.Uuid
+  position          Int     @default(0)
+  is_required       Boolean @default(true)
+  /// Prerequisite: the previous course in the path must be completed first.
+  requires_previous Boolean @default(false)
+  /// Days after assignment this course is due.
+  due_days          Int?
+
+  learning_path LearningPath @relation(fields: [learning_path_id], references: [id], onDelete: Cascade)
+  course        Course       @relation(fields: [course_id], references: [id], onDelete: Restrict)
+
+  @@unique([learning_path_id, course_id])
+  @@map("learning_path_courses")
+}
+
+/// A person's copy of a learning path at assignment time (path edits don't change plans).
+model LearningPlan {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id  String             @db.Uuid
+  user_id          String             @db.Uuid
+  learning_path_id String?            @db.Uuid
+  path_name        String
+  status           LearningPlanStatus @default(ACTIVE)
+  assigned_by      String?            @db.Uuid
+  assigned_at      DateTime           @default(now()) @db.Timestamptz(3)
+  due_date         DateTime?          @db.Date
+  completed_at     DateTime?          @db.Timestamptz(3)
+
+  organization  Organization       @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user          User               @relation("PlanUser", fields: [user_id], references: [id], onDelete: Cascade)
+  learning_path LearningPath?      @relation(fields: [learning_path_id], references: [id], onDelete: SetNull)
+  assigner      User?              @relation("PlanAssigner", fields: [assigned_by], references: [id], onDelete: SetNull)
+  items         LearningPlanItem[]
+  enrollments   CourseEnrollment[]
+
+  @@index([user_id])
+  @@index([organization_id, status])
+  @@map("learning_plans")
+}
+
+model LearningPlanItem {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  learning_plan_id       String    @db.Uuid
+  course_id              String    @db.Uuid
+  position               Int       @default(0)
+  is_required            Boolean   @default(true)
+  prerequisite_course_id String?   @db.Uuid
+  due_date               DateTime? @db.Date
+
+  plan         LearningPlan @relation(fields: [learning_plan_id], references: [id], onDelete: Cascade)
+  course       Course       @relation("PlanItemCourse", fields: [course_id], references: [id], onDelete: Restrict)
+  prerequisite Course?      @relation("PlanItemPrerequisite", fields: [prerequisite_course_id], references: [id], onDelete: SetNull)
+
+  @@unique([learning_plan_id, course_id])
+  @@map("learning_plan_items")
+}
+
+model RequiredTrainingRule {
+  id              String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                 @db.Uuid
+  course_id       String                 @db.Uuid
+  target_type     RequiredTrainingTarget
+  /// Department, position, intern or onboarding template id (null for EVERYONE).
+  target_id       String?                @db.Uuid
+  due_days        Int                    @default(14)
+  is_active       Boolean                @default(true)
+  created_by      String?                @db.Uuid
+  created_at      DateTime               @default(now()) @db.Timestamptz(3)
+
+  organization Organization       @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  course       Course             @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  creator      User?              @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  enrollments  CourseEnrollment[]
+
+  @@index([organization_id, is_active])
+  @@map("required_training_rules")
+}
+
+model LearningAssignment {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  course_id    String   @db.Uuid
+  module_id    String?  @db.Uuid
+  title        String
+  description  String?
+  instructions String?
+  /// Days after enrollment the assignment is due.
+  due_days     Int?
+  /// Optional points; when set, a rubric is required (enforced by a CHECK).
+  max_points   Int?
+  rubric       String?
+  is_required  Boolean  @default(true)
+  position     Int      @default(0)
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  course      Course                         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  module      CourseModule?                  @relation(fields: [module_id], references: [id], onDelete: SetNull)
+  submissions LearningAssignmentSubmission[]
+
+  @@index([course_id])
+  @@map("learning_assignments")
+}
+
+/// One per person and assignment; each submit/resubmit adds an immutable version (same rules as task submissions).
+model LearningAssignmentSubmission {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String           @db.Uuid
+  assignment_id   String           @db.Uuid
+  user_id         String           @db.Uuid
+  status          SubmissionStatus @default(DRAFT)
+  draft_text      String?
+  current_version Int              @default(0)
+  points_awarded  Int?
+  reviewed_by     String?          @db.Uuid
+  reviewed_at     DateTime?        @db.Timestamptz(3)
+  review_comment  String?
+  created_at      DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization                @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  assignment   LearningAssignment          @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  user         User                        @relation("AssignmentSubmitter", fields: [user_id], references: [id], onDelete: Cascade)
+  reviewer     User?                       @relation("AssignmentReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  versions     LearningSubmissionVersion[]
+
+  @@unique([assignment_id, user_id])
+  @@index([organization_id, status])
+  @@map("learning_assignment_submissions")
+}
+
+model LearningSubmissionVersion {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  submission_id  String           @db.Uuid
+  version_number Int
+  message        String?
+  status         SubmissionStatus @default(SUBMITTED)
+  submitted_by   String?          @db.Uuid
+  submitted_at   DateTime         @default(now()) @db.Timestamptz(3)
+  reviewed_by    String?          @db.Uuid
+  reviewed_at    DateTime?        @db.Timestamptz(3)
+  review_comment String?
+  points_awarded Int?
+
+  submission LearningAssignmentSubmission @relation(fields: [submission_id], references: [id], onDelete: Cascade)
+  submitter  User?                        @relation("LearningVersionSubmitter", fields: [submitted_by], references: [id], onDelete: SetNull)
+  reviewer   User?                        @relation("LearningVersionReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  files      LearningSubmissionFile[]
+
+  @@unique([submission_id, version_number])
+  @@map("learning_submission_versions")
+}
+
+model LearningSubmissionFile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version_id   String   @db.Uuid
+  file_name    String
+  storage_path String
+  mime_type    String
+  file_size    Int
+  created_at   DateTime @default(now()) @db.Timestamptz(3)
+
+  version LearningSubmissionVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@index([version_id])
+  @@map("learning_submission_files")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1424,79 +2362,364 @@ model CalendarEvent {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Feedback {
-  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String             @db.Uuid
-  from_user_id    String             @db.Uuid
-  to_user_id      String             @db.Uuid
-  intern_id       String?            @db.Uuid
-  category        FeedbackCategory   @default(GENERAL)
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String              @db.Uuid
+  from_user_id    String              @db.Uuid
+  to_user_id      String              @db.Uuid
+  intern_id       String?             @db.Uuid
+  /// Topic (Phase 01); feedback_type is the Phase 06 classification.
+  category        FeedbackCategory    @default(GENERAL)
+  feedback_type   FeedbackType        @default(GENERAL)
+  context_type    FeedbackContextType @default(GENERAL)
+  context_id      String?             @db.Uuid
   body            String
-  visibility      FeedbackVisibility @default(RECIPIENT)
-  created_at      DateTime           @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  visibility      FeedbackVisibility  @default(SHARED_WITH_INTERN)
+  edited_at       DateTime?           @db.Timestamptz(3)
+  created_at      DateTime            @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  from_user    User         @relation("FeedbackFrom", fields: [from_user_id], references: [id], onDelete: Restrict)
-  to_user      User         @relation("FeedbackTo", fields: [to_user_id], references: [id], onDelete: Restrict)
-  intern       Intern?      @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  organization Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  from_user    User              @relation("FeedbackFrom", fields: [from_user_id], references: [id], onDelete: Restrict)
+  to_user      User              @relation("FeedbackTo", fields: [to_user_id], references: [id], onDelete: Restrict)
+  intern       Intern?           @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  requests     FeedbackRequest[]
 
   @@index([organization_id])
   @@index([to_user_id])
   @@index([intern_id])
+  @@index([context_type, context_id])
   @@map("feedback")
 }
 
-model WeeklyCheckin {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  intern_id       String    @db.Uuid
-  week_start      DateTime  @db.Date
-  accomplishments String?
-  current_work    String?
-  blockers        String?
-  learning        String?
-  support_needed  String?
-  submitted_at    DateTime? @db.Timestamptz(3)
-  reviewed_by     String?   @db.Uuid
-  reviewed_at     DateTime? @db.Timestamptz(3)
+model FeedbackRequest {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                @db.Uuid
+  requester_id    String                @db.Uuid
+  recipient_id    String                @db.Uuid
+  intern_id       String?               @db.Uuid
+  context_type    FeedbackContextType   @default(GENERAL)
+  context_id      String?               @db.Uuid
+  question        String
+  due_date        DateTime?             @db.Date
+  status          FeedbackRequestStatus @default(OPEN)
+  feedback_id     String?               @db.Uuid
+  created_at      DateTime              @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
 
-  intern   Intern @relation(fields: [intern_id], references: [id], onDelete: Restrict)
-  reviewer User?  @relation(fields: [reviewed_by], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  requester    User         @relation("FeedbackRequester", fields: [requester_id], references: [id], onDelete: Cascade)
+  recipient    User         @relation("FeedbackRequestRecipient", fields: [recipient_id], references: [id], onDelete: Cascade)
+  intern       Intern?      @relation(fields: [intern_id], references: [id], onDelete: Cascade)
+  feedback     Feedback?    @relation(fields: [feedback_id], references: [id], onDelete: SetNull)
+
+  @@index([recipient_id, status])
+  @@index([requester_id])
+  @@map("feedback_requests")
+}
+
+model WeeklyCheckin {
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id      String        @db.Uuid
+  intern_id            String        @db.Uuid
+  week_start           DateTime      @db.Date
+  status               CheckinStatus @default(DRAFT)
+  accomplishments      String?
+  current_work         String?
+  blockers             String?
+  learning             String?
+  support_needed       String?
+  next_week_priorities String?
+  submitted_at         DateTime?     @db.Timestamptz(3)
+  reviewed_by          String?       @db.Uuid
+  reviewed_at          DateTime?     @db.Timestamptz(3)
+  review_comment       String?
+  created_at           DateTime      @default(now()) @db.Timestamptz(3)
+  updated_at           DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern       Intern       @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  reviewer     User?        @relation(fields: [reviewed_by], references: [id], onDelete: SetNull)
 
   @@unique([intern_id, week_start])
+  @@index([organization_id, status])
   @@map("weekly_checkins")
 }
 
 /// Dimension scores are 1–5 (CHECK constraint). No overall judgment is
 /// computed or stored by the system.
 model PerformanceReview {
-  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id     String                  @db.Uuid
-  intern_id           String                  @db.Uuid
-  reviewer_id         String                  @db.Uuid
-  review_period_start DateTime                @db.Date
-  review_period_end   DateTime                @db.Date
-  technical_skills    Int?
-  communication       Int?
-  ownership           Int?
-  quality             Int?
-  reliability         Int?
-  teamwork            Int?
-  learning            Int?
-  problem_solving     Int?
-  overall_comments    String?
-  status              PerformanceReviewStatus @default(DRAFT)
-  submitted_at        DateTime?               @db.Timestamptz(3)
-  created_at          DateTime                @default(now()) @db.Timestamptz(3)
-  updated_at          DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id       String                  @db.Uuid
+  intern_id             String                  @db.Uuid
+  /// Primary manager (the MANAGER respondent).
+  reviewer_id           String                  @db.Uuid
+  mentor_id             String?                 @db.Uuid
+  cycle_id              String?                 @db.Uuid
+  template_id           String?                 @db.Uuid
+  review_period_start   DateTime                @db.Date
+  review_period_end     DateTime                @db.Date
+  due_date              DateTime?               @db.Date
+  /// Phase 01 fixed dimensions — unused by template-based reviews (kept, never deleted).
+  technical_skills      Int?
+  communication         Int?
+  ownership             Int?
+  quality               Int?
+  reliability           Int?
+  teamwork              Int?
+  learning              Int?
+  problem_solving       Int?
+  overall_comments      String?
+  status                PerformanceReviewStatus @default(DRAFT)
+  self_review_enabled   Boolean                 @default(true)
+  mentor_review_enabled Boolean                 @default(true)
+  hr_review_enabled     Boolean                 @default(true)
+  /// Respondent stages already submitted.
+  stage_submitted       ReviewRespondent[]      @default([])
+  submitted_at          DateTime?               @db.Timestamptz(3)
+  completed_at          DateTime?               @db.Timestamptz(3)
+  completed_by          String?                 @db.Uuid
+  locked_at             DateTime?               @db.Timestamptz(3)
+  reopened_at           DateTime?               @db.Timestamptz(3)
+  reopen_reason         String?
+  created_at            DateTime                @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  intern       Intern       @relation(fields: [intern_id], references: [id], onDelete: Restrict)
-  reviewer     User         @relation(fields: [reviewer_id], references: [id], onDelete: Restrict)
+  organization      Organization                @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern            Intern                      @relation(fields: [intern_id], references: [id], onDelete: Restrict)
+  reviewer          User                        @relation("ReviewReviewer", fields: [reviewer_id], references: [id], onDelete: Restrict)
+  mentor            User?                       @relation("ReviewMentor", fields: [mentor_id], references: [id], onDelete: SetNull)
+  completer         User?                       @relation("ReviewCompleter", fields: [completed_by], references: [id], onDelete: SetNull)
+  cycle             PerformanceCycle?           @relation(fields: [cycle_id], references: [id], onDelete: Restrict)
+  template          PerformanceTemplate?        @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  answers           PerformanceReviewAnswer[]
+  revisions         PerformanceReviewRevision[]
+  development_plans DevelopmentPlan[]
 
   @@index([organization_id, status])
   @@index([intern_id])
   @@index([reviewer_id])
+  @@index([cycle_id])
   @@map("performance_reviews")
+}
+
+model PerformanceTemplate {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  name            String
+  description     String?
+  is_active       Boolean  @default(true)
+  created_by      String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator      User?                @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  sections     PerformanceSection[]
+  cycles       PerformanceCycle[]
+  reviews      PerformanceReview[]
+
+  @@index([organization_id])
+  @@map("performance_templates")
+}
+
+model PerformanceSection {
+  id          String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id String             @db.Uuid
+  title       String
+  description String?
+  position    Int                @default(0)
+  respondents ReviewRespondent[] @default([MANAGER])
+
+  template  PerformanceTemplate   @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  questions PerformanceQuestion[]
+
+  @@index([template_id, position])
+  @@map("performance_sections")
+}
+
+model PerformanceQuestion {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  section_id        String             @db.Uuid
+  prompt            String
+  question_type     ReviewQuestionType @default(TEXT)
+  /// What good looks like / rubric criteria shown next to the question.
+  guidance          String?
+  options           String[]           @default([])
+  is_required       Boolean            @default(true)
+  requires_evidence Boolean            @default(false)
+  position          Int                @default(0)
+
+  section PerformanceSection        @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  answers PerformanceReviewAnswer[]
+
+  @@index([section_id, position])
+  @@map("performance_questions")
+}
+
+model PerformanceCycle {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id       String            @db.Uuid
+  name                  String
+  cycle_type            ReviewCycleType
+  status                ReviewCycleStatus @default(DRAFT)
+  template_id           String            @db.Uuid
+  start_date            DateTime          @db.Date
+  due_date              DateTime          @db.Date
+  department_id         String?           @db.Uuid
+  self_review_enabled   Boolean           @default(true)
+  mentor_review_enabled Boolean           @default(true)
+  hr_review_enabled     Boolean           @default(true)
+  created_by            String?           @db.Uuid
+  opened_at             DateTime?         @db.Timestamptz(3)
+  closed_at             DateTime?         @db.Timestamptz(3)
+  created_at            DateTime          @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  template     PerformanceTemplate @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  department   Department?         @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  creator      User?               @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  reviews      PerformanceReview[]
+
+  @@index([organization_id, status])
+  @@map("performance_cycles")
+}
+
+model PerformanceReviewAnswer {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  review_id        String           @db.Uuid
+  question_id      String           @db.Uuid
+  respondent       ReviewRespondent
+  author_id        String?          @db.Uuid
+  rating           Int?
+  text_value       String?
+  bool_value       Boolean?
+  selected_options String[]         @default([])
+  evidence         String?
+  /// Links to real records: [{ type: 'task' | 'project' | 'course' | 'goal' | 'feedback' | 'checkin', id }].
+  evidence_refs    Json             @default("[]")
+  created_at       DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  review    PerformanceReview           @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  question  PerformanceQuestion         @relation(fields: [question_id], references: [id], onDelete: Restrict)
+  author    User?                       @relation(fields: [author_id], references: [id], onDelete: SetNull)
+  revisions PerformanceReviewRevision[]
+
+  @@unique([review_id, question_id, respondent], map: "performance_review_answers_review_question_respondent_key")
+  @@map("performance_review_answers")
+}
+
+model PerformanceReviewRevision {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  review_id  String   @db.Uuid
+  answer_id  String?  @db.Uuid
+  actor_id   String?  @db.Uuid
+  reason     String
+  before     Json
+  after      Json
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+
+  review PerformanceReview        @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  answer PerformanceReviewAnswer? @relation(fields: [answer_id], references: [id], onDelete: SetNull)
+  actor  User?                    @relation(fields: [actor_id], references: [id], onDelete: SetNull)
+
+  @@index([review_id])
+  @@map("performance_review_revisions")
+}
+
+model PerformanceGoal {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String       @db.Uuid
+  intern_id       String       @db.Uuid
+  title           String
+  description     String?
+  category        GoalCategory @default(OTHER)
+  status          GoalStatus   @default(NOT_STARTED)
+  /// Manually set in 25% steps (0, 25, 50, 75, 100) — never computed from opaque signals.
+  progress        Int          @default(0)
+  start_date      DateTime?    @db.Date
+  target_date     DateTime?    @db.Date
+  owner_id        String       @db.Uuid
+  created_by      String?      @db.Uuid
+  completed_at    DateTime?    @db.Timestamptz(3)
+  created_at      DateTime     @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization      Organization          @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern            Intern                @relation(fields: [intern_id], references: [id], onDelete: Cascade)
+  owner             User                  @relation("GoalOwner", fields: [owner_id], references: [id], onDelete: Restrict)
+  creator           User?                 @relation("GoalCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  evidence          GoalEvidence[]
+  development_items DevelopmentPlanItem[]
+
+  @@index([organization_id, status])
+  @@index([intern_id])
+  @@map("performance_goals")
+}
+
+model GoalEvidence {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goal_id       String           @db.Uuid
+  evidence_type GoalEvidenceType
+  /// Id of the existing task / project / submission / course / feedback / document (no copies).
+  reference_id  String?          @db.Uuid
+  url           String?
+  note          String?
+  added_by      String?          @db.Uuid
+  created_at    DateTime         @default(now()) @db.Timestamptz(3)
+
+  goal  PerformanceGoal @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+  adder User?           @relation(fields: [added_by], references: [id], onDelete: SetNull)
+
+  @@index([goal_id])
+  @@map("goal_evidence")
+}
+
+model DevelopmentPlan {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                @db.Uuid
+  intern_id       String                @db.Uuid
+  review_id       String?               @db.Uuid
+  title           String
+  status          DevelopmentPlanStatus @default(ACTIVE)
+  created_by      String?               @db.Uuid
+  created_at      DateTime              @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  intern       Intern                @relation(fields: [intern_id], references: [id], onDelete: Cascade)
+  review       PerformanceReview?    @relation(fields: [review_id], references: [id], onDelete: SetNull)
+  creator      User?                 @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  items        DevelopmentPlanItem[]
+
+  @@index([intern_id])
+  @@map("development_plans")
+}
+
+model DevelopmentPlanItem {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plan_id     String                @db.Uuid
+  area        String
+  action      String
+  owner_id    String?               @db.Uuid
+  target_date DateTime?             @db.Date
+  status      DevelopmentItemStatus @default(NOT_STARTED)
+  evidence    String?
+  /// Recommended course (completing it is evidence, not proof of mastery).
+  course_id   String?               @db.Uuid
+  goal_id     String?               @db.Uuid
+  position    Int                   @default(0)
+  created_at  DateTime              @default(now()) @db.Timestamptz(3)
+  updated_at  DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  plan   DevelopmentPlan  @relation(fields: [plan_id], references: [id], onDelete: Cascade)
+  owner  User?            @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  course Course?          @relation(fields: [course_id], references: [id], onDelete: SetNull)
+  goal   PerformanceGoal? @relation(fields: [goal_id], references: [id], onDelete: SetNull)
+
+  @@index([plan_id])
+  @@map("development_plan_items")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1512,13 +2735,24 @@ model Announcement {
   published_by    String?              @db.Uuid
   published_at    DateTime?            @db.Timestamptz(3)
   expires_at      DateTime?            @db.Timestamptz(3)
+  category        AnnouncementCategory @default(COMPANY)
+  /// SCHEDULED announcements go live at published_at (daily/at-read publishing).
+  status          AnnouncementStatus   @default(PUBLISHED)
+  audience        AnnouncementAudience @default(EVERYONE)
+  /// Department / team / user ids for DEPARTMENT, TEAM and SPECIFIC audiences.
+  audience_ids    String[]             @default([]) @db.Uuid
+  archived_at     DateTime?            @db.Timestamptz(3)
+  notified_at     DateTime?            @db.Timestamptz(3)
+  created_by      String?              @db.Uuid
   created_at      DateTime             @default(now()) @db.Timestamptz(3)
   updated_at      DateTime             @default(now()) @updatedAt @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   publisher    User?        @relation(fields: [published_by], references: [id], onDelete: SetNull)
+  creator      User?        @relation("AnnouncementCreator", fields: [created_by], references: [id], onDelete: SetNull)
 
   @@index([organization_id, published_at])
+  @@index([organization_id, status])
   @@map("announcements")
 }
 

@@ -2,6 +2,7 @@ import type { OnboardingAssigneeRole, OnboardingItemStatus, Prisma } from '@pris
 import { z } from 'zod'
 import { prisma } from '@/lib/db/client'
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
+import { onboardingBucket, type OnboardingBucket } from '@/lib/hr/operations'
 import type { RequestMeta } from '@/lib/http/request-meta'
 import { addDays, todayIn } from '@/lib/interns/dates'
 import { isOverdue, onboardingProgress, type OnboardingProgress } from '@/lib/interns/progress'
@@ -392,8 +393,15 @@ export const onboardingService = {
           : progress.overdue > 0
             ? 'OVERDUE'
             : 'IN_PROGRESS'
-      return { ...instance, progress, lastDue, state }
+      return {
+        ...instance,
+        progress,
+        lastDue,
+        state,
+        bucket: onboardingBucket(progress, Boolean(instance.completed_at)),
+      }
     })
+    const bucketCount = (bucket: OnboardingBucket) => rows.filter((row) => row.bucket === bucket).length
     return {
       stats: {
         total: rows.length,
@@ -402,6 +410,13 @@ export const onboardingService = {
         overdue: rows.filter((row) => !row.completed_at && row.progress.overdue > 0).length,
         blocked: rows.filter((row) => !row.completed_at && row.progress.blocked > 0).length,
       },
+      buckets: {
+        NOT_STARTED: bucketCount('NOT_STARTED'),
+        IN_PROGRESS: bucketCount('IN_PROGRESS'),
+        NEARLY_COMPLETE: bucketCount('NEARLY_COMPLETE'),
+        COMPLETE: bucketCount('COMPLETE'),
+        OVERDUE: bucketCount('OVERDUE'),
+      } satisfies Record<OnboardingBucket, number>,
       rows,
     }
   },

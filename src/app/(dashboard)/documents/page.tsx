@@ -1,36 +1,44 @@
 import type { Metadata } from 'next'
-import { FileText } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { PageHeader } from '@/components/common/page-header'
-import { PhasePlaceholder } from '@/components/common/phase-placeholder'
 import { AccessDenied } from '@/components/common/states'
+import { DocumentsPanel } from '@/features/interns/components/documents-panel'
+import { firstParam } from '@/lib/validation/list-params'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
+import { documentService, VISIBILITY_LABELS } from '@/server/services/document.service'
+import { internService } from '@/server/services/intern.service'
 
 export const metadata: Metadata = { title: 'Documents' }
 
-export default async function Page() {
+/** An intern's own documents and required-document checklist. HR reviews at /hr/documents. */
+export default async function DocumentsPage({ searchParams }: PageProps<'/documents'>) {
   const ctx = await requirePageContext()
+  const internId = await internService.myInternId(ctx)
+  if (!internId) {
+    if (authorizationService.can(ctx, 'document.verify')) redirect('/hr/documents')
+    return <AccessDenied what="documents" />
+  }
   if (!authorizationService.can(ctx, 'document.read')) return <AccessDenied what="documents" />
-
+  const data = await documentService.listForIntern(ctx, internId)
   return (
     <>
-      <PageHeader title="Documents" />
-      <PhasePlaceholder
-        icon={FileText}
-        phase="05"
+      <PageHeader
         title="Documents"
-        description="Offer letters, NDAs, IDs and certificates, stored securely."
-        planned={[
-          'Upload with type and visibility (intern, manager, HR, admin)',
-          'Signed, time-limited download links',
-          'Per-intern document checklist',
-          'Retention and deletion controls',
-        ]}
-        foundation={[
-          'internship_documents table with visibility',
-          'Storage service with type, signature and size validation',
-          'Local and Supabase storage providers',
-        ]}
+        description="Upload the documents HR needs. You’ll be notified when each one is verified or needs replacing."
+      />
+      <DocumentsPanel
+        internId={internId}
+        requirements={data.requirements}
+        documents={data.documents}
+        history={data.history}
+        completion={data.completion}
+        types={data.types}
+        canUpload={data.canUpload}
+        assignable={data.assignable}
+        visibilityLabels={VISIBILITY_LABELS}
+        timeZone={ctx.organization.timezone}
+        highlight={firstParam(await searchParams, 'highlight')}
       />
     </>
   )

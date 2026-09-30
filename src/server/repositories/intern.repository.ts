@@ -16,6 +16,16 @@ export interface InternDirectoryFilter {
   joinedTo?: Date
   endFrom?: Date
   endTo?: Date
+  onboarding?: 'not_started' | 'in_progress' | 'complete'
+  /** Restrict to / exclude these intern ids (used for computed filters such as document completion). */
+  ids?: string[]
+  excludeIds?: string[]
+}
+
+const ONBOARDING_FILTERS: Record<NonNullable<InternDirectoryFilter['onboarding']>, Prisma.InternWhereInput> = {
+  not_started: { internships: { none: { onboarding: { isNot: null } } } },
+  in_progress: { internships: { some: { onboarding: { is: { completed_at: null } } } } },
+  complete: { internships: { some: { onboarding: { is: { completed_at: { not: null } } } } } },
 }
 
 export const INTERN_SORTS = ['name', 'joining', 'end', 'status', 'department', 'created'] as const
@@ -36,6 +46,9 @@ function filterWhere(filter: InternDirectoryFilter): Prisma.InternWhereInput[] {
     ...(filter.mentorId ? [{ mentor_id: filter.mentorId }] : []),
     ...(joining ? [{ joining_date: joining }] : []),
     ...(ending ? [{ expected_end_date: ending }] : []),
+    ...(filter.onboarding ? [ONBOARDING_FILTERS[filter.onboarding]] : []),
+    ...(filter.ids ? [{ id: { in: filter.ids } }] : []),
+    ...(filter.excludeIds ? [{ id: { notIn: filter.excludeIds } }] : []),
     ...(q
       ? [
           {
@@ -76,6 +89,7 @@ function orderBy(sort: InternSort, dir: 'asc' | 'desc'): Prisma.InternOrderByWit
 /** Columns for directory rows — selective, no personal data. */
 const directorySelect = {
   id: true,
+  user_id: true,
   employee_code: true,
   status: true,
   joining_date: true,

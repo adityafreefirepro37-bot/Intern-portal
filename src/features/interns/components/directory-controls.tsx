@@ -24,7 +24,19 @@ const FILTER_KEYS = [
   'joinedTo',
   'endFrom',
   'endTo',
+  'onboarding',
+  'documents',
 ] as const
+
+const ONBOARDING_OPTIONS = [
+  { value: 'not_started', label: 'Not started' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'complete', label: 'Complete' },
+]
+const DOCUMENT_OPTIONS = [
+  { value: 'complete', label: 'All required verified' },
+  { value: 'incomplete', label: 'Missing or unverified' },
+]
 
 /**
  * Directory search, filters, sort and page size. All state lives in the URL,
@@ -38,6 +50,7 @@ export function DirectoryControls({
   positions,
   people,
   sorts,
+  hrFilters = false,
 }: {
   statuses: Option[]
   departments: Option[]
@@ -45,6 +58,8 @@ export function DirectoryControls({
   positions: Option[]
   people: Option[]
   sorts: Option[]
+  /** Onboarding and document-completion filters (viewers with those permissions). */
+  hrFilters?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -193,6 +208,8 @@ export function DirectoryControls({
           {date('joinedTo', 'Joined to')}
           {date('endFrom', 'Ends from')}
           {date('endTo', 'Ends to')}
+          {hrFilters && select('onboarding', 'Onboarding', ONBOARDING_OPTIONS)}
+          {hrFilters && select('documents', 'Required documents', DOCUMENT_OPTIONS)}
           <div className="flex items-end">
             <Button
               type="button"

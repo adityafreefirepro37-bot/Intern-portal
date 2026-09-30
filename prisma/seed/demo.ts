@@ -2,6 +2,7 @@ import type { InternStatus, PrismaClient } from '@prisma/client'
 import type { SystemRoleSlug } from '../../src/lib/permissions/catalog'
 import { dateFrom, daysFrom, seedId } from './ids'
 import type { ReferenceData } from './reference'
+import { seedHr } from './hr'
 import { seedWork } from './work'
 
 /**
@@ -553,9 +554,14 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
         created_by: userIds.hr,
       },
     })
+    // Phase 06: lessons live in modules; the demo courses keep one module each.
+    const moduleId = seedId(`module:${course.key}:0`)
+    const moduleData = { course_id: record.id, title: 'Module 1', position: 0 }
+    const existingModule = await prisma.courseModule.findFirst({ where: { course_id: record.id }, orderBy: { position: 'asc' } })
+    const module = existingModule ?? (await prisma.courseModule.create({ data: { id: moduleId, ...moduleData } }))
     for (const [index, [title, minutes]] of course.lessons.entries()) {
       const id = seedId(`lesson:${course.key}:${index}`)
-      const data = { course_id: record.id, title, sort_order: index, estimated_minutes: minutes }
+      const data = { course_id: record.id, module_id: module.id, title, sort_order: index, estimated_minutes: minutes }
       await prisma.lesson.upsert({ where: { id }, update: data, create: { id, ...data } })
     }
   }
@@ -565,6 +571,7 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     update: {},
     create: {
       id: quizId,
+      course_id: seedId('course:orientation'),
       lesson_id: seedId('lesson:orientation:1'),
       title: 'Planning and review check',
       passing_score: 70,
@@ -573,20 +580,6 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
 
   // ── Communication ─────────────────────────────────────────────────────────
   const announcementId = seedId('announcement:welcome')
-  const announcementData = {
-    organization_id: orgId,
-    title: 'Welcome to AYAVA INTERN OS',
-    body: 'This workspace is running on development demo data. People, projects and tasks shown here are fictional.',
-    priority: 'NORMAL' as const,
-    published_by: userIds.hr,
-    published_at: daysFrom(now, -1),
-    expires_at: null,
-  }
-  await prisma.announcement.upsert({
-    where: { id: announcementId },
-    update: announcementData,
-    create: { id: announcementId, ...announcementData },
-  })
 
   await prisma.channel.upsert({
     where: { organization_id_slug: { organization_id: orgId, slug: 'general' } },
@@ -637,5 +630,18 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     await prisma.auditLog.upsert({ where: { id }, update: data, create: { id, ...data } })
   }
 
-  return { userIds, accounts: DEV_ACCOUNTS }
+  // ── HR operations (prisma/seed/hr.ts) — also seeds the announcements ─────
+  const org = await prisma.organization.findUniqueOrThrow({ where: { id: orgId }, select: { timezone: true } })
+  const hr = await seedHr(prisma, {
+    organizationId: orgId,
+    timeZone: org.timezone,
+    userIds,
+    internIds,
+    internshipIds,
+    departmentIds: ref.departmentIds,
+    leaveTypeIds: ref.leaveTypeIds,
+    now,
+  })
+
+  return { userIds, accounts: DEV_ACCOUNTS, hr }
 }

@@ -10,7 +10,11 @@ profiles, status lifecycle, onboarding templates and checklists, policy acknowle
 manager / mentor dashboards) and **Phase 04 — Tasks, projects & work management** (projects with members, milestones,
 files and activity; tasks with a server-enforced lifecycle, priorities, deadlines, subtasks, checklists, dependencies,
 comments and attachments; submissions with versioned reviews; list, board, My Work and workload views; in-app
-notifications). Features are delivered in later phases (see
+notifications) and **Phase 05 — HR operations** (HR dashboard and action centre; attendance with breaks, rules,
+corrections and monthly calendar; leave with working-day counting, balances, overlap checks and approvals; configurable
+document types with versioning, verification, sensitivity and expiry; HR requests; targeted and scheduled
+announcements; holidays; ending internships and offboarding checklists; HR calendar, analytics and CSV exports).
+Features are delivered in later phases (see
 [Roadmap](#roadmap)); pages for unbuilt features say so plainly instead of pretending to work.
 
 ## Tech stack
@@ -154,11 +158,15 @@ Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages S
   sessions, rate limiting and audit; Phase 03 intern creation (transaction, rollback, concurrent codes), editing,
   assignment, status engine, ending-soon idempotency, onboarding, document visibility and scope; Phase 04 project →
   task → submit → changes → resubmit → approve flow, dependencies, bulk actions, mentions, workload, deadline jobs and
-  the work security matrix. Refuses any database whose name lacks `test`.
+  the work security matrix; Phase 05 attendance (check-in/out, breaks, corrections, HR edits, scope), leave (working
+  days, overlaps, balance, no self-approval, audited override), documents (versions, verification, sensitive access,
+  completion), HR requests, targeted/scheduled announcements, holidays, HR settings, compensation, offboarding, exports
+  and the HR dashboard. Refuses any database whose name lacks `test`.
 - **End-to-end** (`tests/e2e`): public checks always run (route protection, 401s, auth pages, accessibility, CSP and
   headers). Signed-in checks (navigation, roles, logout/back button, multi-tab, profile, security, users, HR adds an
   intern, intern completes onboarding, manager scope, intern denials, manager creates a project and assigns a task,
-  intern starts and submits, review → changes → resubmit → approve) run once
+  intern starts and submits, review → changes → resubmit → approve; HR dashboard and HR record, attendance, correction,
+  leave, document verification and offboarding scenarios, HR role restrictions and phone layouts) run once
   Supabase keys and `SEED_DEV_PASSWORD` are set; otherwise they are reported as skipped.
   Use `npx playwright install chromium` or `PLAYWRIGHT_CHANNEL=msedge`.
 
@@ -177,7 +185,11 @@ Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages S
 4. Create the first Super Admin: `npm run admin:invite -- --email you@company.com --first Name --last Surname`, open
    the printed link, set a password. Invite everyone else from **Users**.
 5. Schedule the daily job: `POST /api/jobs/daily` with `Authorization: Bearer $CRON_SECRET` once a day (e.g. Vercel
-   Cron). Set `CRON_SECRET` (24+ characters); without it the endpoint is disabled.
+   Cron). Set `CRON_SECRET` (24+ characters); without it the endpoint is disabled. It also expires documents,
+   sends expiry reminders and publishes scheduled announcements.
+6. Prisma and pooled connections: `connection_limit=1` suits serverless (one request per instance). A long-running
+   server (`next start`/`next dev` on one machine) handles concurrent requests and needs a larger pool (e.g. 5–10),
+   or requests queue and time out (Prisma P2024).
 
 ## Security
 
@@ -195,7 +207,7 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | 02     | **Authentication, RBAC & security** — done                                |
 | 03     | **Intern management, HR directory & onboarding** — done                   |
 | 04     | **Tasks, projects & work management** — done (calendar moves to 06)       |
-| 05     | HR operations: attendance, leave, documents, learning                     |
+| 05     | **HR operations: attendance, leave, documents, requests, offboarding** — done |
 | 06     | Communication and performance: messages, notification delivery, calendar, reviews |
 | 07     | AYAVA AI and knowledge base (RAG)                                         |
 | 08     | Analytics and certificates                                                |
@@ -207,6 +219,6 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Authentication](docs/authentication.md) ·
 [Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md) ·
 [Intern management](docs/intern-management.md) · [Onboarding](docs/onboarding.md) ·
-[Work management](docs/work-management.md)
+[Work management](docs/work-management.md) · [HR operations](docs/hr-operations.md)
 
 Internal use only — Ayava Creatives.

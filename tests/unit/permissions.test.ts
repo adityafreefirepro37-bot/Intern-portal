@@ -202,7 +202,9 @@ describe('least-privilege role matrix', () => {
     expect(manager.has('document.manage')).toBe(false)
     expect(manager.has('user.read')).toBe(false)
     expect(mentor.get('intern.read')).toBe('ASSIGNED')
-    expect(mentor.has('performance.read')).toBe(false)
+    // Phase 06: mentors take part in their mentees' reviews (section-level privacy is enforced in the service).
+    expect(mentor.get('performance.read')).toBe('ASSIGNED')
+    expect(mentor.has('performance.review')).toBe(false)
     expect(mentor.has('document.read')).toBe(false)
     for (const key of ['intern.read', 'leave.approve', 'document.manage', 'attendance.manage'])
       expect(hr.get(key)).toBe('ORGANIZATION')
@@ -270,5 +272,154 @@ describe('navigation by permission', () => {
       if (item.permission) expect(isPermissionKey(item.permission as PermissionKey)).toBe(true)
     }
     expect(filterNavigation([{ href: '/', label: 'Overview' }]).map((section) => section.title)).toEqual(['Ayava'])
+  })
+})
+
+describe('Prompt 05 HR permissions', () => {
+  // Specification name → catalog key (see docs/authorization.md).
+  const HR_SPEC: Record<string, string> = {
+    'hr.dashboard.read': 'hr_dashboard.read',
+    'hr.interns.read': 'intern.read',
+    'hr.interns.update': 'intern.update',
+    'hr.interns.export': 'intern.export',
+    'hr.attendance.read': 'attendance.read',
+    'hr.attendance.manage': 'attendance.manage',
+    'hr.attendance.export': 'attendance.export',
+    'hr.leave.read': 'leave.read',
+    'hr.leave.approve': 'leave.approve',
+    'hr.leave.manage': 'leave.manage',
+    'hr.leave.export': 'leave.export',
+    'hr.documents.read': 'document.read',
+    'hr.documents.verify': 'document.verify',
+    'hr.documents.manage': 'document.manage',
+    'hr.documents.sensitive': 'document.sensitive',
+    'hr.documents.export': 'document.export',
+    'hr.requests.read': 'hr_request.read',
+    'hr.requests.manage': 'hr_request.manage',
+    'hr.announcements.create': 'announcement.create',
+    'hr.announcements.publish': 'announcement.update',
+    'hr.offboarding.read': 'offboarding.read',
+    'hr.offboarding.manage': 'offboarding.manage',
+    'hr.settings.update': 'hr_settings.update',
+    'hr.analytics.read': 'analytics.read',
+    'hr.analytics.export': 'analytics.export',
+  }
+
+  it('maps every HR specification permission to a catalog key', () => {
+    expect(Object.values(HR_SPEC).filter((key) => !isPermissionKey(key))).toEqual([])
+  })
+
+  it('gives HR every HR permission organization-wide', () => {
+    const hr = grantsOf('hr')
+    for (const key of Object.values(HR_SPEC)) expect([key, hr.get(key)]).toEqual([key, 'ORGANIZATION'])
+    expect(hr.get('compensation.read')).toBe('ORGANIZATION')
+    expect(hr.get('holiday.manage')).toBe('ORGANIZATION')
+  })
+
+  it('keeps compensation, sensitive documents, exports and HR settings away from other roles', () => {
+    for (const role of ['manager', 'mentor', 'intern'] as const) {
+      const grants = grantsOf(role)
+      for (const key of [
+        'compensation.read',
+        'compensation.update',
+        'document.sensitive',
+        'document.verify',
+        'hr_settings.update',
+        'hr_request.manage',
+        'hr_dashboard.read',
+        'intern.export',
+        'attendance.export',
+        'leave.export',
+        'leave.manage',
+      ])
+        expect([role, key, grants.has(key)]).toEqual([role, key, false])
+    }
+  })
+
+  it('lets everyone raise and read their own HR requests', () => {
+    for (const role of ['manager', 'mentor', 'intern'] as const) {
+      const grants = grantsOf(role)
+      expect(grants.get('hr_request.create')).toBe('OWN')
+      expect(grants.get('hr_request.read')).toBe('OWN')
+    }
+  })
+})
+
+describe('Prompt 06 learning and performance permissions', () => {
+  // Specification name → catalog key (see docs/learning-performance.md).
+  const SPEC: Record<string, string> = {
+    'learning.read': 'learning.read',
+    'learning.course.create': 'course.create',
+    'learning.course.update': 'course.update',
+    'learning.publish': 'course.publish',
+    'learning.lesson.create': 'course.update',
+    'learning.quiz.create': 'course.update',
+    'learning.assignment.review': 'learning_assignment.review',
+    'learning.progress.read': 'learning.read',
+    'learning.progress.manage': 'learning.manage',
+    'learning.enrollment.manage': 'learning.manage',
+    'learning.path.read': 'learning_path.read',
+    'learning.path.create': 'learning_path.create',
+    'learning.path.update': 'learning_path.update',
+    'learning.path.delete': 'learning_path.delete',
+    'learning.analytics.read': 'learning.read',
+    'learning.analytics.export': 'learning.export',
+    'performance.feedback.read': 'feedback.read',
+    'performance.feedback.create': 'feedback.create',
+    'performance.feedback.update': 'feedback.update',
+    'performance.checkin.read': 'checkin.read',
+    'performance.checkin.create': 'checkin.create',
+    'performance.checkin.update': 'checkin.review',
+    'performance.review.read': 'performance.read',
+    'performance.review.create': 'performance.create',
+    'performance.review.update': 'performance.update',
+    'performance.review.submit': 'performance.update',
+    'performance.goal.read': 'goal.read',
+    'performance.goal.create': 'goal.create',
+    'performance.goal.update': 'goal.update',
+    'performance.goal.review': 'goal.review',
+    'performance.templates.manage': 'performance_template.manage',
+    'performance.cycles.manage': 'performance_cycle.manage',
+    'performance.analytics.export': 'performance.export',
+  }
+
+  it('maps every specification permission to a catalog key', () => {
+    expect(Object.values(SPEC).filter((key) => !isPermissionKey(key))).toEqual([])
+  })
+
+  it('gives HR organization-wide learning and performance administration', () => {
+    const hr = grantsOf('hr')
+    for (const key of [
+      'course.create',
+      'course.publish',
+      'learning.manage',
+      'learning.export',
+      'learning_path.create',
+      'learning_assignment.review',
+      'goal.review',
+      'performance.review',
+      'performance.export',
+      'performance_template.manage',
+      'performance_cycle.manage',
+    ])
+      expect([key, hr.get(key)]).toEqual([key, 'ORGANIZATION'])
+  })
+
+  it('limits managers and mentors to their interns, and interns to their own records', () => {
+    const manager = grantsOf('manager')
+    const mentor = grantsOf('mentor')
+    const intern = grantsOf('intern')
+    for (const key of ['learning.manage', 'learning_assignment.review', 'goal.review', 'performance.update'])
+      expect([key, manager.get(key)]).toEqual([key, 'ASSIGNED'])
+    for (const key of ['learning.manage', 'learning_assignment.review', 'goal.update', 'performance.update'])
+      expect([key, mentor.get(key)]).toEqual([key, 'ASSIGNED'])
+    for (const key of ['goal.read', 'goal.create', 'feedback.request', 'performance.update', 'learning.track'])
+      expect([key, intern.get(key)]).toEqual([key, 'OWN'])
+    for (const role of [manager, mentor, intern]) {
+      for (const key of ['performance_template.manage', 'performance_cycle.manage', 'performance.export', 'learning.export'])
+        expect([key, role.has(key)]).toEqual([key, false])
+    }
+    expect(intern.has('learning_assignment.review')).toBe(false)
+    expect(intern.has('course.create')).toBe(false)
   })
 })

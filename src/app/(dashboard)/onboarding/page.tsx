@@ -10,7 +10,8 @@ import { UserAvatar } from '@/components/common/user-avatar'
 import { DataTable } from '@/components/tables/data-table'
 import { buttonVariants } from '@/components/ui/button'
 import { Progress } from '@/components/ui/misc'
-import { formatDay, fullName } from '@/lib/utils'
+import { ONBOARDING_BUCKET_LABELS } from '@/lib/hr/operations'
+import { cn, formatDay, fullName } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
 import { internService } from '@/server/services/intern.service'
@@ -19,6 +20,7 @@ import { onboardingService } from '@/server/services/onboarding.service'
 export const metadata: Metadata = { title: 'Onboarding' }
 
 const STATES = ['IN_PROGRESS', 'OVERDUE', 'BLOCKED', 'COMPLETED'] as const
+const BUCKETS = ['NOT_STARTED', 'IN_PROGRESS', 'NEARLY_COMPLETE', 'COMPLETE', 'OVERDUE'] as const
 const STATE_LABELS: Record<(typeof STATES)[number], string> = {
   IN_PROGRESS: 'In progress',
   OVERDUE: 'Overdue',
@@ -35,10 +37,15 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
     return <AccessDenied what="onboarding" />
   }
 
-  const { stats, rows } = await onboardingService.dashboard(ctx)
-  const requested = (await searchParams).state
-  const state = STATES.find((s) => s === requested)
-  const visible = state ? rows.filter((row) => row.state === state) : rows.filter((row) => row.state !== 'COMPLETED')
+  const { stats, rows, buckets } = await onboardingService.dashboard(ctx)
+  const params = await searchParams
+  const state = STATES.find((s) => s === params.state)
+  const bucket = BUCKETS.find((b) => b === params.bucket)
+  const visible = bucket
+    ? rows.filter((row) => row.bucket === bucket)
+    : state
+      ? rows.filter((row) => row.state === state)
+      : rows.filter((row) => row.state !== 'COMPLETED')
   type Row = (typeof rows)[number]
 
   return (
@@ -71,11 +78,34 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
         <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} href="/onboarding?state=COMPLETED" />
       </section>
 
+      <section aria-labelledby="buckets-title" className="mb-6">
+        <h2 id="buckets-title" className="mb-2 text-label text-muted-foreground">
+          Progress (required items; nearly complete is 80% or more)
+        </h2>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {BUCKETS.map((b) => (
+            <li key={b}>
+              <Link
+                href={`/onboarding?bucket=${b}`}
+                aria-current={bucket === b ? 'page' : undefined}
+                className={cn(
+                  'flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-small hover:border-ring/40',
+                  bucket === b && 'border-primary ring-1 ring-primary',
+                )}
+              >
+                <span>{ONBOARDING_BUCKET_LABELS[b]}</span>
+                <span className="tabular font-semibold">{buckets[b]}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <nav aria-label="Filter onboarding" className="mb-4 flex flex-wrap gap-2">
         <Link
           href="/onboarding"
-          aria-current={!state ? 'page' : undefined}
-          className={buttonVariants({ variant: !state ? 'default' : 'outline', size: 'sm' })}
+          aria-current={!state && !bucket ? 'page' : undefined}
+          className={buttonVariants({ variant: !state && !bucket ? 'default' : 'outline', size: 'sm' })}
         >
           Open
         </Link>
@@ -98,7 +128,13 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
         empty={
           <EmptyState
             icon={ClipboardList}
-            title={state ? `Nothing ${STATE_LABELS[state].toLowerCase()}` : 'No onboarding in progress'}
+            title={
+              bucket
+                ? `Nothing ${ONBOARDING_BUCKET_LABELS[bucket].toLowerCase()}`
+                : state
+                  ? `Nothing ${STATE_LABELS[state].toLowerCase()}`
+                  : 'No onboarding in progress'
+            }
             description="Checklists appear when an intern moves to Onboarding."
           />
         }
@@ -143,6 +179,12 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
             key: 'state',
             header: 'State',
             cell: (row) => <StatusBadge status={row.state === 'OVERDUE' ? 'LATE' : row.state} />,
+          },
+          {
+            key: 'bucket',
+            header: 'Progress',
+            hideBelow: 'md',
+            cell: (row) => <span className="whitespace-nowrap">{ONBOARDING_BUCKET_LABELS[row.bucket]}</span>,
           },
           { key: 'template', header: 'Template', hideBelow: 'md', cell: (row) => row.template_name ?? '—' },
           {

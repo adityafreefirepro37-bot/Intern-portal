@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/db/client'
 import { logger } from '@/lib/logging'
+import type { PermissionKey } from '@/lib/permissions'
 import { parseInput } from '@/lib/validation'
 import type { RequestContext } from '../context'
 import { authorizationService } from './authorization.service'
@@ -23,6 +24,23 @@ export const NOTIFICATION_TYPES = {
   PROJECT_MEMBER_ADDED: 'PROJECT_MEMBER_ADDED',
   PROJECT_MILESTONE_DUE: 'PROJECT_MILESTONE_DUE',
   PROJECT_STATUS_CHANGED: 'PROJECT_STATUS_CHANGED',
+  LEAVE_REQUESTED: 'LEAVE_REQUESTED',
+  LEAVE_APPROVED: 'LEAVE_APPROVED',
+  LEAVE_REJECTED: 'LEAVE_REJECTED',
+  LEAVE_CANCELLED: 'LEAVE_CANCELLED',
+  ATTENDANCE_CORRECTION_REQUESTED: 'ATTENDANCE_CORRECTION_REQUESTED',
+  ATTENDANCE_CORRECTION_APPROVED: 'ATTENDANCE_CORRECTION_APPROVED',
+  ATTENDANCE_CORRECTION_REJECTED: 'ATTENDANCE_CORRECTION_REJECTED',
+  DOCUMENT_UPLOADED: 'DOCUMENT_UPLOADED',
+  DOCUMENT_VERIFIED: 'DOCUMENT_VERIFIED',
+  DOCUMENT_REJECTED: 'DOCUMENT_REJECTED',
+  DOCUMENT_EXPIRING: 'DOCUMENT_EXPIRING',
+  ONBOARDING_ITEM_ASSIGNED: 'ONBOARDING_ITEM_ASSIGNED',
+  ONBOARDING_ITEM_OVERDUE: 'ONBOARDING_ITEM_OVERDUE',
+  HR_REQUEST_CREATED: 'HR_REQUEST_CREATED',
+  HR_REQUEST_UPDATED: 'HR_REQUEST_UPDATED',
+  HR_REQUEST_COMMENTED: 'HR_REQUEST_COMMENTED',
+  ANNOUNCEMENT_PUBLISHED: 'ANNOUNCEMENT_PUBLISHED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -30,16 +48,52 @@ export interface NotificationInput {
   type: NotificationType
   title: string
   body?: string
-  entityType: 'task' | 'project'
+  entityType: NotificationEntity
   entityId: string
 }
+
+export type NotificationEntity =
+  | 'task'
+  | 'project'
+  | 'leave'
+  | 'attendance_correction'
+  | 'document'
+  | 'intern_onboarding'
+  | 'hr_request'
+  | 'announcement'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
   if (!entityId) return null
   if (entityType === 'task') return `/tasks/${entityId}`
   if (entityType === 'project') return `/projects/${entityId}`
+  if (entityType === 'hr_request') return `/requests/${entityId}`
+  if (entityType === 'announcement') return `/announcements?highlight=${entityId}`
+  if (entityType === 'intern_onboarding') return `/interns/${entityId}/onboarding`
+  // Leave, corrections and documents open the page that lists them for the viewer.
+  if (entityType === 'leave') return `/leave?highlight=${entityId}`
+  if (entityType === 'attendance_correction') return `/attendance?highlight=${entityId}`
+  if (entityType === 'document') return `/documents?highlight=${entityId}`
   return null
+}
+
+/**
+ * Active users holding `permission` organization-wide — e.g. the people who
+ * handle HR queues. Derived from grants (data), never from role names.
+ */
+export async function usersWithPermission(organizationId: string, permission: PermissionKey): Promise<string[]> {
+  const [resource, action] = permission.split('.')
+  const rows = await prisma.userRole.findMany({
+    where: {
+      user: { organization_id: organizationId, status: 'ACTIVE', deleted_at: null },
+      role: {
+        organization_id: organizationId,
+        role_permissions: { some: { scope: 'ORGANIZATION', permission: { resource, action } } },
+      },
+    },
+    select: { user_id: true },
+  })
+  return [...new Set(rows.map((row) => row.user_id))]
 }
 
 export const notificationService = {

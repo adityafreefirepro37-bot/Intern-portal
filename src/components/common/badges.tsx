@@ -13,6 +13,10 @@ const STATUS_TONES: Record<string, BadgeVariant> = {
   PUBLISHED: 'success',
   PRESENT: 'success',
   ISSUED: 'success',
+  VERIFIED: 'success',
+  RESOLVED: 'success',
+  DONE: 'success',
+  COMPLETE: 'success',
   // in motion
   ACTIVE: 'primary',
   IN_PROGRESS: 'primary',
@@ -21,30 +25,45 @@ const STATUS_TONES: Record<string, BadgeVariant> = {
   SUBMITTED: 'info',
   UNDER_REVIEW: 'info',
   IN_REVIEW: 'info',
+  UPLOADED: 'info',
+  OPEN: 'info',
+  SCHEDULED: 'info',
+  ON_LEAVE: 'info',
+  NEARLY_COMPLETE: 'info',
   // needs attention
   BLOCKED: 'destructive',
   REJECTED: 'destructive',
   TERMINATED: 'destructive',
   ABSENT: 'destructive',
+  EXPIRED: 'destructive',
+  OVERDUE: 'destructive',
   CHANGES_REQUESTED: 'warning',
   ENDING_SOON: 'warning',
   ON_HOLD: 'warning',
   PENDING: 'warning',
   LATE: 'warning',
+  HALF_DAY: 'warning',
+  MISSING: 'warning',
+  REQUIRED: 'warning',
+  WAITING_FOR_USER: 'warning',
   // idle / archived
   BACKLOG: 'neutral',
   PLANNED: 'neutral',
   SELECTED: 'neutral',
   DRAFT: 'neutral',
+  HOLIDAY: 'neutral',
+  WEEKEND: 'neutral',
+  NOT_STARTED: 'neutral',
+  SKIPPED: 'outline',
   CANCELLED: 'outline',
   ARCHIVED: 'outline',
   ALUMNI: 'outline',
 }
 
-export function StatusBadge({ status, className }: { status: string; className?: string }) {
+export function StatusBadge({ status, label, className }: { status: string; label?: string; className?: string }) {
   return (
     <Badge variant={STATUS_TONES[status] ?? 'neutral'} className={className}>
-      {humanizeEnum(status)}
+      {label ?? humanizeEnum(status)}
     </Badge>
   )
 }

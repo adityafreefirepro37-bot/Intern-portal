@@ -6,8 +6,10 @@ import {
   CalendarDays,
   CheckSquare,
   Briefcase,
+  CalendarClock,
   ClipboardList,
   Clock,
+  FileCheck2,
   FileText,
   FolderKanban,
   GraduationCap,
@@ -16,6 +18,7 @@ import {
   Inbox,
   Gauge,
   KeyRound,
+  LifeBuoy,
   LayoutDashboard,
   Megaphone,
   MessagesSquare,
@@ -97,7 +100,6 @@ export const NAVIGATION: NavSection[] = [
     title: 'People',
     items: [
       { label: 'My Internship', href: '/my-internship', icon: IdCard, when: 'isIntern', mobile: true },
-      { label: 'HR Dashboard', href: '/hr', icon: Briefcase, permission: 'intern.create' },
       {
         label: 'Interns',
         scopedLabel: 'Team Interns',
@@ -131,9 +133,38 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'HR',
     items: [
-      { label: 'Attendance', href: '/attendance', icon: Clock, permission: 'attendance.read', phase: '05' },
-      { label: 'Leave', href: '/leave', icon: Palmtree, permission: 'leave.read', phase: '05' },
-      { label: 'Documents', href: '/documents', icon: FileText, permission: 'document.read', phase: '05' },
+      { label: 'HR Dashboard', href: '/hr', icon: Briefcase, permission: 'hr_dashboard.read' },
+      // Personal HR self-service (people who record their own attendance/leave).
+      { label: 'Attendance', href: '/attendance', icon: Clock, permission: 'attendance.create', mobile: true },
+      { label: 'Leave', href: '/leave', icon: Palmtree, permission: 'leave.request' },
+      { label: 'Documents', href: '/documents', icon: FileText, permission: 'document.upload', when: 'isIntern' },
+      // Oversight views (scope-limited for managers).
+      {
+        label: 'Attendance',
+        scopedLabel: 'Team Attendance',
+        href: '/hr/attendance',
+        icon: Clock,
+        permission: 'attendance.read',
+        minScope: 'ASSIGNED',
+      },
+      {
+        label: 'Leave',
+        scopedLabel: 'Team Leave',
+        href: '/hr/leave',
+        icon: Palmtree,
+        permission: 'leave.read',
+        minScope: 'ASSIGNED',
+      },
+      { label: 'Documents', href: '/hr/documents', icon: FileCheck2, permission: 'document.verify' },
+      {
+        label: 'HR Requests',
+        href: '/hr/requests',
+        icon: LifeBuoy,
+        permission: 'hr_request.manage',
+        minScope: 'ORGANIZATION',
+      },
+      { label: 'Ending Internships', href: '/hr/offboarding', icon: CalendarClock, permission: 'offboarding.read' },
+      { label: 'My Requests', href: '/requests', icon: LifeBuoy, permission: 'hr_request.create' },
       { label: 'Performance', href: '/performance', icon: Gauge, permission: 'performance.read', phase: '06' },
       { label: 'Certificates', href: '/certificates', icon: Award, permission: 'certificate.read', phase: '08' },
     ],

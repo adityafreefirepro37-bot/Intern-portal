@@ -1,9 +1,5 @@
 import type { RequestContext } from '../context'
-import {
-  announcementRepository,
-  courseRepository,
-  organizationStructureRepository,
-} from '../repositories/content.repository'
+import { courseRepository, organizationStructureRepository } from '../repositories/content.repository'
 import { authorizationService } from './authorization.service'
 
 /** Learning catalog (course authoring and progress tracking arrive in Prompt 05). */
@@ -19,13 +15,8 @@ export const learningService = {
   },
 }
 
-/** Announcements (publishing arrives in Prompt 06). */
-export const announcementService = {
-  async listActive(ctx: RequestContext, take = 10, now = new Date()) {
-    authorizationService.require(ctx, 'announcement.read')
-    return announcementRepository.listActive(ctx.organization.id, now, take)
-  },
-}
+/** Announcements moved to announcement.service.ts (targeting, scheduling, publishing). */
+export { announcementService } from './announcement.service'
 
 /** Departments, teams and positions (management arrives in Prompt 03). */
 export const organizationService = {

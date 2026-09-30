@@ -193,6 +193,14 @@ describe('seed', () => {
       rolePermissions: await prisma.rolePermission.count(),
       projects: await prisma.project.count(),
       courses: await prisma.course.count(),
+      attendance: await prisma.attendance.count(),
+      leave: await prisma.leaveRequest.count(),
+      documents: await prisma.internshipDocument.count(),
+      documentTypes: await prisma.hrDocumentType.count(),
+      holidays: await prisma.holiday.count(),
+      hrRequests: await prisma.hrRequest.count(),
+      announcements: await prisma.announcement.count(),
+      offboarding: await prisma.offboardingItem.count(),
     })
     // Simulate interns created after the first seed: re-seeding must never move the code counter backwards.
     const counterKey = { organization_id: AYAVA_ORGANIZATION_ID, key: 'intern.employee_code' }
@@ -211,5 +219,5 @@ describe('seed', () => {
     expect(await counts()).toEqual(before)
     const after = await prisma.codeCounter.findUniqueOrThrow({ where: { organization_id_key: counterKey } })
     expect(after.value).toBe(counter.value)
-  })
+  }, 120_000) // the full demo seed (work + HR data, demo document files) takes a while
 })

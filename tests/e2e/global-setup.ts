@@ -9,7 +9,8 @@ const SEEDED_DONE = [3, 5, 6]
  *  - clears rate-limit counters so repeated runs don't trip the sign-in limits;
  *  - soft-deletes interns created by earlier e2e runs (emails e2e.*@test.ayava.dev);
  *  - restores the seeded intern's onboarding checklist to its seed state so the
- *    "intern completes onboarding" flow always starts from the same place.
+ *    "intern completes onboarding" flow always starts from the same place;
+ *  - resets the HR flows' data (today's check-in, e2e leave/requests, Tara's offboarding).
  */
 export default async function globalSetup() {
   loadEnvConfig(process.cwd())
@@ -70,6 +71,34 @@ export default async function globalSetup() {
         data: { deleted_at: now },
       })
       await prisma.intern.update({ where: { id: aanya.id }, data: { status: 'ONBOARDING' } })
+    }
+
+    // HR flows (Prompt 05): the intern checks in fresh today; e2e leave, requests
+    // and contacts are removed; Tara's offboarding checklist returns to its seed state.
+    if (aanya) {
+      const today = new Date(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now)}T00:00:00Z`)
+      await prisma.attendanceCorrection.deleteMany({ where: { user_id: aanya.user_id, date: today } })
+      await prisma.attendance.deleteMany({ where: { user_id: aanya.user_id, date: today } })
+      await prisma.leaveRequest.deleteMany({ where: { user_id: aanya.user_id, reason: { startsWith: 'E2E' } } })
+      await prisma.emergencyContact.deleteMany({ where: { intern_id: aanya.id, name: { startsWith: 'E2E' } } })
+    }
+    await prisma.hrRequest.deleteMany({ where: { subject: { startsWith: 'E2E' } } })
+    const seedDone = ['Confirm final task handover', 'Prepare experience letter']
+    const tara = await prisma.offboardingChecklist.findFirst({
+      where: { intern: { employee_code: 'AYV-INT-0005' } },
+      select: { id: true, items: { select: { id: true, title: true } } },
+    })
+    if (tara) {
+      for (const item of tara.items) {
+        const done = seedDone.includes(item.title)
+        await prisma.offboardingItem.update({
+          where: { id: item.id },
+          data: done
+            ? { status: 'DONE', note: null }
+            : { status: 'PENDING', note: null, completed_at: null, completed_by: null },
+        })
+      }
+      await prisma.offboardingChecklist.update({ where: { id: tara.id }, data: { completed_at: null } })
     }
   } finally {
     await prisma.$disconnect()

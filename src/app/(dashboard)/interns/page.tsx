@@ -1,7 +1,15 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarClock, ClipboardList, GraduationCap, UserPlus, UserRoundCheck, UsersRound } from 'lucide-react'
+import {
+  CalendarClock,
+  ClipboardList,
+  Download,
+  GraduationCap,
+  UserPlus,
+  UserRoundCheck,
+  UsersRound,
+} from 'lucide-react'
 import { StatusBadge } from '@/components/common/badges'
 import { PageHeader } from '@/components/common/page-header'
 import { StatCard } from '@/components/common/stat-card'
@@ -12,6 +20,7 @@ import { Pagination } from '@/components/tables/pagination'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DirectoryControls, PageSizeSelect } from '@/features/interns/components/directory-controls'
+import { ONBOARDING_BUCKET_LABELS } from '@/lib/hr/operations'
 import { STATUS_LABELS, INTERN_STATUSES } from '@/lib/interns/lifecycle'
 import { formatDay, fullName } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
@@ -43,7 +52,7 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
   }
 
   const raw = await searchParams
-  const [{ query, page, stats }, options] = await Promise.all([
+  const [{ query, page, stats, columns }, options] = await Promise.all([
     internService.directory(ctx, raw),
     internService.formOptions(ctx),
   ])
@@ -63,8 +72,12 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
     query.joinedFrom ||
     query.joinedTo ||
     query.endFrom ||
-    query.endTo,
+    query.endTo ||
+    query.onboarding ||
+    query.documents,
   )
+  const canExport = authorizationService.can(ctx, 'intern.export')
+  const exportQuery = new URLSearchParams(params).toString()
 
   return (
     <>
@@ -76,11 +89,21 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
             : 'Interns in the departments and teams you lead.'
         }
         actions={
-          canCreate && (
-            <Link href="/interns/new" className={buttonVariants()}>
-              <UserPlus aria-hidden /> Add intern
-            </Link>
-          )
+          <>
+            {canExport && (
+              <a
+                href={`/api/hr/export/interns${exportQuery ? `?${exportQuery}` : ''}`}
+                className={buttonVariants({ variant: 'outline' })}
+              >
+                <Download aria-hidden /> Export CSV
+              </a>
+            )}
+            {canCreate && (
+              <Link href="/interns/new" className={buttonVariants()}>
+                <UserPlus aria-hidden /> Add intern
+              </Link>
+            )}
+          </>
         }
       />
 
@@ -111,6 +134,7 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
         positions={options.positions.map((p) => ({ value: p.id, label: p.title }))}
         people={options.staff.map((s) => ({ value: s.id, label: s.name }))}
         sorts={SORTS}
+        hrFilters={columns.onboarding || columns.documents}
       />
 
       {page.items.length === 0 ? (
@@ -196,6 +220,59 @@ export default async function InternsPage({ searchParams }: PageProps<'/interns'
                 ),
               },
               { key: 'status', header: 'Status', cell: (intern) => <StatusBadge status={intern.status} /> },
+              ...(columns.onboarding
+                ? [
+                    {
+                      key: 'onboarding',
+                      header: 'Onboarding',
+                      hideBelow: 'lg' as const,
+                      cell: (intern: Row) =>
+                        intern.hr.onboarding ? (
+                          <span className="whitespace-nowrap">
+                            {intern.hr.onboarding.percent}%{' '}
+                            <span className="text-caption text-muted-foreground">
+                              {ONBOARDING_BUCKET_LABELS[intern.hr.onboarding.bucket]}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        ),
+                    },
+                  ]
+                : []),
+              ...(columns.attendance
+                ? [
+                    {
+                      key: 'attendance',
+                      header: 'Attendance (30d)',
+                      hideBelow: 'lg' as const,
+                      cell: (intern: Row) =>
+                        intern.hr.attendanceRate === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span className="tabular">{intern.hr.attendanceRate}%</span>
+                        ),
+                    },
+                  ]
+                : []),
+              ...(columns.documents
+                ? [
+                    {
+                      key: 'documents',
+                      header: 'Documents',
+                      hideBelow: 'lg' as const,
+                      cell: (intern: Row) =>
+                        intern.hr.documents ? (
+                          <span className="tabular whitespace-nowrap">
+                            {intern.hr.documents.verified}/{intern.hr.documents.required}
+                            {intern.hr.documents.complete ? '' : ' verified'}
+                          </span>
+                        ) : (
+                          '—'
+                        ),
+                    },
+                  ]
+                : []),
               {
                 key: 'dates',
                 header: 'Internship',

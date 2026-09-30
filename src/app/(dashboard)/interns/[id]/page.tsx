@@ -1,12 +1,18 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BookOpen, Clock, Gauge, Palmtree } from 'lucide-react'
+import { BookOpen, Gauge } from 'lucide-react'
 import { StatusBadge } from '@/components/common/badges'
 import { AccessDenied } from '@/components/common/states'
 import { UserAvatar } from '@/components/common/user-avatar'
 import { Breadcrumbs } from '@/components/navigation/breadcrumbs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AttendanceCalendar, AttendanceDays, AttendanceSummary } from '@/features/hr/components/attendance-calendar'
+import { HrRecord } from '@/features/hr/components/hr-record'
+import { MonthNav } from '@/features/hr/components/hr-nav'
+import { LeaveList } from '@/features/hr/components/leave'
+import { LeaveBalances } from '@/features/hr/components/leave-views'
+import { OffboardingChecklist } from '@/features/hr/components/offboarding'
 import { DocumentsPanel } from '@/features/interns/components/documents-panel'
 import { OnboardingChecklist } from '@/features/interns/components/onboarding-checklist'
 import { OwnInternProfileForm } from '@/features/interns/components/own-profile-form'
@@ -22,12 +28,17 @@ import {
 } from '@/features/interns/components/profile-view'
 import { InternshipProgressBar, OnboardingProgressBar } from '@/features/interns/components/progress'
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
+import { formatMonth, monthLabel, shiftMonth } from '@/lib/hr/time'
 import { formatDateOnly } from '@/lib/interns/dates'
 import { formatDay, humanizeEnum } from '@/lib/utils'
 import { idSchema } from '@/lib/validation'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
 import { DOCUMENT_TYPE_LABELS, documentService, VISIBILITY_LABELS } from '@/server/services/document.service'
+import { attendanceService } from '@/server/services/attendance.service'
+import { internHrService } from '@/server/services/intern-hr.service'
+import { leaveService } from '@/server/services/leave.service'
+import { offboardingService } from '@/server/services/offboarding.service'
 import { internService } from '@/server/services/intern.service'
 import { onboardingService } from '@/server/services/onboarding.service'
 
@@ -61,14 +72,16 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
     ...(can.viewOnboarding || can.manageOnboarding ? [{ key: 'onboarding', label: 'Onboarding' }] : []),
     ...(hasTasks ? [{ key: 'tasks', label: 'Tasks' }] : []),
     ...(hasProjects ? [{ key: 'projects', label: 'Projects' }] : []),
-    { key: 'attendance', label: 'Attendance' },
-    { key: 'leave', label: 'Leave' },
+    ...(can.viewAttendance ? [{ key: 'attendance', label: 'Attendance' }] : []),
+    ...(can.viewLeave ? [{ key: 'leave', label: 'Leave' }] : []),
     { key: 'learning', label: 'Learning' },
     { key: 'performance', label: 'Performance' },
     ...(can.viewDocuments ? [{ key: 'documents', label: 'Documents' }] : []),
+    ...(can.seeSensitive ? [{ key: 'hr', label: 'HR record' }] : []),
     ...(can.viewActivity ? [{ key: 'activity', label: 'Activity' }] : []),
   ]
-  const requested = (await searchParams).tab
+  const query = await searchParams
+  const requested = query.tab
   const tab = tabs.find((t) => t.key === requested)?.key ?? 'overview'
   const basePath = `/interns/${profile.id}`
 
@@ -207,29 +220,6 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
                 </CardContent>
               </Card>
             )}
-            {profile.emergencyContacts && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Emergency contacts</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {profile.emergencyContacts.length === 0 && (
-                    <p className="text-small text-muted-foreground">None recorded.</p>
-                  )}
-                  {profile.emergencyContacts.map((contact) => (
-                    <div key={contact.id} className="text-small">
-                      <p className="font-medium">
-                        {contact.name}{' '}
-                        <span className="font-normal text-muted-foreground">({contact.relationship})</span>
-                      </p>
-                      <p className="text-muted-foreground">
-                        {[contact.phone, contact.email].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
           </div>
           {profile.education?.bio && !can.editSelfProfile && (
             <Card className="lg:col-span-3">
@@ -304,21 +294,14 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       {tab === 'projects' && <WorkTab ctx={ctx} internId={profile.id} kind="projects" />}
 
       {tab === 'attendance' && (
-        <ModuleComingSoon
-          icon={Clock}
-          title="Attendance"
-          phase="05"
-          description="Daily check-ins, attendance history and corrections."
+        <AttendanceTab
+          ctx={ctx}
+          userId={profile.userId}
+          internId={profile.id}
+          month={typeof query.month === 'string' ? query.month : undefined}
         />
       )}
-      {tab === 'leave' && (
-        <ModuleComingSoon
-          icon={Palmtree}
-          title="Leave"
-          phase="05"
-          description="Leave requests, approvals and balances."
-        />
-      )}
+      {tab === 'leave' && <LeaveTab ctx={ctx} userId={profile.userId} />}
       {tab === 'learning' && (
         <ModuleComingSoon
           icon={BookOpen}
@@ -337,6 +320,7 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       )}
 
       {tab === 'documents' && <DocumentsTab ctx={ctx} internId={profile.id} />}
+      {tab === 'hr' && <HrRecordTab ctx={ctx} internId={profile.id} showOffboarding={can.viewOffboarding} />}
       {tab === 'activity' && <ActivityTab ctx={ctx} internId={profile.id} />}
     </>
   )
@@ -399,13 +383,104 @@ async function DocumentsTab({ ctx, internId }: { ctx: Ctx; internId: string }) {
   return (
     <DocumentsPanel
       internId={internId}
+      requirements={result.requirements}
       documents={result.documents}
+      history={result.history}
+      completion={result.completion}
+      types={result.types}
       canUpload={result.canUpload}
       assignable={result.assignable}
-      typeLabels={DOCUMENT_TYPE_LABELS}
       visibilityLabels={VISIBILITY_LABELS}
       timeZone={ctx.organization.timezone}
     />
+  )
+}
+
+async function AttendanceTab({
+  ctx,
+  userId,
+  internId,
+  month,
+}: {
+  ctx: Ctx
+  userId: string
+  internId: string
+  month?: string
+}) {
+  const data = await attendanceService.month(ctx, { userId, month })
+  const base = `/interns/${internId}?tab=attendance`
+  return (
+    <Card>
+      <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardTitle>Attendance</CardTitle>
+        <MonthNav
+          label={monthLabel(data.month)}
+          prevHref={`${base}&month=${formatMonth(shiftMonth(data.month, -1))}`}
+          nextHref={`${base}&month=${formatMonth(shiftMonth(data.month, 1))}`}
+          todayHref={base}
+        />
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <AttendanceSummary summary={data.summary} />
+        <AttendanceCalendar days={data.days} caption={`Attendance for ${monthLabel(data.month)}`} />
+        <AttendanceDays days={data.days} timeZone={ctx.organization.timezone} />
+      </CardContent>
+    </Card>
+  )
+}
+
+async function LeaveTab({ ctx, userId }: { ctx: Ctx; userId: string }) {
+  const data = await leaveService.forUser(ctx, userId)
+  return (
+    <div className="space-y-6">
+      <LeaveBalances balances={data.balances} />
+      <LeaveList rows={data.requests} showPerson={false} emptyText="No leave requests." />
+    </div>
+  )
+}
+
+async function HrRecordTab({
+  ctx,
+  internId,
+  showOffboarding,
+}: {
+  ctx: Ctx
+  internId: string
+  showOffboarding: boolean
+}) {
+  const [record, offboarding] = await Promise.all([
+    internHrService.record(ctx, internId),
+    showOffboarding ? offboardingService.checklist(ctx, internId) : Promise.resolve(null),
+  ])
+  return (
+    <div className="space-y-6">
+      <HrRecord
+        internId={internId}
+        personal={record.personal}
+        contacts={record.contacts}
+        compensation={record.compensation}
+        can={record.can}
+      />
+      {offboarding && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Offboarding</CardTitle>
+            <CardDescription>
+              {offboarding.checklist
+                ? offboarding.checklist.completed_at
+                  ? `Completed ${formatDay(offboarding.checklist.completed_at)}`
+                  : `Started ${formatDay(offboarding.checklist.started_at)}`
+                : 'Not started. HR starts offboarding from Ending internships.'}
+            </CardDescription>
+          </CardHeader>
+          {offboarding.checklist && (
+            <CardContent>
+              <OffboardingChecklist items={offboarding.checklist.items} canManage={offboarding.canManage} />
+            </CardContent>
+          )}
+        </Card>
+      )}
+    </div>
   )
 }
 

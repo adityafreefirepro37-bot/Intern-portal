@@ -81,6 +81,9 @@ async function main() {
   console.log('Seeding development demo data…')
   const demo = await seedDemo(prisma, reference)
   console.log('✔ Demo people, interns, projects, tasks, courses and announcements')
+  console.log(
+    `✔ HR demo data: ${demo.hr.attendance} attendance days, ${demo.hr.leave} leave requests, ${demo.hr.documents} documents, ${demo.hr.requests} HR requests`,
+  )
   console.log('  Development accounts (profiles only unless linked to Supabase Auth):')
   for (const account of DEV_ACCOUNTS) console.log(`   - ${account.email} (${account.role})`)
 

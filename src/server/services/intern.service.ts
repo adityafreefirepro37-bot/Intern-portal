@@ -6,6 +6,7 @@ import type { RequestMeta } from '@/lib/http/request-meta'
 import { EMPLOYEE_CODE_COUNTER_KEY, formatEmployeeCode, parseEmployeeCode } from '@/lib/interns/employee-code'
 import { parseDateOnly, todayIn } from '@/lib/interns/dates'
 import { INTERN_STATUSES } from '@/lib/interns/lifecycle'
+import { onboardingBucket, toCsv } from '@/lib/hr/operations'
 import { internshipProgress, onboardingProgress } from '@/lib/interns/progress'
 import { logger } from '@/lib/logging'
 import { maskValue } from '@/lib/security/masking'
@@ -24,6 +25,8 @@ import { resolveInternAccess } from './intern-access'
 import { invitationIssuer } from './invitation.service'
 import { emitItemAssignments, generateOnboarding } from './onboarding.service'
 import { skipTake, toPage } from './pagination'
+import { attendanceRates } from './attendance.service'
+import { completionByIntern } from './document.service'
 import { settingsService } from './settings.service'
 import { userService } from './user.service'
 
@@ -72,6 +75,8 @@ export const directoryQuerySchema = z.object({
   joinedTo: isoDateSchema.optional().catch(undefined),
   endFrom: isoDateSchema.optional().catch(undefined),
   endTo: isoDateSchema.optional().catch(undefined),
+  onboarding: z.enum(['not_started', 'in_progress', 'complete']).optional().catch(undefined),
+  documents: z.enum(['complete', 'incomplete']).optional().catch(undefined),
   sort: z.enum(INTERN_SORTS).default('name').catch('name'),
   dir: z.enum(['asc', 'desc']).default('asc').catch('asc'),
   page: z.coerce.number().int().min(1).max(10_000).default(1).catch(1),
@@ -222,6 +227,20 @@ export const internService = {
       joinedTo: query.joinedTo ? parseDateOnly(query.joinedTo) : undefined,
       endFrom: query.endFrom ? parseDateOnly(query.endFrom) : undefined,
       endTo: query.endTo ? parseDateOnly(query.endTo) : undefined,
+      onboarding: query.onboarding,
+    }
+    const today = todayIn(ctx.organization.timezone)
+    if (query.documents) {
+      // Completion is computed (required types × current versions), so resolve it to ids first.
+      const all = await prisma.intern.findMany({ where: { AND: [where, { deleted_at: null }] }, select: { id: true } })
+      const completion = await completionByIntern(
+        ctx.organization.id,
+        all.map((i) => i.id),
+        today,
+      )
+      const complete = [...completion].filter(([, c]) => c.complete).map(([id]) => id)
+      if (query.documents === 'complete') filter.ids = complete
+      else filter.excludeIds = complete
     }
     const pagination = { page: query.page, pageSize: query.pageSize }
     const [[rows, total], byStatus] = await Promise.all([
@@ -229,9 +248,59 @@ export const internService = {
       internRepository.countByStatus(where),
     ])
     const count = (status: InternStatus) => byStatus[status] ?? 0
+    const has = (key: 'onboarding.read' | 'attendance.read' | 'document.read') => ctx.actor.permissions.has(key)
+    const ids = rows.map((r) => r.id)
+    const [onboardingItems, onboardings, rates, documents] = await Promise.all([
+      has('onboarding.read')
+        ? prisma.onboardingItem.findMany({
+            where: { internship: { intern_id: { in: ids } }, onboarding_id: { not: null } },
+            select: { required: true, status: true, due_date: true, internship: { select: { intern_id: true } } },
+          })
+        : Promise.resolve([]),
+      has('onboarding.read')
+        ? prisma.onboarding.findMany({
+            where: { internship: { intern_id: { in: ids } } },
+            select: { completed_at: true, internship: { select: { intern_id: true } } },
+          })
+        : Promise.resolve([]),
+      has('attendance.read')
+        ? attendanceRates(
+            ctx.organization.id,
+            ctx.organization.timezone,
+            rows
+              .filter((r) => ['ONBOARDING', 'ACTIVE', 'ENDING_SOON'].includes(r.status))
+              .map((r) => ({ userId: r.user_id, joiningDate: r.joining_date })),
+          )
+        : Promise.resolve(new Map<string, number | null>()),
+      has('document.read') ? completionByIntern(ctx.organization.id, ids, today) : Promise.resolve(null),
+    ])
+    const items = rows.map((row) => {
+      const onboarding = onboardings.find((o) => o.internship.intern_id === row.id)
+      const progress = onboarding
+        ? onboardingProgress(
+            onboardingItems.filter((i) => i.internship.intern_id === row.id),
+            today,
+          )
+        : null
+      return {
+        ...row,
+        hr: {
+          onboarding: progress
+            ? { percent: progress.percent, bucket: onboardingBucket(progress, Boolean(onboarding?.completed_at)) }
+            : null,
+          attendanceRate: rates.get(row.user_id) ?? null,
+          documents: documents?.get(row.id) ?? null,
+        },
+      }
+    })
     return {
       query,
-      page: toPage(rows, total, pagination),
+      columns: {
+        onboarding: has('onboarding.read'),
+        attendance: has('attendance.read'),
+        documents: has('document.read'),
+      },
+      page: toPage(items, total, pagination),
       stats: {
         total: Object.values(byStatus).reduce((sum, n) => sum + (n ?? 0), 0),
         active: count('ACTIVE'),
@@ -241,6 +310,64 @@ export const internService = {
         selected: count('SELECTED'),
       },
     }
+  },
+
+  /** CSV of the directory (intern.export), same filters as the page; audited. */
+  async exportCsv(ctx: RequestContext, rawQuery: unknown) {
+    authorizationService.require(ctx, 'intern.export')
+    const scope = authorizationService.require(ctx, 'intern.read')
+    const query = directoryQuerySchema.parse(rawQuery ?? {})
+    const [rows] = await internRepository.directoryPage(internScope(ctx.actor, scope), {
+      filter: {
+        q: query.q,
+        status: query.status,
+        departmentId: query.department,
+        teamId: query.team,
+        positionId: query.position,
+        managerId: query.manager,
+        mentorId: query.mentor,
+        onboarding: query.onboarding,
+      },
+      sort: query.sort,
+      dir: query.dir,
+      skip: 0,
+      take: 10_000,
+    })
+    const day = (value: Date | null) => (value ? value.toISOString().slice(0, 10) : '')
+    const csv = toCsv(
+      [
+        'Employee code',
+        'Name',
+        'Email',
+        'Status',
+        'Department',
+        'Team',
+        'Position',
+        'Manager',
+        'Mentor',
+        'Joining date',
+        'Expected end',
+      ],
+      rows.map((r) => [
+        r.employee_code,
+        fullName(r.user),
+        r.user.email,
+        r.status,
+        r.department?.name ?? '',
+        r.team?.name ?? '',
+        r.position?.title ?? '',
+        r.manager ? fullName(r.manager) : '',
+        r.mentor ? fullName(r.mentor) : '',
+        day(r.joining_date),
+        day(r.expected_end_date),
+      ]),
+    )
+    await auditService.logForContext(ctx, {
+      action: AUDIT_ACTIONS.EXPORT_GENERATED,
+      resourceType: 'intern',
+      metadata: { kind: 'interns', rows: rows.length },
+    })
+    return { csv, fileName: `interns-${day(todayIn(ctx.organization.timezone))}.csv` }
   },
 
   async list(ctx: RequestContext, pagination: Pagination, filter: { status?: InternStatus } = {}) {
@@ -913,23 +1040,6 @@ export const internService = {
         : null,
     ])
     return { tasks, projects }
-  },
-
-  /** HR dashboard data (organization- or team-scoped by the viewer's intern.read grant). */
-  async hrOverview(ctx: RequestContext) {
-    authorizationService.require(ctx, 'intern.create')
-    const scope = internScope(ctx.actor, authorizationService.require(ctx, 'intern.read'))
-    const today = todayIn(ctx.organization.timezone)
-    const page = (filter: InternDirectoryFilter, sort: (typeof INTERN_SORTS)[number], dir: 'asc' | 'desc') =>
-      internRepository.directoryPage(scope, { filter, sort, dir, skip: 0, take: 6 }).then(([rows]) => rows)
-    const [byStatus, endingSoon, joining, recent, unassigned] = await Promise.all([
-      internRepository.countByStatus(scope),
-      page({ status: 'ENDING_SOON' }, 'end', 'asc'),
-      page({ joinedFrom: today }, 'joining', 'asc'),
-      page({}, 'created', 'desc'),
-      internRepository.countUnassigned(scope, ['SELECTED', 'ONBOARDING', 'ACTIVE', 'ENDING_SOON']),
-    ])
-    return { byStatus, endingSoon, joining, recent, unassigned }
   },
 
   /**

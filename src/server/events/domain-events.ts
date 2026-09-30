@@ -51,6 +51,27 @@ export interface DomainEventMap {
   'project.member_added': { projectId: string; userId: string; role: string }
   'project.status_changed': { projectId: string; from: string; to: string }
   'project.milestone_due': { projectId: string; milestoneId: string; dueDate: string }
+  'attendance.correction_requested': { correctionId: string; userId: string; date: string }
+  'attendance.correction_reviewed': {
+    correctionId: string
+    userId: string
+    date: string
+    decision: 'APPROVED' | 'REJECTED'
+  }
+  'leave.requested': { leaveId: string; userId: string }
+  'leave.reviewed': { leaveId: string; userId: string; decision: 'APPROVED' | 'REJECTED' }
+  'leave.cancelled': { leaveId: string; userId: string; wasApproved: boolean }
+  'document.reviewed': {
+    internId: string
+    documentId: string
+    decision: 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED'
+    replacementRequested: boolean
+  }
+  'document.expiring': { internId: string; documentId: string; expiresAt: string; expired: boolean }
+  'hr_request.created': { requestId: string }
+  'hr_request.updated': { requestId: string; from: string; to: string }
+  'hr_request.commented': { requestId: string; commentId: string; byRequester: boolean }
+  'announcement.published': { announcementId: string }
 }
 
 export type DomainEventName = keyof DomainEventMap

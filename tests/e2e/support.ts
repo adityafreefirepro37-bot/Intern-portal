@@ -45,5 +45,6 @@ export async function signIn(page: Page, role: AccountRole, next?: string) {
   await page.getByLabel('Email').fill(ACCOUNTS[role])
   await page.getByLabel('Password', { exact: true }).fill(process.env.SEED_DEV_PASSWORD ?? '')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  // Sign-in round-trips to Supabase Auth and renders the destination; allow for a cold dev server.
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 45_000 })
 }

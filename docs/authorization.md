@@ -33,6 +33,13 @@ The catalog uses singular, snake_case resources (enforced by a database CHECK). 
 Additions: `user.invite`, `user.suspend`, `user.assign_role`, `task.comment`, `learning.track`, `leave_type.manage`,
 `position.*`, `meeting.*`, `message.*`, `channel.manage`, `certificate.revoke`.
 
+Phase 05 HR names map as `hr.dashboard.read` → `hr_dashboard.read`, `hr.interns.export` → `intern.export`,
+`hr.attendance.export` → `attendance.export`, `hr.leave.manage/export` → `leave.manage`/`leave.export`,
+`hr.documents.verify/sensitive/export` → `document.verify`/`document.sensitive`/`document.export`,
+`hr.requests.*` → `hr_request.*`, `hr.offboarding.*` → `offboarding.*`, `hr.settings.update` →
+`hr_settings.update`, `hr.analytics.export` → `analytics.export`; plus `holiday.manage` and
+`compensation.read/update` (full table in [hr-operations.md](hr-operations.md#permissions)).
+
 ## Default role matrix (least privilege)
 
 | Area | Super Admin | Admin | HR | Manager | Mentor | Intern |
@@ -41,6 +48,9 @@ Additions: `user.invite`, `user.suspend`, `user.assign_role`, `task.comment`, `l
 | Users (invite, suspend, assign role) | ✔ | ✔ | ✔ (below HR) | — | — | — |
 | Interns, profiles, internships, onboarding | org | org | org | assigned (read) | assigned (read) | own profile |
 | Attendance, leave (approve), documents | org | org | org | assigned | — | own |
+| Document verification, sensitive documents, HR exports, HR settings, compensation | ✔ | ✔ | ✔ | — | — | — |
+| HR requests | ✔ | ✔ | handle all | own | own | own |
+| Ending internships / offboarding | ✔ | ✔ | manage | assigned (read) | — | — |
 | Projects & tasks | org | org | org (manage/review) | read org; manage/assign/review in projects they lead | create/assign/review where they mentor | own & member projects (work/submit) |
 | Feedback, check-ins | org | org | org | assigned | assigned | own |
 | Performance reviews | org | org | org (read/sign-off) | assigned (write) | — | own (read) |

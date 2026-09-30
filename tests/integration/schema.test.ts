@@ -30,6 +30,16 @@ const EXPECTED_TABLES = [
   'task_comment_mentions',
   'task_time_entries',
   'project_attachments',
+  // Phase 05: HR operations
+  'attendance_breaks',
+  'leave_balances',
+  'document_types',
+  'holidays',
+  'hr_requests',
+  'hr_request_comments',
+  'hr_request_attachments',
+  'offboarding_checklists',
+  'offboarding_items',
   'internships',
   'internship_documents',
   'onboarding_items',
@@ -258,6 +268,54 @@ describe('referential actions protect history', () => {
     await expectDbRejection(
       prisma.organization.delete({ where: { id: AYAVA_ORGANIZATION_ID } }),
       /violates RESTRICT setting|Foreign key constraint/,
+    )
+  })
+})
+
+describe('Phase 05 HR constraints', () => {
+  it('allows one holiday per date and one open break per attendance record', async () => {
+    const date = new Date('2031-01-01T00:00:00Z')
+    await prisma.holiday.create({ data: { organization_id: AYAVA_ORGANIZATION_ID, date, name: 'Constraint test' } })
+    await expectDbRejection(
+      prisma.holiday.create({ data: { organization_id: AYAVA_ORGANIZATION_ID, date, name: 'Duplicate' } }),
+    )
+    const user = await prisma.user.findFirstOrThrow({ where: { email: 'intern@ayavacreatives.com' } })
+    const record = await prisma.attendance.create({
+      data: {
+        organization_id: AYAVA_ORGANIZATION_ID,
+        user_id: user.id,
+        date: new Date('2031-01-02T00:00:00Z'),
+        check_in_at: new Date(),
+      },
+    })
+    await prisma.attendanceBreak.create({ data: { attendance_id: record.id, started_at: new Date() } })
+    await expectDbRejection(
+      prisma.attendanceBreak.create({ data: { attendance_id: record.id, started_at: new Date() } }),
+    )
+  })
+
+  it('requires a reason for rejected documents and overridden leave', async () => {
+    const doc = await prisma.internshipDocument.findFirstOrThrow({ where: { status: 'VERIFIED' } })
+    await expectDbRejection(
+      prisma.internshipDocument.update({ where: { id: doc.id }, data: { status: 'REJECTED', rejection_reason: null } }),
+    )
+    const leave = await prisma.leaveRequest.findFirstOrThrow()
+    await expectDbRejection(
+      prisma.leaveRequest.update({ where: { id: leave.id }, data: { overlap_override: true, override_reason: null } }),
+    )
+  })
+
+  it('requires targets for department, team and specific-people announcements', async () => {
+    await expectDbRejection(
+      prisma.announcement.create({
+        data: {
+          organization_id: AYAVA_ORGANIZATION_ID,
+          title: `Targeted ${uniqueSuffix()}`,
+          body: 'x',
+          audience: 'SPECIFIC',
+          audience_ids: [],
+        },
+      }),
     )
   })
 })

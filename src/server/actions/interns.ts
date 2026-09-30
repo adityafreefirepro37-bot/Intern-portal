@@ -198,6 +198,8 @@ export async function uploadDocumentAction(_previous: FormState, formData: FormD
     )
     revalidatePath('/interns', 'layout')
     revalidatePath('/onboarding', 'layout')
+    revalidatePath('/documents')
+    revalidatePath('/hr', 'layout')
     return { status: 'success', message: 'Document uploaded.' }
   } catch (error) {
     return formError(error)

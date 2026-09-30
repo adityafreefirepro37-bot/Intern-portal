@@ -14,8 +14,21 @@ const documentSelect = {
   visibility: true,
   uploaded_by: true,
   created_at: true,
+  document_type_id: true,
+  status: true,
+  version: true,
+  is_current: true,
+  previous_version_id: true,
+  expires_at: true,
+  rejection_reason: true,
+  verified_at: true,
+  notes: true,
   uploader: { select: { first_name: true, last_name: true, display_name: true } },
+  verifier: { select: { first_name: true, last_name: true, display_name: true } },
+  type: { select: { id: true, name: true, is_sensitive: true, is_required: true, has_expiry: true } },
 } as const
+
+export { documentSelect }
 
 export const documentRepository = {
   create(data: Prisma.InternshipDocumentUncheckedCreateInput) {
@@ -25,7 +38,7 @@ export const documentRepository = {
   listForIntern(internId: string) {
     return prisma.internshipDocument.findMany({
       where: { intern_id: internId, deleted_at: null },
-      orderBy: { created_at: 'desc' },
+      orderBy: [{ is_current: 'desc' }, { created_at: 'desc' }],
       select: documentSelect,
     })
   },

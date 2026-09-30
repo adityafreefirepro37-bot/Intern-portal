@@ -1,7 +1,7 @@
 import 'server-only'
 import { prisma } from '@/lib/db/client'
 
-/** Courses and announcements (read paths used in Phase 01). */
+/** Courses and announcement search (read paths). */
 export const courseRepository = {
   list(organizationId: string) {
     return prisma.course.findMany({
@@ -32,31 +32,16 @@ export const courseRepository = {
 }
 
 export const announcementRepository = {
-  listActive(organizationId: string, now: Date, take: number) {
-    return prisma.announcement.findMany({
-      where: {
-        organization_id: organizationId,
-        published_at: { not: null, lte: now },
-        OR: [{ expires_at: null }, { expires_at: { gt: now } }],
-      },
-      orderBy: [{ priority: 'desc' }, { published_at: 'desc' }],
-      take,
-      select: {
-        id: true,
-        title: true,
-        body: true,
-        priority: true,
-        published_at: true,
-        publisher: { select: { first_name: true, last_name: true, display_name: true } },
-      },
-    })
-  },
-
   search(organizationId: string, term: string, now: Date, take: number) {
     return prisma.announcement.findMany({
       where: {
         organization_id: organizationId,
         published_at: { not: null, lte: now },
+        status: { in: ['PUBLISHED', 'SCHEDULED'] },
+        // Search only surfaces organization-wide announcements; targeted ones
+        // are reachable through the viewer's own feed.
+        audience: 'EVERYONE',
+        OR: [{ expires_at: null }, { expires_at: { gt: now } }],
         title: { contains: term, mode: 'insensitive' },
       },
       take,

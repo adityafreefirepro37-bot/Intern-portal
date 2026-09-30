@@ -34,6 +34,9 @@ export interface InternAccess {
     uploadDocuments: boolean
     deleteDocuments: boolean
     viewActivity: boolean
+    viewAttendance: boolean
+    viewLeave: boolean
+    viewOffboarding: boolean
   }
 }
 
@@ -104,6 +107,9 @@ export async function resolveInternAccess(ctx: RequestContext, internId: string)
       uploadDocuments: covers('document.upload'),
       deleteDocuments: !isSelf && covers('document.delete'),
       viewActivity: !isSelf && covers('intern.read'),
+      viewAttendance: covers('attendance.read'),
+      viewLeave: covers('leave.read'),
+      viewOffboarding: !isSelf && covers('offboarding.read'),
     },
   }
 }
