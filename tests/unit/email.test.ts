@@ -76,6 +76,51 @@ describe('email configuration', () => {
   })
 })
 
+describe('option settings pasted into hosting dashboards', () => {
+  it('ignores quotes, spaces and capitals', () => {
+    expect(parseEnv({ STORAGE_PROVIDER: ' "Supabase" ', EMAIL_PROVIDER: "'SMTP'" })).toMatchObject({
+      STORAGE_PROVIDER: 'supabase',
+      EMAIL_PROVIDER: 'smtp',
+    })
+  })
+
+  it('treats blank or missing values as the default', () => {
+    const empty = parseEnv({})
+    expect(empty).toMatchObject({ STORAGE_PROVIDER: 'local', LOG_LEVEL: 'info' })
+    expect(empty.EMAIL_PROVIDER).toBeUndefined()
+    expect(parseEnv({ STORAGE_PROVIDER: '', EMAIL_PROVIDER: '', LOG_LEVEL: ' ' })).toMatchObject({
+      STORAGE_PROVIDER: 'local',
+      EMAIL_PROVIDER: undefined,
+      LOG_LEVEL: 'info',
+    })
+  })
+
+  it('reads ports with quotes and explains a port that is not a number', () => {
+    expect(parseEnv({ SMTP_PORT: ' "587" ' }).SMTP_PORT).toBe(587)
+    expect(() => parseEnv({ SMTP_PORT: '465 # TLS' })).toThrow(
+      'SMTP_PORT: must be a port number such as 465 or 587 (got "465 # TLS")',
+    )
+  })
+
+  it('cleans web addresses and rejects anything that is not one', () => {
+    expect(parseEnv({ SUPABASE_URL: ' "https://abcd.supabase.co/" ' }).SUPABASE_URL).toBe('https://abcd.supabase.co')
+    expect(parseEnv({}).NEXT_PUBLIC_APP_URL).toBe('http://localhost:3000')
+    expect(parseEnv({ SUPABASE_URL: '' }).SUPABASE_URL).toBeUndefined()
+    for (const bad of ['abcd.supabase.co', 'https://abcd.supabase.co # project', 'postgresql://db.example.com']) {
+      expect(() => parseEnv({ SUPABASE_URL: bad })).toThrow(/SUPABASE_URL: must be your Supabase project URL/)
+    }
+    expect(() => parseEnv({ NEXT_PUBLIC_APP_URL: 'not a url' })).toThrow(
+      /NEXT_PUBLIC_APP_URL: must be your site address/,
+    )
+  })
+
+  it('explains an invalid value with the allowed options', () => {
+    expect(() => parseEnv({ STORAGE_PROVIDER: 's3' })).toThrow(
+      'STORAGE_PROVIDER: must be one of local, supabase (got "s3")',
+    )
+  })
+})
+
 describe('SMTP delivery', () => {
   it('sends through the configured server with TLS on 465', async () => {
     sendMail.mockResolvedValue({ messageId: '1' })
