@@ -132,7 +132,7 @@ export function CommandMenu({
       <DialogContent hideClose className="top-[12vh] max-w-xl translate-y-0 gap-0 p-0 sm:top-[18vh]">
         <DialogTitle className="sr-only">Search</DialogTitle>
         <DialogDescription className="sr-only">
-          Search interns, tasks, projects, courses and announcements, or jump to a page.
+          Search interns, tasks, projects, courses, learning paths, goals, reviews, feedback and announcements, or jump to a page.
         </DialogDescription>
         <div className="flex items-center gap-2 border-b px-4">
           <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />

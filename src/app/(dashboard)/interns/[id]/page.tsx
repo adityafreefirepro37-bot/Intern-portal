@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { BookOpen, Gauge } from 'lucide-react'
 import { StatusBadge } from '@/components/common/badges'
 import { AccessDenied } from '@/components/common/states'
 import { UserAvatar } from '@/components/common/user-avatar'
@@ -20,7 +19,6 @@ import { ProfileActions } from '@/features/interns/components/profile-actions'
 import {
   ActivityTimeline,
   Detail,
-  ModuleComingSoon,
   ProfileTabs,
   ProjectsList,
   TasksList,
@@ -41,6 +39,7 @@ import { leaveService } from '@/server/services/leave.service'
 import { offboardingService } from '@/server/services/offboarding.service'
 import { internService } from '@/server/services/intern.service'
 import { onboardingService } from '@/server/services/onboarding.service'
+import { LearningTab, PerformanceTab } from '@/features/interns/components/learning-performance-tabs'
 
 export const metadata: Metadata = { title: 'Intern' }
 
@@ -74,8 +73,8 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
     ...(hasProjects ? [{ key: 'projects', label: 'Projects' }] : []),
     ...(can.viewAttendance ? [{ key: 'attendance', label: 'Attendance' }] : []),
     ...(can.viewLeave ? [{ key: 'leave', label: 'Leave' }] : []),
-    { key: 'learning', label: 'Learning' },
-    { key: 'performance', label: 'Performance' },
+    ...(ctx.actor.permissions.has('learning.read') ? [{ key: 'learning', label: 'Learning' }] : []),
+    ...(ctx.actor.permissions.has('performance.read') ? [{ key: 'performance', label: 'Performance' }] : []),
     ...(can.viewDocuments ? [{ key: 'documents', label: 'Documents' }] : []),
     ...(can.seeSensitive ? [{ key: 'hr', label: 'HR record' }] : []),
     ...(can.viewActivity ? [{ key: 'activity', label: 'Activity' }] : []),
@@ -302,22 +301,8 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
         />
       )}
       {tab === 'leave' && <LeaveTab ctx={ctx} userId={profile.userId} />}
-      {tab === 'learning' && (
-        <ModuleComingSoon
-          icon={BookOpen}
-          title="Learning progress"
-          phase="07"
-          description="Course enrolments, progress and completions."
-        />
-      )}
-      {tab === 'performance' && (
-        <ModuleComingSoon
-          icon={Gauge}
-          title="Performance"
-          phase="06"
-          description="Reviews, feedback and check-ins from manager and mentor."
-        />
-      )}
+      {tab === 'learning' && <LearningTab ctx={ctx} userId={profile.userId} />}
+      {tab === 'performance' && <PerformanceTab ctx={ctx} internId={profile.id} isSelf={relation.isSelf} />}
 
       {tab === 'documents' && <DocumentsTab ctx={ctx} internId={profile.id} />}
       {tab === 'hr' && <HrRecordTab ctx={ctx} internId={profile.id} showOffboarding={can.viewOffboarding} />}

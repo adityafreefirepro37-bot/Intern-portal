@@ -4,6 +4,7 @@ import { PROJECT_STATUS_LABELS } from '@/lib/work/projects'
 import { NOTIFICATION_TYPES, notificationService } from '../services/notification.service'
 import { domainEvents } from './domain-events'
 import { registerHrSubscribers } from './hr-subscribers'
+import { registerLearningPerformanceSubscribers } from './learning-performance-subscribers'
 
 /**
  * Built-in domain-event subscribers: turn work events into in-app
@@ -25,6 +26,7 @@ async function taskInfo(taskId: string) {
 
 export function registerSubscribers() {
   registerHrSubscribers()
+  registerLearningPerformanceSubscribers()
 
   domainEvents.on('task.assigned', async ({ organizationId, actorUserId, payload }) => {
     const task = await taskInfo(payload.taskId)

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { filterNavigation, isActivePath, type VisibleNavItem } from '@/config/navigation'
+import { activeHref, filterNavigation, type VisibleNavItem } from '@/config/navigation'
 import { cn } from '@/lib/utils'
 
 /** Sectioned navigation used by the desktop sidebar and the mobile drawer. */
@@ -17,6 +17,7 @@ export function NavList({
 }) {
   const pathname = usePathname()
   const sections = filterNavigation(nav)
+  const current = activeHref(pathname, nav.map((item) => item.href))
 
   return (
     <nav aria-label="Main" className="flex flex-col gap-5">
@@ -32,7 +33,7 @@ export function NavList({
           </p>
           <ul className="flex flex-col gap-0.5">
             {section.items.map((item) => {
-              const active = isActivePath(pathname, item.href)
+              const active = item.href === current
               const Icon = item.icon
               return (
                 <li key={item.href}>

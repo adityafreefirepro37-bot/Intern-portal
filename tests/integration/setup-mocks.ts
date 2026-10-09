@@ -29,5 +29,8 @@ jest.mock('next/cache', () => ({
   revalidateTag: () => undefined,
 }))
 
+// testTimeout in a Jest *project* config is ignored, so set it here (real database round trips).
+jest.setTimeout(30_000)
+
 // Keep the global reachable for helpers without importing this file twice.
 ;(globalThis as unknown as { __setTestRequest: typeof setTestRequest }).__setTestRequest = setTestRequest

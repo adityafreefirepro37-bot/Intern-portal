@@ -84,6 +84,9 @@ async function main() {
   console.log(
     `✔ HR demo data: ${demo.hr.attendance} attendance days, ${demo.hr.leave} leave requests, ${demo.hr.documents} documents, ${demo.hr.requests} HR requests`,
   )
+  console.log(
+    `✔ Learning & performance: ${demo.growth.courses} courses, ${demo.growth.paths} paths, ${demo.growth.enrollments} enrollments (${demo.growth.completions} completed), ${demo.growth.goals} goals, ${demo.growth.reviews} reviews`,
+  )
   console.log('  Development accounts (profiles only unless linked to Supabase Auth):')
   for (const account of DEV_ACCOUNTS) console.log(`   - ${account.email} (${account.role})`)
 

@@ -288,3 +288,35 @@ export function validateReviewAnswer(
   if (final && question.requires_evidence && !empty && !value.evidence?.trim()) return 'Add the evidence for this answer'
   return null
 }
+
+// ── Cycles and development plans ─────────────────────────────────────────────
+
+export const CYCLE_TYPE_LABELS = { MIDPOINT: 'Mid-point review', FINAL: 'Final review', CUSTOM: 'Custom' } as const
+
+export const CYCLE_STATUS_LABELS = {
+  DRAFT: 'Draft',
+  OPEN: 'Open',
+  IN_REVIEW: 'In review',
+  COMPLETED: 'Completed',
+  ARCHIVED: 'Archived',
+} as const
+
+export const DEVELOPMENT_PLAN_STATUS_LABELS = { ACTIVE: 'Active', COMPLETED: 'Completed', CANCELLED: 'Cancelled' } as const
+
+export const DEVELOPMENT_ITEM_STATUS_LABELS = {
+  NOT_STARTED: 'Not started',
+  IN_PROGRESS: 'In progress',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+} as const
+
+export const EVIDENCE_TYPE_LABELS = {
+  TASK: 'Task',
+  PROJECT: 'Project',
+  SUBMISSION: 'Submission',
+  COURSE: 'Course',
+  FEEDBACK: 'Feedback',
+  DOCUMENT: 'Document',
+  LINK: 'Link',
+  NOTE: 'Note',
+} as const

@@ -186,9 +186,24 @@ export async function seedHr(prisma: PrismaClient, input: HrSeedInput) {
   ]
   // Only seed-owned rows (deterministic ids) are replaced; leave people create is kept.
   await prisma.leaveRequest.deleteMany({ where: { id: { in: leaveSeeds.map((l) => seedId(`leave:${l.key}`)) } } })
+  // Leave falls on working days (a weekend or holiday "leave" would have 0 days):
+  // future dates move forward to the next working day, past dates move back.
+  const shiftToWorking = (offset: number) => {
+    const step = offset >= 0 ? 1 : -1
+    while (!isWorking(dateFrom(today, offset))) offset += step
+    return offset
+  }
+  const leaveRanges: { who: Key; status: LeaveStatus; start: Date; end: Date }[] = []
   for (const l of leaveSeeds) {
-    const start = dateFrom(today, l.from)
-    const end = dateFrom(today, l.to)
+    const startOffset = shiftToWorking(l.from)
+    let endOffset = startOffset
+    for (let span = l.to - l.from; span > 0; span--) {
+      endOffset++
+      while (!isWorking(dateFrom(today, endOffset))) endOffset++
+    }
+    const start = dateFrom(today, startOffset)
+    const end = dateFrom(today, endOffset)
+    leaveRanges.push({ who: l.who, status: l.status, start, end })
     const decided = l.status !== 'PENDING'
     await prisma.leaveRequest.create({
       data: {
@@ -235,10 +250,7 @@ export async function seedHr(prisma: PrismaClient, input: HrSeedInput) {
     },
   })
   const onLeave = (who: Key, date: Date) =>
-    leaveSeeds.some(
-      (l) =>
-        l.who === who && l.status === 'APPROVED' && date >= dateFrom(today, l.from) && date <= dateFrom(today, l.to),
-    )
+    leaveRanges.some((l) => l.who === who && l.status === 'APPROVED' && date >= l.start && date <= l.end)
 
   // ── Attendance history (past working days) + a few check-ins today ───────
   const tracked: { who: Key; joinedDaysAgo: number }[] = [

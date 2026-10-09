@@ -1,6 +1,7 @@
 import type { InternStatus, PrismaClient } from '@prisma/client'
 import type { SystemRoleSlug } from '../../src/lib/permissions/catalog'
 import { dateFrom, daysFrom, seedId } from './ids'
+import { seedLearningPerformance } from './learning-performance'
 import type { ReferenceData } from './reference'
 import { seedHr } from './hr'
 import { seedWork } from './work'
@@ -558,10 +559,10 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     const moduleId = seedId(`module:${course.key}:0`)
     const moduleData = { course_id: record.id, title: 'Module 1', position: 0 }
     const existingModule = await prisma.courseModule.findFirst({ where: { course_id: record.id }, orderBy: { position: 'asc' } })
-    const module = existingModule ?? (await prisma.courseModule.create({ data: { id: moduleId, ...moduleData } }))
+    const courseModule = existingModule ?? (await prisma.courseModule.create({ data: { id: moduleId, ...moduleData } }))
     for (const [index, [title, minutes]] of course.lessons.entries()) {
       const id = seedId(`lesson:${course.key}:${index}`)
-      const data = { course_id: record.id, module_id: module.id, title, sort_order: index, estimated_minutes: minutes }
+      const data = { course_id: record.id, module_id: courseModule.id, title, sort_order: index, estimated_minutes: minutes }
       await prisma.lesson.upsert({ where: { id }, update: data, create: { id, ...data } })
     }
   }
@@ -643,5 +644,15 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     now,
   })
 
-  return { userIds, accounts: DEV_ACCOUNTS, hr }
+  // ── Learning and performance (prisma/seed/learning-performance.ts) ────────
+  const growth = await seedLearningPerformance(prisma, {
+    organizationId: orgId,
+    userIds,
+    internIds,
+    departmentIds: ref.departmentIds,
+    positionIds: ref.positionIds,
+    now,
+  })
+
+  return { userIds, accounts: DEV_ACCOUNTS, hr, growth }
 }

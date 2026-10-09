@@ -41,6 +41,31 @@ export const NOTIFICATION_TYPES = {
   HR_REQUEST_UPDATED: 'HR_REQUEST_UPDATED',
   HR_REQUEST_COMMENTED: 'HR_REQUEST_COMMENTED',
   ANNOUNCEMENT_PUBLISHED: 'ANNOUNCEMENT_PUBLISHED',
+  COURSE_ASSIGNED: 'COURSE_ASSIGNED',
+  LEARNING_PATH_ASSIGNED: 'LEARNING_PATH_ASSIGNED',
+  LEARNING_DEADLINE_APPROACHING: 'LEARNING_DEADLINE_APPROACHING',
+  LEARNING_OVERDUE: 'LEARNING_OVERDUE',
+  COURSE_COMPLETED: 'COURSE_COMPLETED',
+  QUIZ_PASSED: 'QUIZ_PASSED',
+  QUIZ_FAILED: 'QUIZ_FAILED',
+  ASSIGNMENT_SUBMITTED: 'ASSIGNMENT_SUBMITTED',
+  ASSIGNMENT_REVIEWED: 'ASSIGNMENT_REVIEWED',
+  ASSIGNMENT_CHANGES_REQUESTED: 'ASSIGNMENT_CHANGES_REQUESTED',
+  CHECKIN_OPEN: 'CHECKIN_OPEN',
+  CHECKIN_DUE: 'CHECKIN_DUE',
+  CHECKIN_REVIEWED: 'CHECKIN_REVIEWED',
+  FEEDBACK_RECEIVED: 'FEEDBACK_RECEIVED',
+  FEEDBACK_REQUESTED: 'FEEDBACK_REQUESTED',
+  GOAL_ASSIGNED: 'GOAL_ASSIGNED',
+  GOAL_DEADLINE_APPROACHING: 'GOAL_DEADLINE_APPROACHING',
+  REVIEW_OPENED: 'REVIEW_OPENED',
+  SELF_REVIEW_DUE: 'SELF_REVIEW_DUE',
+  MANAGER_REVIEW_DUE: 'MANAGER_REVIEW_DUE',
+  MENTOR_REVIEW_DUE: 'MENTOR_REVIEW_DUE',
+  HR_REVIEW_DUE: 'HR_REVIEW_DUE',
+  REVIEW_COMPLETED: 'REVIEW_COMPLETED',
+  REVIEW_OVERDUE: 'REVIEW_OVERDUE',
+  DEVELOPMENT_PLAN_CREATED: 'DEVELOPMENT_PLAN_CREATED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -49,7 +74,7 @@ export interface NotificationInput {
   title: string
   body?: string
   entityType: NotificationEntity
-  entityId: string
+  entityId: string | null
 }
 
 export type NotificationEntity =
@@ -61,6 +86,16 @@ export type NotificationEntity =
   | 'intern_onboarding'
   | 'hr_request'
   | 'announcement'
+  | 'course'
+  | 'learning_plan'
+  | 'learning_submission'
+  | 'quiz_attempt'
+  | 'goal'
+  | 'checkin'
+  | 'feedback'
+  | 'feedback_request'
+  | 'review'
+  | 'development_plan'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
@@ -74,6 +109,16 @@ export function notificationHref(entityType: string | null, entityId: string | n
   if (entityType === 'leave') return `/leave?highlight=${entityId}`
   if (entityType === 'attendance_correction') return `/attendance?highlight=${entityId}`
   if (entityType === 'document') return `/documents?highlight=${entityId}`
+  if (entityType === 'course') return `/learning/courses/${entityId}`
+  if (entityType === 'learning_plan') return `/learning?view=paths&highlight=${entityId}`
+  if (entityType === 'learning_submission') return `/learning/reviews/${entityId}`
+  if (entityType === 'quiz_attempt') return `/learning/quizzes/attempts/${entityId}`
+  if (entityType === 'goal') return `/performance/goals/${entityId}`
+  if (entityType === 'checkin') return `/performance/checkins/${entityId}`
+  if (entityType === 'feedback') return `/performance/feedback?highlight=${entityId}`
+  if (entityType === 'feedback_request') return `/performance/feedback?view=requests&highlight=${entityId}`
+  if (entityType === 'review') return `/performance/reviews/${entityId}`
+  if (entityType === 'development_plan') return `/performance/development/${entityId}`
   return null
 }
 

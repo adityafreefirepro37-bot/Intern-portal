@@ -3,8 +3,10 @@ import {
   Award,
   BarChart3,
   BookOpen,
+  CalendarCheck,
   CalendarDays,
   CheckSquare,
+  ClipboardCheck,
   Briefcase,
   CalendarClock,
   ClipboardList,
@@ -18,14 +20,18 @@ import {
   Inbox,
   Gauge,
   KeyRound,
+  Library,
   LifeBuoy,
+  LineChart,
   LayoutDashboard,
   Megaphone,
+  MessageSquareHeart,
   MessagesSquare,
   Palmtree,
   ScrollText,
   Settings,
   Sparkles,
+  Target,
   UserCog,
   UserRound,
   UsersRound,
@@ -128,7 +134,29 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Learning',
-    items: [{ label: 'Learning Hub', href: '/learning', icon: BookOpen, permission: 'course.read', mobile: true }],
+    items: [
+      { label: 'Learning Hub', href: '/learning', icon: BookOpen, permission: 'course.read', mobile: true },
+      { label: 'Learning Reviews', href: '/learning/reviews', icon: ClipboardCheck, permission: 'learning_assignment.review' },
+      { label: 'Manage Learning', href: '/learning/manage', icon: Library, permission: 'course.update' },
+      {
+        label: 'Learning Analytics',
+        scopedLabel: 'Team Learning',
+        href: '/learning/analytics',
+        icon: LineChart,
+        permission: 'learning.read',
+        minScope: 'ASSIGNED',
+      },
+    ],
+  },
+  {
+    title: 'Performance',
+    items: [
+      { label: 'Performance', href: '/performance', icon: Gauge, permission: 'performance.read' },
+      { label: 'Goals', href: '/performance/goals', icon: Target, permission: 'goal.read' },
+      { label: 'Check-ins', href: '/performance/checkins', icon: CalendarCheck, permission: 'checkin.read' },
+      { label: 'Feedback', href: '/performance/feedback', icon: MessageSquareHeart, permission: 'feedback.read' },
+      { label: 'Reviews', href: '/performance/reviews', icon: ClipboardList, permission: 'performance.read' },
+    ],
   },
   {
     title: 'HR',
@@ -165,7 +193,6 @@ export const NAVIGATION: NavSection[] = [
       },
       { label: 'Ending Internships', href: '/hr/offboarding', icon: CalendarClock, permission: 'offboarding.read' },
       { label: 'My Requests', href: '/requests', icon: LifeBuoy, permission: 'hr_request.create' },
-      { label: 'Performance', href: '/performance', icon: Gauge, permission: 'performance.read', phase: '06' },
       { label: 'Certificates', href: '/certificates', icon: Award, permission: 'certificate.read', phase: '08' },
     ],
   },
@@ -245,4 +272,9 @@ export function filterNavigation(visible: readonly VisibleNavItem[]): { title: s
 
 export function isActivePath(pathname: string, href: string): boolean {
   return href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/** The most specific visible href matching the path (so /learning/reviews doesn't also light up /learning). */
+export function activeHref(pathname: string, hrefs: readonly string[]): string | null {
+  return hrefs.filter((href) => isActivePath(pathname, href)).sort((a, b) => b.length - a.length)[0] ?? null
 }

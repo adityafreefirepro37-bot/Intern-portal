@@ -72,6 +72,31 @@ export interface DomainEventMap {
   'hr_request.updated': { requestId: string; from: string; to: string }
   'hr_request.commented': { requestId: string; commentId: string; byRequester: boolean }
   'announcement.published': { announcementId: string }
+  'learning.course_assigned': { enrollmentId: string; courseId: string; userId: string; required: boolean }
+  'learning.path_assigned': { planId: string; userId: string; pathName: string }
+  'learning.lesson_completed': { courseId: string; lessonId: string; userId: string }
+  'learning.course_completed': { enrollmentId: string; courseId: string; userId: string }
+  'learning.quiz_submitted': { attemptId: string; quizId: string; userId: string; passed: boolean }
+  'learning.assignment_submitted': { submissionId: string; assignmentId: string; userId: string; version: number }
+  'learning.assignment_reviewed': {
+    submissionId: string
+    assignmentId: string
+    userId: string
+    decision: 'APPROVED' | 'CHANGES_REQUESTED'
+  }
+  'learning.deadline': { enrollmentId: string; courseId: string; userId: string; kind: 'DUE_SOON' | 'OVERDUE' }
+  'performance.goal_created': { goalId: string; internId: string; ownerId: string }
+  'performance.goal_deadline': { goalId: string; ownerId: string }
+  'performance.checkin_reviewed': { checkinId: string; internUserId: string }
+  'performance.checkin_reminder': { internUserId: string; kind: 'OPEN' | 'DUE'; weekStart: string }
+  'performance.feedback_given': { feedbackId: string; recipientId: string; visibleToRecipient: boolean }
+  'performance.feedback_requested': { requestId: string; recipientId: string }
+  'performance.review_notice': {
+    reviewId: string
+    kind: 'OPENED' | 'SELF_DUE' | 'MANAGER_DUE' | 'MENTOR_DUE' | 'HR_DUE' | 'COMPLETED' | 'OVERDUE'
+    recipientIds: string[]
+  }
+  'performance.development_plan_created': { planId: string; internUserId: string }
 }
 
 export type DomainEventName = keyof DomainEventMap

@@ -15,15 +15,17 @@ import { formatDate, greeting } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
 import { dashboardService, UPCOMING_WINDOW_DAYS } from '@/server/services/dashboard.service'
 import { internService } from '@/server/services/intern.service'
+import { performanceDashboardService } from '@/server/services/performance-dashboard.service'
 
 export const metadata: Metadata = { title: 'Overview' }
 
 export default async function OverviewPage() {
   const ctx = await requirePageContext()
   const now = new Date()
-  const [overview, people] = await Promise.all([
+  const [overview, people, growth] = await Promise.all([
     dashboardService.getOverview(ctx, now),
     internService.dashboardSummary(ctx),
+    performanceDashboardService.attention(ctx),
   ])
   const { stats } = overview
   const firstName = ctx.actor.displayName.split(' ')[0]
@@ -146,6 +148,26 @@ export default async function OverviewPage() {
         </div>
 
         <div className="space-y-6">
+          {growth && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Learning &amp; performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="divide-y text-small">
+                  {growth.map((item) => (
+                    <li key={item.label}>
+                      <Link href={item.href} className="flex items-center justify-between gap-3 py-2 hover:underline">
+                        <span className="min-w-0 truncate">{item.label}</span>
+                        <span className={item.attention ? 'tabular font-semibold text-warning' : 'tabular font-medium'}>{item.value}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>Quick actions</CardTitle>

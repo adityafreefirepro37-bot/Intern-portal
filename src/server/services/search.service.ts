@@ -7,6 +7,10 @@ import { projectRepository } from '../repositories/project.repository'
 import { taskRepository } from '../repositories/task.repository'
 import { internScope, projectScope, taskScope } from '../repositories/scope'
 import { authorizationService } from './authorization.service'
+import { feedbackService } from './feedback.service'
+import { goalService } from './goal.service'
+import { learningService } from './learning.service'
+import { performanceReviewService } from './performance-review.service'
 
 /**
  * Global search.
@@ -17,7 +21,18 @@ import { authorizationService } from './authorization.service'
  * do simple case-insensitive matching; ranking, full-text search and document
  * content search can replace a provider without touching callers or the UI.
  */
-export type SearchEntityType = 'intern' | 'task' | 'project' | 'milestone' | 'course' | 'announcement' | 'document'
+export type SearchEntityType =
+  | 'intern'
+  | 'task'
+  | 'project'
+  | 'milestone'
+  | 'course'
+  | 'learning_path'
+  | 'goal'
+  | 'review'
+  | 'feedback'
+  | 'announcement'
+  | 'document'
 
 export interface SearchResult {
   id: string
@@ -115,7 +130,67 @@ const providers: SearchProvider[] = [
         id: row.id,
         type: 'course',
         title: row.title,
-        href: `/learning?highlight=${row.id}`,
+        href: `/learning/courses/${row.id}`,
+      }))
+    },
+  },
+  {
+    type: 'learning_path',
+    label: 'Learning paths',
+    permission: 'learning_path.read',
+    async search(ctx, term, limit) {
+      const rows = await learningService.searchPaths(ctx, term, limit)
+      return rows.map((row) => ({
+        id: row.id,
+        type: 'learning_path',
+        title: row.name,
+        subtitle: row.status === 'PUBLISHED' ? undefined : humanizeEnum(row.status),
+        href: `/learning/paths/${row.id}`,
+      }))
+    },
+  },
+  {
+    type: 'goal',
+    label: 'Goals',
+    permission: 'goal.read',
+    async search(ctx, term, limit) {
+      const rows = await goalService.search(ctx, term, limit)
+      return rows.map((row) => ({
+        id: row.id,
+        type: 'goal',
+        title: row.title,
+        subtitle: [fullName(row.intern.user), humanizeEnum(row.status)].join(' · '),
+        href: `/performance/goals/${row.id}`,
+      }))
+    },
+  },
+  {
+    type: 'review',
+    label: 'Performance reviews',
+    permission: 'performance.read',
+    async search(ctx, term, limit) {
+      const rows = await performanceReviewService.search(ctx, term, limit)
+      return rows.map((row) => ({
+        id: row.id,
+        type: 'review',
+        title: `${fullName(row.intern.user)} — ${row.cycle?.name ?? 'Review'}`,
+        subtitle: humanizeEnum(row.status),
+        href: `/performance/reviews/${row.id}`,
+      }))
+    },
+  },
+  {
+    type: 'feedback',
+    label: 'Feedback',
+    permission: 'feedback.read',
+    async search(ctx, term, limit) {
+      const rows = await feedbackService.search(ctx, term, limit)
+      return rows.map((row) => ({
+        id: row.id,
+        type: 'feedback',
+        title: row.body.length > 80 ? `${row.body.slice(0, 80)}…` : row.body,
+        subtitle: `${fullName(row.from_user)} → ${fullName(row.to_user)}`,
+        href: `/performance/feedback?view=${row.to_user_id === ctx.actor.userId ? 'received' : row.from_user_id === ctx.actor.userId ? 'given' : 'interns'}&highlight=${row.id}`,
       }))
     },
   },

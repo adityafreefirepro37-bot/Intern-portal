@@ -3,8 +3,12 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { config } from '@/lib/config'
 import { jsonError, jsonSuccess } from '@/lib/http/response'
 import { announcementJobs } from '@/server/services/announcement.service'
+import { checkinJobs } from '@/server/services/checkin.service'
 import { documentJobs } from '@/server/services/document.service'
+import { goalJobs } from '@/server/services/goal.service'
 import { internLifecycleService } from '@/server/services/intern-lifecycle.service'
+import { learningJobs } from '@/server/services/learning-analytics.service'
+import { reviewJobs } from '@/server/services/performance-review.service'
 import { workJobsService } from '@/server/services/work-jobs.service'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +30,8 @@ function authorized(request: NextRequest): boolean {
  *   3. task due-soon / overdue and milestone due-soon events (notifications)
  *   4. documents past their expiry → EXPIRED, expiring-soon reminders
  *   5. scheduled announcements that are due → published (+ notifications)
+ *   6. learning deadlines (due in 3 days / overdue), goal target-date reminders
+ *   7. weekly check-in reminders (Monday: open, Friday: due) and overdue reviews
  * Every step is idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
@@ -36,6 +42,10 @@ export async function POST(request: NextRequest) {
     const deadlines = await workJobsService.emitTaskDeadlines()
     const documents = await documentJobs.run()
     const announcements = await announcementJobs.publishDue()
+    const learning = await learningJobs.emitDeadlines()
+    const goals = await goalJobs.emitDeadlines()
+    const checkins = await checkinJobs.emitReminders()
+    const reviews = await reviewJobs.emitOverdue()
     return jsonSuccess({
       endingSoon: endingSoon.marked,
       overdueEvents: overdue.emitted,
@@ -43,6 +53,10 @@ export async function POST(request: NextRequest) {
       documentsExpired: documents.expired,
       documentReminders: documents.warned,
       announcementsPublished: announcements.published,
+      ...learning,
+      ...goals,
+      ...checkins,
+      ...reviews,
     })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })

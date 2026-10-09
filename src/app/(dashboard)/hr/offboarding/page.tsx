@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { CalendarClock } from 'lucide-react'
-import { PhaseBadge, StatusBadge } from '@/components/common/badges'
+import { StatusBadge } from '@/components/common/badges'
 import { PageHeader } from '@/components/common/page-header'
 import { AccessDenied, EmptyState } from '@/components/common/states'
 import { UserAvatar } from '@/components/common/user-avatar'
@@ -13,6 +13,7 @@ import { hrNavItems } from '@/features/hr/nav'
 import { ENDING_WINDOWS } from '@/lib/hr/operations'
 import { formatDay, humanizeEnum, pluralize } from '@/lib/utils'
 import { firstParam } from '@/lib/validation/list-params'
+import { REVIEW_STATUS_LABELS } from '@/lib/performance/rules'
 import { requirePageContext } from '@/server/context'
 import { authorizationService } from '@/server/services/authorization.service'
 import { offboardingService } from '@/server/services/offboarding.service'
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: 'Ending internships · HR' }
 /**
  * Internships ending within 7 / 14 / 30 days (or past their end date and
  * still active), with open work, documents and certificate status, and each
- * intern's offboarding checklist. Performance reviews arrive in Phase 06.
+ * intern's offboarding checklist, with the status of their latest performance review.
  */
 export default async function OffboardingPage({ searchParams }: PageProps<'/hr/offboarding'>) {
   const ctx = await requirePageContext()
@@ -96,7 +97,13 @@ export default async function OffboardingPage({ searchParams }: PageProps<'/hr/o
                     <div>
                       <dt className="text-caption text-muted-foreground">Review</dt>
                       <dd>
-                        <PhaseBadge phase="06" />
+                        {row.review ? (
+                          <Link href={`/performance/reviews/${row.review.id}`}>
+                            <StatusBadge status={row.review.status} label={REVIEW_STATUS_LABELS[row.review.status]} />
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">None yet</span>
+                        )}
                       </dd>
                     </div>
                     <div>
