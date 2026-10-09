@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:pooled": "node scripts/dev-pooled.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
