@@ -149,3 +149,91 @@ export async function resolveRecord(
     }
   }
 }
+
+export interface RecordRef {
+  intern: Pick<InternPlacement, 'id' | 'user_id'>
+  type: RecordType
+  id: string
+}
+
+/**
+ * resolveRecord() for a list of references (null entries resolve to null),
+ * with the same organization and intern checks. Common types load with one
+ * query per type instead of one per reference, so a page of 100 feedback rows
+ * costs a handful of queries rather than 100.
+ */
+export async function resolveRecords(
+  organizationId: string,
+  refs: (RecordRef | null)[],
+): Promise<({ title: string; href: string } | null)[]> {
+  const present = refs.filter((ref): ref is RecordRef => ref !== null)
+  const ids = (type: RecordType) => [...new Set(present.filter((ref) => ref.type === type).map((ref) => ref.id))]
+  const userIds = [...new Set(present.map((ref) => ref.intern.user_id))]
+  const [taskIds, projectIds, courseIds, goalIds, checkinIds] = [ids('TASK'), ids('PROJECT'), ids('COURSE'), ids('GOAL'), ids('CHECKIN')]
+
+  const [tasks, projects, enrollments, goals, checkins] = await Promise.all([
+    taskIds.length
+      ? prisma.task.findMany({
+          where: { id: { in: taskIds }, organization_id: organizationId, deleted_at: null },
+          select: { id: true, title: true, assignees: { where: { user_id: { in: userIds } }, select: { user_id: true } } },
+        })
+      : Promise.resolve([]),
+    projectIds.length
+      ? prisma.project.findMany({
+          where: { id: { in: projectIds }, organization_id: organizationId, deleted_at: null },
+          select: { id: true, name: true, members: { where: { user_id: { in: userIds } }, select: { user_id: true } } },
+        })
+      : Promise.resolve([]),
+    courseIds.length
+      ? prisma.courseEnrollment.findMany({
+          where: { course_id: { in: courseIds }, user_id: { in: userIds }, organization_id: organizationId },
+          select: { course_id: true, user_id: true, course: { select: { title: true } } },
+        })
+      : Promise.resolve([]),
+    goalIds.length
+      ? prisma.performanceGoal.findMany({
+          where: { id: { in: goalIds }, organization_id: organizationId },
+          select: { id: true, intern_id: true, title: true },
+        })
+      : Promise.resolve([]),
+    checkinIds.length
+      ? prisma.weeklyCheckin.findMany({
+          where: { id: { in: checkinIds }, organization_id: organizationId },
+          select: { id: true, intern_id: true, week_start: true },
+        })
+      : Promise.resolve([]),
+  ])
+
+  return Promise.all(
+    refs.map(async (ref) => {
+      if (!ref) return null
+      const { id, intern } = ref
+      switch (ref.type) {
+        case 'TASK': {
+          const row = tasks.find((t) => t.id === id && t.assignees.some((a) => a.user_id === intern.user_id))
+          return row ? { title: row.title, href: `/tasks/${id}` } : null
+        }
+        case 'PROJECT': {
+          const row = projects.find((p) => p.id === id && p.members.some((m) => m.user_id === intern.user_id))
+          return row ? { title: row.name, href: `/projects/${id}` } : null
+        }
+        case 'COURSE': {
+          const row = enrollments.find((e) => e.course_id === id && e.user_id === intern.user_id)
+          return row ? { title: row.course.title, href: `/learning/courses/${id}` } : null
+        }
+        case 'GOAL': {
+          const row = goals.find((g) => g.id === id && g.intern_id === intern.id)
+          return row ? { title: row.title, href: `/performance/goals/${id}` } : null
+        }
+        case 'CHECKIN': {
+          const row = checkins.find((c) => c.id === id && c.intern_id === intern.id)
+          return row
+            ? { title: `Check-in, week of ${row.week_start.toISOString().slice(0, 10)}`, href: `/performance/checkins/${id}` }
+            : null
+        }
+        default:
+          return resolveRecord(organizationId, intern, ref.type, id)
+      }
+    }),
+  )
+}

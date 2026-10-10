@@ -18,6 +18,7 @@ import {
   relation,
   requireInternFor,
   resolveRecord,
+  resolveRecords,
   scopedInternWhere,
   type RecordType,
 } from './performance-access'
@@ -191,15 +192,15 @@ export const goalService = {
 
   async get(ctx: RequestContext, goalId: string) {
     const goal = await loadGoal(ctx, goalId)
-    const evidence = await Promise.all(
-      goal.evidence.map(async (e) => ({
-        ...e,
-        record:
-          e.reference_id && !['LINK', 'NOTE'].includes(e.evidence_type)
-            ? await resolveRecord(ctx.organization.id, goal.intern, e.evidence_type as RecordType, e.reference_id)
-            : null,
-      })),
+    const records = await resolveRecords(
+      ctx.organization.id,
+      goal.evidence.map((e) =>
+        e.reference_id && !['LINK', 'NOTE'].includes(e.evidence_type)
+          ? { intern: goal.intern, type: e.evidence_type as RecordType, id: e.reference_id }
+          : null,
+      ),
     )
+    const evidence = goal.evidence.map((e, index) => ({ ...e, record: records[index] }))
     const today = todayIn(ctx.organization.timezone)
     return {
       goal: { ...goal, evidence },

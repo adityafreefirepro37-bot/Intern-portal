@@ -194,7 +194,7 @@ export const learningService = {
     authorizationService.require(ctx, 'course.read')
     const today = todayIn(ctx.organization.timezone)
     const userId = ctx.actor.userId
-    const [enrollments, plans, lessonsDone, quizStats, assignmentStats, intern] = await Promise.all([
+    const [enrollments, plans, lessonsDone, quizStats, assignmentStats, intern, minutes] = await Promise.all([
       prisma.courseEnrollment.findMany({
         where: { user_id: userId, status: { not: 'CANCELLED' }, course: { deleted_at: null } },
         orderBy: [{ updated_at: 'desc' }],
@@ -234,13 +234,13 @@ export const learningService = {
         where: { user_id: userId, deleted_at: null },
         select: { department_id: true, position_id: true },
       }),
+      prisma.lesson.aggregate({
+        where: { learning_progress: { some: { user_id: userId, status: 'COMPLETED' } } },
+        _sum: { estimated_minutes: true },
+      }),
     ])
     const views = enrollments.map((e) => enrollmentView(e, today))
     const completedCourseIds = new Set(views.filter((v) => v.status === 'COMPLETED').map((v) => v.course_id))
-    const minutes = await prisma.lesson.aggregate({
-      where: { learning_progress: { some: { user_id: userId, status: 'COMPLETED' } } },
-      _sum: { estimated_minutes: true },
-    })
     const enrolledIds = new Set(views.map((v) => v.course_id))
     const recommended = await prisma.course.findMany({
       where: {

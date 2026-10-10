@@ -79,7 +79,7 @@ export const projectRepository = {
     options: { filter: ProjectFilter; sort: ProjectSort; dir: 'asc' | 'desc'; skip: number; take: number },
   ) {
     const where: Prisma.ProjectWhereInput = { AND: [scope, { deleted_at: null }, ...filterWhere(options.filter)] }
-    return prisma.$transaction([
+    return Promise.all([
       prisma.project.findMany({
         where,
         orderBy: orderBy(options.sort, options.dir),

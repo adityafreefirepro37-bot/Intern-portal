@@ -11,7 +11,15 @@ import { AUDIT_ACTIONS } from './audit-actions'
 import { auditService } from './audit.service'
 import { authorizationService } from './authorization.service'
 import { optionalText, optionalUuid, personSelect } from './hr-shared'
-import { covers, internPlacementSelect, ownIntern, requireInternFor, resolveRecord, scopedInternWhere } from './performance-access'
+import {
+  covers,
+  internPlacementSelect,
+  ownIntern,
+  requireInternFor,
+  resolveRecord,
+  resolveRecords,
+  scopedInternWhere,
+} from './performance-access'
 
 /**
  * Feedback about interns. Visibility is enforced on the server for every
@@ -148,20 +156,22 @@ async function visibleFeedback(ctx: RequestContext, where: Prisma.FeedbackWhereI
 }
 
 async function withContext(ctx: RequestContext, rows: FeedbackRow[]) {
-  return Promise.all(
-    rows.map(async (row) => {
+  const contexts = await resolveRecords(
+    ctx.organization.id,
+    rows.map((row) => {
       const type = CONTEXT_RECORD[row.context_type]
-      const context =
-        type && row.context_id && row.intern ? await resolveRecord(ctx.organization.id, row.intern, type, row.context_id) : null
-      const { intern, ...rest } = row
-      return {
-        ...rest,
-        internId: intern?.id ?? null,
-        context,
-        canEdit: row.from_user_id === ctx.actor.userId && authorizationService.can(ctx, 'feedback.update'),
-      }
+      return type && row.context_id && row.intern ? { intern: row.intern, type, id: row.context_id } : null
     }),
   )
+  return rows.map((row, index) => {
+    const { intern, ...rest } = row
+    return {
+      ...rest,
+      internId: intern?.id ?? null,
+      context: contexts[index],
+      canEdit: row.from_user_id === ctx.actor.userId && authorizationService.can(ctx, 'feedback.update'),
+    }
+  })
 }
 
 export const feedbackService = {
@@ -181,7 +191,7 @@ export const feedbackService = {
         : view === 'given'
           ? { from_user_id: me }
           : { to_user_id: { not: me }, ...(filters.internId ? { intern_id: filters.internId } : {}) }
-    const [rows, incoming, outgoing, interns] = await Promise.all([
+    const [rows, incoming, outgoing, interns, recipients] = await Promise.all([
       view === 'requests' ? Promise.resolve([]) : visibleFeedback(ctx, { ...where, ...typeFilter, ...search }),
       prisma.feedbackRequest.findMany({
         where: { organization_id: ctx.organization.id, recipient_id: me },
@@ -213,8 +223,8 @@ export const feedbackService = {
         },
       }),
       staff ? this.internOptions(ctx) : Promise.resolve([]),
+      intern && authorizationService.can(ctx, 'feedback.request') ? requestRecipients(intern) : Promise.resolve([]),
     ])
-    const recipients = intern && authorizationService.can(ctx, 'feedback.request') ? await requestRecipients(intern) : []
     return {
       view,
       filters,

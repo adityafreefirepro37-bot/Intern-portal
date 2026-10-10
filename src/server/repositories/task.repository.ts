@@ -189,7 +189,7 @@ export const taskRepository = {
   /** Backwards-compatible simple list (used by existing callers). */
   listPage(scope: Prisma.TaskWhereInput, options: { skip: number; take: number; status?: TaskStatus }) {
     const where = live(scope, ...(options.status ? [{ status: options.status }] : []))
-    return prisma.$transaction([
+    return Promise.all([
       prisma.task.findMany({
         where,
         orderBy: [{ due_date: { sort: 'asc', nulls: 'last' } }, { created_at: 'desc' }],
@@ -207,7 +207,7 @@ export const taskRepository = {
     options: { where: Prisma.TaskWhereInput[]; sort: TaskSort; dir: 'asc' | 'desc'; skip: number; take: number },
   ) {
     const where = live(scope, ...options.where)
-    return prisma.$transaction([
+    return Promise.all([
       prisma.task.findMany({
         where,
         orderBy: orderBy(options.sort, options.dir),

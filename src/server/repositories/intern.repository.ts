@@ -129,7 +129,7 @@ export const internRepository = {
     options: { filter: InternDirectoryFilter; sort: InternSort; dir: 'asc' | 'desc'; skip: number; take: number },
   ) {
     const where: Prisma.InternWhereInput = { AND: [scope, { deleted_at: null }, ...filterWhere(options.filter)] }
-    return prisma.$transaction([
+    return Promise.all([
       prisma.intern.findMany({
         where,
         orderBy: orderBy(options.sort, options.dir),
@@ -277,7 +277,7 @@ export const internRepository = {
   },
 
   countRelated(organizationId: string, userId: string) {
-    return prisma.$transaction([
+    return Promise.all([
       prisma.intern.count({ where: { organization_id: organizationId, deleted_at: null, manager_id: userId } }),
       prisma.intern.count({ where: { organization_id: organizationId, deleted_at: null, mentor_id: userId } }),
     ])

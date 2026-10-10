@@ -134,8 +134,17 @@ export const workService = {
     const reviewWhere = reviewable(ctx)
     const orgWide = readScope === 'ORGANIZATION'
 
-    const [myOpen, myDueToday, myOverdue, myInReview, myBlocked, myUpcoming, myProjects, pendingReviews] =
-      await Promise.all([
+    const projectScopeGrant = ctx.actor.permissions.get('project.read')
+
+    // Everything that doesn't depend on another result loads in one parallel
+    // round; on a hosted database each sequential round costs a network trip.
+    const [
+      [myOpen, myDueToday, myOverdue, myInReview, myBlocked, myUpcoming, myProjects, pendingReviews],
+      interns,
+      organization,
+      projects,
+    ] = await Promise.all([
+      Promise.all([
         count(mine, OPEN),
         count(mine, OPEN, { due_date: today }),
         count(mine, OPEN, { due_date: { lt: today } }),
@@ -153,13 +162,43 @@ export const workService = {
         reviewWhere
           ? prisma.task.count({ where: { AND: [reviewWhere, { deleted_at: null }] } })
           : Promise.resolve(null),
-      ])
+      ]),
+      // Team view: tasks of interns the viewer manages/mentors, or in projects they lead.
+      prisma.intern.findMany({
+        where: { organization_id: ctx.organization.id, deleted_at: null, OR: [{ manager_id: me }, { mentor_id: me }] },
+        select: { user_id: true },
+      }),
+      orgWide
+        ? Promise.all([
+            prisma.project.count({ where: { organization_id: ctx.organization.id, deleted_at: null, status: 'ACTIVE' } }),
+            count(OPEN),
+            count(OPEN, { due_date: { lt: today } }),
+            count({ status: 'BLOCKED' }),
+            count({ status: 'IN_REVIEW', submissions: { some: { status: { in: PENDING_REVIEW_STATUSES } } } }),
+          ]).then(([activeProjects, openTasks, overdue, blocked, pendingReviews]) => ({
+            activeProjects,
+            openTasks,
+            overdue,
+            blocked,
+            pendingReviews,
+          }))
+        : Promise.resolve(null),
+      projectScopeGrant
+        ? prisma.project.findMany({
+            where: {
+              AND: [
+                projectScope(ctx.actor, projectScopeGrant),
+                { deleted_at: null, status: { in: ['PLANNING', 'ACTIVE', 'ON_HOLD'] } },
+                orgWide ? {} : { OR: [{ owner_id: me }, { manager_id: me }, { members: { some: { user_id: me } } }] },
+              ],
+            },
+            orderBy: [{ status: 'asc' }, { target_end_date: { sort: 'asc', nulls: 'last' } }],
+            take: 5,
+            select: { id: true, name: true, status: true, target_end_date: true, progress_percentage: true },
+          })
+        : Promise.resolve([]),
+    ])
 
-    // Team view: tasks of interns the viewer manages/mentors, or in projects they lead.
-    const interns = await prisma.intern.findMany({
-      where: { organization_id: ctx.organization.id, deleted_at: null, OR: [{ manager_id: me }, { mentor_id: me }] },
-      select: { user_id: true },
-    })
     const team: Prisma.TaskWhereInput | null =
       interns.length > 0 || !orgWide
         ? {
@@ -177,47 +216,16 @@ export const workService = {
             ],
           }
         : null
-    const [teamOpen, teamOverdue, teamBlocked] = team
-      ? await Promise.all([
-          count(team, OPEN),
-          count(team, OPEN, { due_date: { lt: today } }),
-          count(team, { status: 'BLOCKED' }),
-        ])
-      : [null, null, null]
-
-    const organization = orgWide
-      ? await Promise.all([
-          prisma.project.count({ where: { organization_id: ctx.organization.id, deleted_at: null, status: 'ACTIVE' } }),
-          count(OPEN),
-          count(OPEN, { due_date: { lt: today } }),
-          count({ status: 'BLOCKED' }),
-          count({ status: 'IN_REVIEW', submissions: { some: { status: { in: PENDING_REVIEW_STATUSES } } } }),
-        ]).then(([activeProjects, openTasks, overdue, blocked, pendingReviews]) => ({
-          activeProjects,
-          openTasks,
-          overdue,
-          blocked,
-          pendingReviews,
-        }))
-      : null
-
-    const projectScopeGrant = ctx.actor.permissions.get('project.read')
-    const projects = projectScopeGrant
-      ? await prisma.project.findMany({
-          where: {
-            AND: [
-              projectScope(ctx.actor, projectScopeGrant),
-              { deleted_at: null, status: { in: ['PLANNING', 'ACTIVE', 'ON_HOLD'] } },
-              orgWide ? {} : { OR: [{ owner_id: me }, { manager_id: me }, { members: { some: { user_id: me } } }] },
-            ],
-          },
-          orderBy: [{ status: 'asc' }, { target_end_date: { sort: 'asc', nulls: 'last' } }],
-          take: 5,
-          select: { id: true, name: true, status: true, target_end_date: true, progress_percentage: true },
-        })
-      : []
-
-    const workload = interns.length > 0 ? await workloadService.forMyInterns(ctx) : null
+    const [[teamOpen, teamOverdue, teamBlocked], workload] = await Promise.all([
+      team
+        ? Promise.all([
+            count(team, OPEN),
+            count(team, OPEN, { due_date: { lt: today } }),
+            count(team, { status: 'BLOCKED' }),
+          ])
+        : Promise.resolve([null, null, null] as const),
+      interns.length > 0 ? workloadService.forMyInterns(ctx) : Promise.resolve(null),
+    ])
 
     return {
       mine: {

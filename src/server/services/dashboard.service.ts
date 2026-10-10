@@ -31,6 +31,7 @@ export const dashboardService = {
       projects,
       announcements,
       activity,
+      work,
     ] = await Promise.all([
       when(allow('intern.read'), () => internService.countActive(ctx)),
       when(allow('task.read'), () => taskService.countOpen(ctx)),
@@ -43,8 +44,8 @@ export const dashboardService = {
       ),
       when(allow('announcement.read'), () => announcementService.listActive(ctx, 3, now)),
       when(allow('audit_log.read'), () => auditRepository.listRecent(ctx.organization.id, 6)),
+      workService.dashboardSummary(ctx),
     ])
-    const work = await workService.dashboardSummary(ctx)
 
     return {
       stats: { activeInterns, openTasks, pendingReviews, upcomingDeadlines: upcomingDeadlineCount },

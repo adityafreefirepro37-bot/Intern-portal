@@ -61,7 +61,7 @@ export const auditRepository = {
 
   listPage(organizationId: string, filter: AuditFilter, skip: number, take: number) {
     const where = whereFor(organizationId, filter)
-    return prisma.$transaction([
+    return Promise.all([
       prisma.auditLog.findMany({
         where,
         orderBy: { created_at: 'desc' },
