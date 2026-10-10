@@ -130,4 +130,4 @@ For deliverability, publish SPF, DKIM and DMARC records for the sending domain.
 
 ## Not yet available
 
-Multi-factor authentication (UI marks it as Phase 09), social sign-in, and self-service email change.
+Multi-factor authentication (UI marks it as Phase 10), social sign-in, and self-service email change.

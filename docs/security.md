@@ -129,7 +129,7 @@ the build if imported by client code. The `settings` table never holds secrets. 
 
 ## Planned
 
-MFA (Phase 09), security-event alerting, and automated dependency scanning in CI.
+MFA (Phase 10), security-event alerting, and automated dependency scanning in CI.
 
 ## Reporting a vulnerability
 

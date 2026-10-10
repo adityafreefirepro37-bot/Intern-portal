@@ -26,7 +26,7 @@ export interface ShellNotification {
   href: string | null
 }
 
-/** In-app notifications (work events). Email and preferences arrive in Phase 06. */
+/** In-app notifications (work events). Email and preferences arrive in Phase 07. */
 export function NotificationBell({ items, unread }: { items: ShellNotification[]; unread: number }) {
   const router = useRouter()
   const [, startTransition] = React.useTransition()

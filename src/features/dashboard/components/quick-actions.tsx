@@ -34,7 +34,7 @@ export function QuickActions({ can }: { can: (permission: string) => boolean }) 
     can('task.read') && { label: 'Open My Work', icon: Inbox, href: '/my-work' },
     can('intern.create') && { label: 'Add intern', icon: UserPlus, href: '/interns/new' },
     can('onboarding.manage') && { label: 'Review onboarding', icon: ClipboardList, href: '/onboarding' },
-    can('meeting.manage') && { label: 'Schedule meeting', icon: CalendarPlus, phase: '06' },
+    can('meeting.manage') && { label: 'Schedule meeting', icon: CalendarPlus, phase: '07' },
     can('attendance.create') && { label: 'Check in / out', icon: Clock, href: '/attendance' },
     can('leave.request') && { label: 'Request leave', icon: Palmtree, href: '/leave' },
     can('hr_request.create') && { label: 'Ask HR', icon: LifeBuoy, href: '/requests' },

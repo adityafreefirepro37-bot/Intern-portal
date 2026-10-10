@@ -144,7 +144,7 @@ async function completePlanIfDone(planId: string, userId: string) {
 }
 
 /**
- * Certificate integration point (Phase 08). A completed course is *eligible*
+ * Certificate integration point (Phase 09). A completed course is *eligible*
  * for a certificate; issuing is the certificate engine's job, so for now the
  * eligibility is only exposed — nothing is generated.
  */

@@ -17,7 +17,7 @@ export default async function Page() {
       <PageHeader title="AYAVA AI" />
       <PhasePlaceholder
         icon={Sparkles}
-        phase="07"
+        phase="08"
         title="AYAVA AI"
         description="An assistant that knows Ayava’s processes and your work."
         planned={[

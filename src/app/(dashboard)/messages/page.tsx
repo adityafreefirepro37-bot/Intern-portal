@@ -17,7 +17,7 @@ export default async function Page() {
       <PageHeader title="Messages" />
       <PhasePlaceholder
         icon={MessagesSquare}
-        phase="06"
+        phase="07"
         title="Messages"
         description="Team channels for day-to-day conversation."
         planned={[

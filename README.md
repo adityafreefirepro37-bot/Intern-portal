@@ -13,8 +13,11 @@ comments and attachments; submissions with versioned reviews; list, board, My Wo
 notifications) and **Phase 05 — HR operations** (HR dashboard and action centre; attendance with breaks, rules,
 corrections and monthly calendar; leave with working-day counting, balances, overlap checks and approvals; configurable
 document types with versioning, verification, sensitivity and expiry; HR requests; targeted and scheduled
-announcements; holidays; ending internships and offboarding checklists; HR calendar, analytics and CSV exports).
-Features are delivered in later phases (see
+announcements; holidays; ending internships and offboarding checklists; HR calendar, analytics and CSV exports) and
+**Phase 06 — Learning & performance** (course catalog and builder with modules, lessons and files; enrollments and
+progress; learning paths, assignments and required training; quizzes; submission reviews; goals with evidence; weekly
+check-ins; feedback and feedback requests; review cycles with templates and staged reviews; development plans;
+learning and performance analytics and CSV exports). Remaining features are delivered in later phases (see
 [Roadmap](#roadmap)); pages for unbuilt features say so plainly instead of pretending to work.
 
 ## Tech stack
@@ -213,13 +216,14 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | 01     | **Foundation** — done                                                     |
 | 02     | **Authentication, RBAC & security** — done                                |
 | 03     | **Intern management, HR directory & onboarding** — done                   |
-| 04     | **Tasks, projects & work management** — done (calendar moves to 06)       |
+| 04     | **Tasks, projects & work management** — done (calendar moves to 07)       |
 | 05     | **HR operations: attendance, leave, documents, requests, offboarding** — done |
-| 06     | Communication and performance: messages, notification delivery, calendar, reviews |
-| 07     | AYAVA AI and knowledge base (RAG)                                         |
-| 08     | Analytics and certificates                                                |
-| 09     | System administration: audit log tools, settings, role editor             |
-| 10     | Polish and launch                                                         |
+| 06     | **Learning & performance: courses, paths, quizzes, goals, check-ins, feedback, reviews** — done |
+| 07     | Communication: messages, notification delivery (email/push, preferences), calendar, meetings |
+| 08     | AYAVA AI and knowledge base (RAG)                                         |
+| 09     | Analytics and certificates                                                |
+| 10     | System administration: audit log tools, settings, role editor, MFA        |
+| 11     | Polish and launch                                                         |
 
 ## Documentation
 

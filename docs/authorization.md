@@ -97,7 +97,7 @@ narrower than the organization). This is never the security boundary.
 - `role_id`, `user_id`, `intern_id` and invitation/session ids are looked up inside the actor's organization (and
   scope), so foreign ids resolve to 404. `organization_id`, `permission_id`, status, manager or role fields sent to
   self-service endpoints are rejected by strict schemas.
-- System roles can't be edited from the app yet; custom-role editing (Phase 09) will be limited to `role.update`.
+- System roles can't be edited from the app yet; custom-role editing (Phase 10) will be limited to `role.update`.
 
 ## Sensitive data
 

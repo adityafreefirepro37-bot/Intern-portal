@@ -87,7 +87,7 @@ test.describe('account pages', () => {
   test('security page lists this device as the current session', async ({ page }) => {
     await page.goto('/security')
     await expect(page.getByText('This device')).toBeVisible()
-    await expect(page.getByText('Authenticator-app 2FA will be offered in Phase 09')).toBeVisible()
+    await expect(page.getByText('Authenticator-app 2FA will be offered in Phase 10')).toBeVisible()
   })
 
   test('user management and roles are available to the super admin', async ({ page }) => {

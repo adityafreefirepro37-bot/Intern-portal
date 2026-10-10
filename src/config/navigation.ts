@@ -99,7 +99,7 @@ export const NAVIGATION: NavSection[] = [
         mobile: true,
       },
       { label: 'Workload', href: '/workload', icon: Gauge, permission: 'task.review' },
-      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '06' },
+      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '07' },
     ],
   },
   {
@@ -193,23 +193,23 @@ export const NAVIGATION: NavSection[] = [
       },
       { label: 'Ending Internships', href: '/hr/offboarding', icon: CalendarClock, permission: 'offboarding.read' },
       { label: 'My Requests', href: '/requests', icon: LifeBuoy, permission: 'hr_request.create' },
-      { label: 'Certificates', href: '/certificates', icon: Award, permission: 'certificate.read', phase: '08' },
+      { label: 'Certificates', href: '/certificates', icon: Award, permission: 'certificate.read', phase: '09' },
     ],
   },
   {
     title: 'Communication',
     items: [
       { label: 'Announcements', href: '/announcements', icon: Megaphone, permission: 'announcement.read' },
-      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read', phase: '06' },
+      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read', phase: '07' },
     ],
   },
   {
     title: 'AI',
-    items: [{ label: 'AYAVA AI', href: '/ai', icon: Sparkles, permission: 'ai.use', phase: '07' }],
+    items: [{ label: 'AYAVA AI', href: '/ai', icon: Sparkles, permission: 'ai.use', phase: '08' }],
   },
   {
     title: 'Analytics',
-    items: [{ label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'analytics.read', phase: '08' }],
+    items: [{ label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'analytics.read', phase: '09' }],
   },
   {
     title: 'System',

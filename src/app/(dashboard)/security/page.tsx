@@ -84,11 +84,11 @@ export default async function SecurityPage() {
           <Card>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle>Two-factor authentication</CardTitle>
-              <PhaseBadge phase="09" />
+              <PhaseBadge phase="10" />
             </CardHeader>
             <CardContent className="flex gap-3 text-small text-muted-foreground">
               <ShieldCheck className="size-5 shrink-0" aria-hidden />
-              Authenticator-app 2FA will be offered in Phase 09. It isn’t available yet.
+              Authenticator-app 2FA will be offered in Phase 10. It isn’t available yet.
             </CardContent>
           </Card>
         </div>

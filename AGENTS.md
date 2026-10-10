@@ -16,7 +16,9 @@ Phase 01 Foundation - COMPLETE
 Phase 02 Authentication, RBAC & security - COMPLETE
 Phase 03 Intern management, HR directory & onboarding - COMPLETE
 Phase 04 Tasks, projects & work management - COMPLETE
-Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - COMPLETE (next: Prompt 06). See README.md and docs/hr-operations.md.
+Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - COMPLETE. See docs/hr-operations.md.
+Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feedback, reviews) - COMPLETE (next: Prompt 07,
+communication: messages, notification delivery, calendar). Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
 

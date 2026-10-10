@@ -56,7 +56,7 @@ test.describe('overview dashboard', () => {
   test('marks unbuilt quick actions with their phase instead of faking them', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('link', { name: 'Create task' })).toBeVisible()
-    await expect(page.locator('[aria-disabled="true"]', { hasText: 'Schedule meeting' })).toContainText('Phase 06')
+    await expect(page.locator('[aria-disabled="true"]', { hasText: 'Schedule meeting' })).toContainText('Phase 07')
   })
 })
 

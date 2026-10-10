@@ -17,7 +17,7 @@ export default async function Page() {
       <PageHeader title="Analytics" />
       <PhasePlaceholder
         icon={BarChart3}
-        phase="08"
+        phase="09"
         title="Analytics"
         description="Programme-wide insight into interns, work and learning."
         planned={[

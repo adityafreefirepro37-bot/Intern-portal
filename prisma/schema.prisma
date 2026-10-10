@@ -2859,7 +2859,7 @@ model CertificateVerification {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI & KNOWLEDGE (pipeline implemented in Prompt 07)
+// AI & KNOWLEDGE (pipeline implemented in Prompt 08)
 // ─────────────────────────────────────────────────────────────────────────────
 
 model AiConversation {

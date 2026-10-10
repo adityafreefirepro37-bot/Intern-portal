@@ -29,7 +29,7 @@ export default async function RolesPage() {
       <PageHeader
         title="Roles & permissions"
         breadcrumbs={[{ label: 'Settings', href: '/settings' }, { label: 'Roles & permissions' }]}
-        description="Each permission applies within a scope: Own records, Assigned interns, Team, Department or the whole Organization. System roles are protected; editing custom roles arrives in Phase 09."
+        description="Each permission applies within a scope: Own records, Assigned interns, Team, Department or the whole Organization. System roles are protected; editing custom roles arrives in Phase 10."
       />
       <div className="grid gap-4">
         {roles.map((role) => {

@@ -45,7 +45,7 @@ const SECTIONS: {
     description: 'Name, branding, working week and attendance rules.',
     icon: Building2,
     permission: 'settings.read',
-    phase: '09',
+    phase: '10',
   },
 ]
 

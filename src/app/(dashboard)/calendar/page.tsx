@@ -17,7 +17,7 @@ export default async function Page() {
       <PageHeader title="Calendar" />
       <PhasePlaceholder
         icon={CalendarDays}
-        phase="06"
+        phase="07"
         title="Calendar"
         description="Meetings, deadlines, trainings and reviews in one schedule."
         planned={[

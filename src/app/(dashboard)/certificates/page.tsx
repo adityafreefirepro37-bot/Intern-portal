@@ -17,7 +17,7 @@ export default async function Page() {
       <PageHeader title="Certificates" />
       <PhasePlaceholder
         icon={Award}
-        phase="08"
+        phase="09"
         title="Certificates"
         description="Completion and experience certificates with public verification."
         planned={[
