@@ -12,7 +12,21 @@ npm run dev
 ```
 
 Using your own PostgreSQL or Supabase: edit `DATABASE_URL`, `DIRECT_URL` and `TEST_DATABASE_URL` in `.env` and skip
-`db:local`. Next.js 16 here differs from older versions (e.g. `middleware` is now `proxy`, request APIs are async,
+`db:local`.
+
+Developing with `.env` pointing at a hosted database (e.g. Supabase) is slow: every query is a network round trip, and
+pages run dozens. Keep `db:local` running and use it instead; sign-in still goes through Supabase:
+
+```bash
+npm run db:local:setup  # once: migrate + seed the local database, link the dev accounts to Supabase Auth
+npm run dev:local       # next dev with DATABASE_URL/DIRECT_URL → local, STORAGE_PROVIDER=local
+```
+
+`scripts/with-local-db.mjs` overrides these for its own process only (`.env` is never written; set
+`LOCAL_DATABASE_URL` to use another local database). `npm run dev:pooled` stays on the hosted database but uses the
+session pooler with five connections, for checking against real data.
+
+Next.js 16 here differs from older versions (e.g. `middleware` is now `proxy`, request APIs are async,
 `error.tsx` receives `retry`); read `node_modules/next/dist/docs/` before using an unfamiliar API.
 
 ### Signing in as different roles

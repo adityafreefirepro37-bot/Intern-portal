@@ -27,6 +27,9 @@ npm run db:local        # local PostgreSQL on :5433 (keep running)
 npm run db:migrate
 npm run db:seed
 npm run dev
+# .env on a hosted database (Supabase)? Develop against the local one — far faster:
+npm run db:local:setup     # once; then
+npm run dev:local          # next dev on localhost:5433 (sign-in still via Supabase)
 
 npm run typecheck && npm run lint && npm test
 npm run test:integration   # real PostgreSQL (TEST_DATABASE_URL, reset each run)

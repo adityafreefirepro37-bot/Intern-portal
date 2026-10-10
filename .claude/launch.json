@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:pooled"],
       "port": 3000
+    },
+    {
+      "name": "ayava-dev-local",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:local"],
+      "port": 3000
     }
   ]
 }

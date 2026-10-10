@@ -90,6 +90,10 @@ npm run dev             # http://localhost:3000
 ```
 
 To use your own PostgreSQL or Supabase instead, set `DATABASE_URL` and `DIRECT_URL` in `.env` and skip `db:local`.
+When `.env` points at a hosted database, develop against the local one anyway for speed (a hosted query is a network
+round trip; a local one takes about a millisecond): `npm run db:local:setup` once, then `npm run dev:local`. Sign-in
+still uses Supabase from `.env`; `.env` itself is never changed. `npm run dev:pooled` runs against the hosted database
+with a session-pooler connection pool instead.
 You can browse the local database with any client (e.g. pgAdmin): host `localhost`, port `5433`, database
 `ayava_intern_os`, user `ayava`, password `ayava-local-dev`.
 
@@ -139,6 +143,9 @@ Vikram Rao manages the website project (Aanya, Neel); Arjun (manager@) manages S
 | `npm run test:integration`  | Integration tests (rebuilds the `TEST_DATABASE_URL` database)  |
 | `npm run test:e2e`          | Playwright end-to-end tests                                    |
 | `npm run db:local`          | Local PostgreSQL (development)                                 |
+| `npm run db:local:setup`    | Migrate + seed the local PostgreSQL, whatever `.env` points at |
+| `npm run dev:local`         | Development server against the local PostgreSQL (fastest)      |
+| `npm run dev:pooled`        | Development server against the hosted database (session pool)  |
 | `npm run db:migrate`        | Create/apply migrations in development                         |
 | `npm run db:migrate:deploy` | Apply migrations in staging/production                         |
 | `npm run db:seed`           | Seed reference data (+ demo data outside production)           |

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:pooled": "node scripts/dev-pooled.mjs",
+    "dev:local": "node scripts/with-local-db.mjs next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -16,6 +17,7 @@
     "test:all": "jest --runInBand",
     "test:e2e": "playwright test",
     "db:local": "node scripts/local-db.mjs",
+    "db:local:setup": "node scripts/with-local-db.mjs \"prisma migrate deploy && tsx prisma/seed.ts\"",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
