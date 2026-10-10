@@ -51,3 +51,6 @@ next-env.d.ts
 /playwright/.cache/
 # signed-in E2E storage (contains session cookies)
 /playwright/.auth/
+
+# Claude Code session state
+/.claude/scheduled_tasks.lock

@@ -18,16 +18,21 @@ const shared = {
 }
 
 export default async function jestConfig() {
+  // `roots` + a relative pattern rather than '<rootDir>/tests/…' globs: on
+  // Windows a checkout under a dot folder (e.g. .claude/worktrees/x) turns
+  // '\.' into an escaped dot in the glob and no test file matches.
   const unit = await createJestConfig({
     ...shared,
     displayName: 'unit',
-    testMatch: ['<rootDir>/tests/unit/**/*.test.ts?(x)'],
+    roots: ['<rootDir>/tests/unit'],
+    testMatch: ['**/*.test.ts?(x)'],
   })()
 
   const integration = await createJestConfig({
     ...shared,
     displayName: 'integration',
-    testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
+    roots: ['<rootDir>/tests/integration'],
+    testMatch: ['**/*.test.ts'],
     setupFiles: ['<rootDir>/tests/integration/setup-env.cjs'],
     setupFilesAfterEnv: ['<rootDir>/tests/integration/setup-mocks.ts'],
     globalSetup: '<rootDir>/tests/integration/global-setup.cjs',
