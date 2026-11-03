@@ -5,7 +5,8 @@ attendance, leave, documents, learning, performance, AI assistance, certificates
 
 Implemented so far: **Phase 01 — Foundation** (architecture, database, design system, shell, read-only views of real data)
 **Phase 02 — Authentication, RBAC & security** (Supabase sign-in, sessions, scoped permissions, user management,
-invitations, audit log) and **Phase 03 — Intern management & onboarding** (HR directory, add-intern workflow, tabbed
+invitations, audit log) and **Phase 03 — Intern management & onboarding** (organization structure — departments,
+teams, positions, heads and leads; HR directory, add-intern workflow, tabbed
 profiles, status lifecycle, onboarding templates and checklists, policy acknowledgements, private documents, HR /
 manager / mentor dashboards) and **Phase 04 — Tasks, projects & work management** (projects with members, milestones,
 files and activity; tasks with a server-enforced lifecycle, priorities, deadlines, subtasks, checklists, dependencies,

@@ -18,15 +18,10 @@ export const learningService = {
 /** Announcements moved to announcement.service.ts (targeting, scheduling, publishing). */
 export { announcementService } from './announcement.service'
 
-/** Departments, teams and positions (management arrives in Prompt 03). */
+/** Department options for filters. Managing departments, teams and positions: organization-structure.service.ts. */
 export const organizationService = {
   async listDepartments(ctx: RequestContext) {
     authorizationService.require(ctx, 'department.read')
     return organizationStructureRepository.listDepartments(ctx.organization.id)
-  },
-
-  async getStructure(ctx: RequestContext) {
-    authorizationService.require(ctx, 'team.read')
-    return organizationStructureRepository.departmentsWithTeams(ctx.organization.id)
   },
 }

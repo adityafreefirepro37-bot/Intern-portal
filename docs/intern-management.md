@@ -122,6 +122,29 @@ Upload, view, download and soft delete, per intern (`documentService`, `/api/doc
   levels they can see.
 - Hidden documents are 404. Deleting is soft and reopens any onboarding item that relied on the document.
 
+## Organization structure (departments, teams, positions)
+
+`/teams` shows the structure to anyone with `team.read`, and is also where it is managed
+(`organization-structure.service.ts`):
+
+| Action | Permission (default roles) |
+| --- | --- |
+| Create / edit departments and their head | `department.create` / `department.update` (Super Admin, Admin) |
+| Create / edit teams, their department and lead | `team.create` / `team.update` (Super Admin, Admin) |
+| Create / edit positions | `position.manage` (Super Admin, Admin, HR) |
+| Archive / restore | `department.delete`, `team.delete`, `position.manage` |
+
+- Nothing is deleted: interns, internships, onboarding templates, learning paths and review cycles refer to these
+  records, so "delete" archives (`is_active = false`) and can be undone from the Archived list. Archived records leave
+  every picker (intern forms, filters).
+- Archiving is refused while current interns (selected, onboarding, active, ending soon), or for a department active
+  teams, still depend on the record. A team or position is restored only into an active department.
+- Names are unique per organization, case-insensitively and including archived records (the error points to
+  restoring instead). Slugs are generated once and never change.
+- Department heads and team leads gain DEPARTMENT / TEAM-scoped access (`scope.ts`), so they must be active members of
+  the organization, and every change is audited with before/after values (`department.saved`, `team.saved`,
+  `*.archived`, `*.restored`).
+
 ## Domain events
 
 `src/server/events/domain-events.ts` is an in-process bus emitted **after** commit:
@@ -136,6 +159,7 @@ the request. Durable history lives in the audit log and `intern_lifecycle_events
 - Unit: `tests/unit/interns.test.ts` — dates, codes, transitions, progress, overdue, schemas.
 - Integration: `tests/integration/interns.test.ts` — create (all rows, rollback, concurrent codes, duplicates),
   editing and mass assignment, assignment, transitions and override, ending-soon idempotency, onboarding,
-  document visibility matrix, scope/IDOR.
+  document visibility matrix, scope/IDOR. `tests/integration/organization-structure.test.ts` — structure permissions,
+  unique names, heads/leads, archive guards and restore, team-lead scope, audit, cross-organization isolation.
 - E2E: `tests/e2e/app/interns.spec.ts` — HR adds John Doe, intern works through onboarding, manager scope,
   security denials.

@@ -1,5 +1,7 @@
 import type { CourseDifficulty, EnrollmentStatus, EnrollmentType, LessonContentType } from '@prisma/client'
 
+export { slugify } from '@/lib/utils/format'
+
 /** Learning rules (pure): course completion, lesson locking, deadlines, plans. */
 
 export const DIFFICULTY_LABELS: Record<CourseDifficulty, string> = {
@@ -165,13 +167,4 @@ export function formatMinutes(minutes: number | null | undefined): string {
   const m = minutes % 60
   if (!h) return `${m} min`
   return m ? `${h} h ${m} min` : `${h} h`
-}
-
-export function slugify(value: string, max = 60) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, max)
-    .replace(/-+$/g, '')
 }

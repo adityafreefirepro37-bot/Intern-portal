@@ -66,3 +66,13 @@ export function percent(part: number, total: number): number {
 export function formatDay(value: Date | string | null | undefined): string {
   return formatDate(value, 'UTC')
 }
+
+/** "Git & GitHub Fundamentals!" → "git-github-fundamentals" (URL- and key-safe). */
+export function slugify(value: string, max = 60) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, max)
+    .replace(/-+$/g, '')
+}
