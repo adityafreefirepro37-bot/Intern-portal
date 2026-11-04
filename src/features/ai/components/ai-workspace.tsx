@@ -41,9 +41,10 @@ export function AiWorkspace({
   const [historyOpen, setHistoryOpen] = React.useState(false)
   // Which chat is mounted. Opening another conversation (or a new one) remounts it to load
   // that history; the conversation this chat just started must not, or focus would be lost.
-  const [instance, setInstance] = React.useState({ generation: 0, conversation: activeId })
-  if (instance.conversation !== activeId) {
-    setInstance({ generation: instance.generation + 1, conversation: activeId })
+  const [instance, setInstance] = React.useState({ generation: 0, activeId, started: null as string | null })
+  if (instance.activeId !== activeId) {
+    const own = activeId !== null && activeId === instance.started
+    setInstance({ generation: own ? instance.generation : instance.generation + 1, activeId, started: own ? instance.started : null })
   }
 
   const href =(next: Record<string, string | null>) => {
@@ -110,7 +111,7 @@ export function AiWorkspace({
             key={instance.generation}
             {...chat}
             onConversationStarted={(id) => {
-              setInstance((current) => ({ ...current, conversation: id }))
+              setInstance((current) => ({ ...current, started: id }))
               window.history.replaceState(null, '', `/ai?c=${id}`)
               router.refresh()
             }}
