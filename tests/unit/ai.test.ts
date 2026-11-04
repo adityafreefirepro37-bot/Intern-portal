@@ -211,6 +211,14 @@ describe('chunking', () => {
     expect(chunks.map((c) => c.page)).toEqual([1, 2])
   })
 
+  it('never carries text across a page, so a citation names the page the fact is on', () => {
+    const chunks = chunkDocument([{ text: 'Only on page one.', page: 1 }, { text: 'Only on page two.', page: 2 }])
+    expect(chunks.map((c) => [c.page, c.content])).toEqual([
+      [1, 'Only on page one.'],
+      [2, 'Only on page two.'],
+    ])
+  })
+
   it('splits at paragraphs, overlaps a sentence, and never exceeds the maximum', () => {
     const paragraph = (n: number) => `Paragraph ${n} has several words in it. It ends with sentence ${n}.`
     const text = Array.from({ length: 40 }, (_, i) => paragraph(i)).join('\n\n')

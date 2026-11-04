@@ -54,8 +54,8 @@ export default async function KnowledgePage({ searchParams }: PageProps<'/knowle
         actions={options ? <AddDocumentDialog options={options} /> : undefined}
       />
 
-      <form action="/knowledge" role="search" className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]">
-        <div className="relative sm:col-span-2 lg:col-span-1">
+      <form action="/knowledge" role="search" className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative sm:col-span-2">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" aria-hidden />
           <Input name="q" type="search" aria-label="Search knowledge" placeholder="Search knowledge…" defaultValue={query.q} className="pl-8" />
         </div>

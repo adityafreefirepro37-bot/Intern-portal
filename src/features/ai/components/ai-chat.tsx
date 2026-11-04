@@ -250,7 +250,7 @@ export function AiChat({
             maxLength={4000}
             disabled={Boolean(disabledReason)}
             placeholder="Ask AYAVA AI…"
-            className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 shadow-none focus-visible:ring-0"
+            className="max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent p-1.5 shadow-none focus-visible:border-transparent focus-visible:outline-none"
           />
           {busy ? (
             <Button type="button" variant="outline" size="icon" aria-label="Stop generating" onClick={() => abortRef.current?.abort()}>
