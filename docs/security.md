@@ -131,6 +131,9 @@ the build if imported by client code. The `settings` table never holds secrets. 
 
 MFA (Phase 10), security-event alerting, and automated dependency scanning in CI.
 
+AYAVA AI's protections (tools over authorized services, retrieval filtered before ranking, fenced untrusted content,
+confirmation for writes, redaction, private conversations) are described in [ai.md](ai.md#security).
+
 ## Reporting a vulnerability
 
 Report privately to the Ayava Creatives engineering team. Do not disclose publicly before a fix is available.

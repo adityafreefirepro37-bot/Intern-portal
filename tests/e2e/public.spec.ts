@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 /** Behaviour that holds whether or not Supabase Auth is configured. */
 
 test.describe('route protection', () => {
-  for (const path of ['/', '/tasks', '/interns', '/users', '/settings/roles', '/profile', '/security', '/audit-logs']) {
+  for (const path of ['/', '/tasks', '/interns', '/users', '/settings/roles', '/profile', '/security', '/audit-logs', '/ai', '/knowledge']) {
     test(`redirects signed-out visitors from ${path} to sign-in`, async ({ page }) => {
       await page.goto(path)
       await expect(page).toHaveURL(/\/login/)
@@ -18,6 +18,7 @@ test.describe('route protection', () => {
       '/api/search?q=web',
       '/api/interns/6f1d3b52-8a4e-4c1f-9b2d-3e7a5c9d0a11',
       '/api/avatars/x/2026/y.png',
+      '/api/knowledge/6f1d3b52-8a4e-4c1f-9b2d-3e7a5c9d0a11',
     ]) {
       const response = await request.get(path)
       expect(response.status()).toBe(401)
@@ -26,6 +27,14 @@ test.describe('route protection', () => {
         error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
       })
     }
+  })
+
+  test('AYAVA AI refuses signed-out and cross-origin requests', async ({ request, baseURL }) => {
+    const signedOut = await request.post('/api/ai/chat', { data: { message: 'Hello' }, headers: { origin: baseURL ?? '' } })
+    expect(signedOut.status()).toBe(401)
+    expect(await signedOut.text()).not.toMatch(/nvapi|api[_-]?key/i)
+    const crossOrigin = await request.post('/api/ai/chat', { data: { message: 'Hello' }, headers: { origin: 'https://evil.example' } })
+    expect([401, 403]).toContain(crossOrigin.status())
   })
 
   test('health check stays public and reveals nothing sensitive', async ({ request }) => {

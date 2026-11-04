@@ -17,8 +17,8 @@ Phase 02 Authentication, RBAC & security - COMPLETE
 Phase 03 Intern management, HR directory & onboarding - COMPLETE
 Phase 04 Tasks, projects & work management - COMPLETE
 Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - COMPLETE. See docs/hr-operations.md.
-Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feedback, reviews) - COMPLETE (next: Prompt 07,
-communication: messages, notification delivery, calendar). Roadmap: README.md#roadmap.
+Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feedback, reviews) - COMPLETE.
+Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - see docs/ai.md. Next: Prompt 08. Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
 
@@ -53,6 +53,8 @@ npm run build
 - Intern access rules live in src/server/services/intern-access.ts; status changes only via internLifecycleService
 - Project/task access lives in src/server/services/work-access.ts; task status only via taskLifecycleService
   (manual) or taskSubmissionService (submit/review); project status only via projectLifecycleService
+- AI reads application data only through src/server/ai/tools.ts (each tool calls the normal service); prompts live only in
+  src/lib/ai/prompts.ts; writes are proposals (ai_action_requests) that run after confirmation; never add an AI action for HR decisions
 - Unbuilt features show a "Phase NN" placeholder or disabled control — no fake functionality
 - `_archive/` holds files from the earlier partial attempt; not compiled — safe to delete once reviewed
 

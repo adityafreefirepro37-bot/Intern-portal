@@ -18,7 +18,10 @@ announcements; holidays; ending internships and offboarding checklists; HR calen
 **Phase 06 — Learning & performance** (course catalog and builder with modules, lessons and files; enrollments and
 progress; learning paths, assignments and required training; quizzes; submission reviews; goals with evidence; weekly
 check-ins; feedback and feedback requests; review cycles with templates and staged reviews; development plans;
-learning and performance analytics and CSV exports). Remaining features are delivered in later phases (see
+learning and performance analytics and CSV exports) and **Phase 07 — AYAVA AI** (permission-aware assistant with
+streaming chat and history; answers from the person's own data through audited tools; a versioned knowledge base with
+hybrid search and citations; task, project, learning and performance assistants; actions that run only after
+confirmation; usage limits and metrics). Remaining features are delivered in later phases (see
 [Roadmap](#roadmap)); pages for unbuilt features say so plainly instead of pretending to work.
 
 ## Tech stack
@@ -30,6 +33,7 @@ learning and performance analytics and CSV exports). Remaining features are deli
 | Icons         | Lucide                                                                        |
 | Database      | PostgreSQL (Supabase-compatible), Prisma 5 ORM, SQL migrations                |
 | Validation    | Zod 4                                                                         |
+| AI            | Provider abstraction over OpenAI-compatible APIs (NVIDIA NIM by default); hybrid knowledge search in PostgreSQL |
 | Auth          | Supabase Auth via server-only `@supabase/ssr` (httpOnly cookies); no passwords stored in our database |
 | Storage       | Storage abstraction with local and Supabase providers                         |
 | Testing       | Jest (unit + integration against real PostgreSQL), Playwright (end-to-end)    |
@@ -217,11 +221,11 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | 01     | **Foundation** — done                                                     |
 | 02     | **Authentication, RBAC & security** — done                                |
 | 03     | **Intern management, HR directory & onboarding** — done                   |
-| 04     | **Tasks, projects & work management** — done (calendar moves to 07)       |
+| 04     | **Tasks, projects & work management** — done (calendar moves to 08)       |
 | 05     | **HR operations: attendance, leave, documents, requests, offboarding** — done |
 | 06     | **Learning & performance: courses, paths, quizzes, goals, check-ins, feedback, reviews** — done |
-| 07     | Communication: messages, notification delivery (email/push, preferences), calendar, meetings |
-| 08     | AYAVA AI and knowledge base (RAG)                                         |
+| 07     | **AYAVA AI: assistant, knowledge base (RAG), confirmed actions** — done   |
+| 08     | Communication: messages, notification delivery (email/push, preferences), calendar, meetings |
 | 09     | Analytics and certificates                                                |
 | 10     | System administration: audit log tools, settings, role editor, MFA        |
 | 11     | Polish and launch                                                         |
@@ -231,6 +235,6 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Authentication](docs/authentication.md) ·
 [Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md) ·
 [Intern management](docs/intern-management.md) · [Onboarding](docs/onboarding.md) ·
-[Work management](docs/work-management.md) · [HR operations](docs/hr-operations.md)
+[Work management](docs/work-management.md) · [HR operations](docs/hr-operations.md) · [AYAVA AI](docs/ai.md)
 
 Internal use only — Ayava Creatives.

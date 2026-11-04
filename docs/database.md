@@ -3,6 +3,14 @@
 PostgreSQL, managed through Prisma (`prisma/schema.prisma`) and SQL migrations (`prisma/migrations`). The schema is fully
 reproducible from the repository: `npm run db:reset` (development) or `npm run db:migrate:deploy` (production).
 
+## AI and knowledge (Phase 07)
+
+`ai_conversations` (private to their owner; context type and id), `ai_messages` (provider, tokens, metadata with sources,
+feedback), `ai_usage_events` (operational counts, no content), `ai_action_requests` (proposals awaiting confirmation),
+`knowledge_documents` (versions share `family_id`; `is_current` marks the one retrieved; visibility and audience columns) and
+`knowledge_chunks` (`embedding real[]` scored by `ayava_cosine_similarity()`, generated `search tsvector`). AI settings live in
+`settings` under the key `ai`. Details: [ai.md](ai.md).
+
 ## Conventions
 
 - Tables are plural `snake_case`; columns `snake_case`.
