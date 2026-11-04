@@ -26,6 +26,8 @@ import { formatDateOnly } from '@/lib/interns/dates'
 import { formatDate, formatDay, fullName } from '@/lib/utils'
 import { idSchema } from '@/lib/validation'
 import { minutesToHours } from '@/lib/work/workload'
+import { AskAyava } from '@/features/ai/components/ask-ayava'
+import { aiOffered, CONTEXT_PROMPTS } from '@/server/ai/suggestions'
 import { requirePageContext } from '@/server/context'
 import { taskService } from '@/server/services/task.service'
 
@@ -92,7 +94,10 @@ export default async function TaskPage({ params }: PageProps<'/tasks/[id]'>) {
         ]}
       />
       <header className="mb-6 mt-2 space-y-3">
-        <h1 className="text-h1 text-balance">{task.title}</h1>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h1 className="text-h1 text-balance">{task.title}</h1>
+          {aiOffered(ctx) && <AskAyava contextType="TASK" contextId={task.id} label={task.title} suggestions={CONTEXT_PROMPTS.TASK ?? []} />}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={task.status} />
           <PriorityBadge priority={task.priority} />

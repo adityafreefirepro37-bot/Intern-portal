@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Building2, ChevronRight, KeyRound, ScrollText, ShieldCheck, UserCog } from 'lucide-react'
+import { Building2, ChevronRight, KeyRound, ScrollText, ShieldCheck, Sparkles, UserCog } from 'lucide-react'
 import { PhaseBadge } from '@/components/common/badges'
 import { PageHeader } from '@/components/common/page-header'
 import { AccessDenied } from '@/components/common/states'
@@ -39,6 +39,13 @@ const SECTIONS: {
     href: '/audit-logs',
     icon: ScrollText,
     permission: 'audit_log.read',
+  },
+  {
+    title: 'AYAVA AI',
+    description: 'Features, usage limits, retention and how AI is being used.',
+    href: '/ai/settings',
+    icon: Sparkles,
+    permission: 'ai.manage',
   },
   {
     title: 'Organization profile',

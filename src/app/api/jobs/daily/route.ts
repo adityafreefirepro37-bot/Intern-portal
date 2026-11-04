@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { config } from '@/lib/config'
 import { jsonError, jsonSuccess } from '@/lib/http/response'
+import { aiJobs } from '@/server/ai/settings.service'
 import { announcementJobs } from '@/server/services/announcement.service'
 import { checkinJobs } from '@/server/services/checkin.service'
 import { documentJobs } from '@/server/services/document.service'
@@ -32,6 +33,7 @@ function authorized(request: NextRequest): boolean {
  *   5. scheduled announcements that are due → published (+ notifications)
  *   6. learning deadlines (due in 3 days / overdue), goal target-date reminders
  *   7. weekly check-in reminders (Monday: open, Friday: due) and overdue reviews
+ *   8. AI retention: old conversations and usage records, expired proposals
  * Every step is idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
@@ -46,6 +48,7 @@ export async function POST(request: NextRequest) {
     const goals = await goalJobs.emitDeadlines()
     const checkins = await checkinJobs.emitReminders()
     const reviews = await reviewJobs.emitOverdue()
+    const ai = await aiJobs.applyRetention()
     return jsonSuccess({
       endingSoon: endingSoon.marked,
       overdueEvents: overdue.emitted,
@@ -57,6 +60,7 @@ export async function POST(request: NextRequest) {
       ...goals,
       ...checkins,
       ...reviews,
+      aiRetention: ai,
     })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })

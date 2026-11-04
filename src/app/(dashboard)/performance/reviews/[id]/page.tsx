@@ -9,6 +9,8 @@ import { CreatePlanDialog } from '@/features/performance/components/setup-forms'
 import { CorrectAnswerDialog, RatingScaleHelp, ReopenReviewDialog, ReviewAnswerForm } from '@/features/performance/components/review-forms'
 import { RATING_SCALE, RESPONDENT_LABELS, REVIEW_STATUS_LABELS } from '@/lib/performance/rules'
 import { cn, formatDay, fullName } from '@/lib/utils'
+import { AskAyava } from '@/features/ai/components/ask-ayava'
+import { aiOffered, CONTEXT_PROMPTS } from '@/server/ai/suggestions'
 import { requirePageContext } from '@/server/context'
 import { performanceReviewService, type ReviewDetail } from '@/server/services/performance-review.service'
 
@@ -97,6 +99,9 @@ export default async function ReviewPage({ params }: PageProps<'/performance/rev
               />
             )}
             {can.plan && <CreatePlanDialog internId={review.intern.id} reviewId={review.id} />}
+            {aiOffered(ctx) && (
+              <AskAyava contextType="PERFORMANCE" contextId={review.id} label={review.cycle?.name ?? 'Performance review'} suggestions={CONTEXT_PROMPTS.PERFORMANCE ?? []} />
+            )}
           </>
         }
       />

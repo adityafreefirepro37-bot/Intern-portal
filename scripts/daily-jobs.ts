@@ -25,6 +25,7 @@ async function main() {
   const { goalJobs } = await import('../src/server/services/goal.service')
   const { checkinJobs } = await import('../src/server/services/checkin.service')
   const { reviewJobs } = await import('../src/server/services/performance-review.service')
+  const { aiJobs } = await import('../src/server/ai/settings.service')
   const { prisma } = await import('../src/lib/db/client')
   try {
     const endingSoon = await internLifecycleService.markEndingSoon()
@@ -36,6 +37,7 @@ async function main() {
     const goals = await goalJobs.emitDeadlines()
     const checkins = await checkinJobs.emitReminders()
     const reviews = await reviewJobs.emitOverdue()
+    const ai = await aiJobs.applyRetention()
     console.log(`Ending soon: ${endingSoon.marked} intern(s) updated. Overdue onboarding events: ${overdue.emitted}.`)
     console.log(
       `Tasks due tomorrow: ${deadlines.dueSoon}. Newly overdue: ${deadlines.overdue}. Milestones due: ${deadlines.milestonesDue}.`,
@@ -48,6 +50,9 @@ async function main() {
     )
     console.log(
       `Check-in open: ${checkins.checkinOpen}. Check-in due: ${checkins.checkinDue}. Reviews overdue: ${reviews.reviewsOverdue}.`,
+    )
+    console.log(
+      `AI retention: ${ai.conversations} conversation(s) and ${ai.usageEvents} usage record(s) removed, ${ai.expiredActions} proposal(s) expired.`,
     )
   } finally {
     await prisma.$disconnect()

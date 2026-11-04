@@ -67,9 +67,10 @@ export function CommandMenu({
     }
   }, [term])
 
+  const canAskAi = nav.some((item) => item.href === '/ai')
   const entries: Entry[] = React.useMemo(() => {
     if (term.length >= 2) {
-      return groups.flatMap((group) =>
+      const results: Entry[] = groups.flatMap((group) =>
         group.results.map((result) => ({
           id: `${result.type}-${result.id}`,
           group: group.label,
@@ -78,12 +79,23 @@ export function CommandMenu({
           href: result.href,
         })),
       )
+      return canAskAi
+        ? [
+            ...results,
+            {
+              id: 'ask-ai',
+              group: 'AYAVA AI',
+              title: `Ask AYAVA AI: “${term.slice(0, 80)}”`,
+              href: `/ai?q=${encodeURIComponent(term.slice(0, 500))}`,
+            },
+          ]
+        : results
     }
     const lower = term.toLowerCase()
     return nav
       .filter((item) => item.label.toLowerCase().includes(lower))
       .map((item) => ({ id: `nav-${item.href}`, group: 'Go to', title: item.label, href: item.href }))
-  }, [term, groups, nav])
+  }, [term, groups, nav, canAskAi])
 
   const safeIndex = Math.min(activeIndex, Math.max(entries.length - 1, 0))
 

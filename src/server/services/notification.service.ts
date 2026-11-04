@@ -8,7 +8,7 @@ import { authorizationService } from './authorization.service'
 
 /**
  * In-app notifications (the `notifications` table from Phase 01). Created by
- * domain-event subscribers (src/server/events/subscribers.ts); Phase 07 adds
+ * domain-event subscribers (src/server/events/subscribers.ts); Phase 08 adds
  * email/push delivery and preferences on top of the same records.
  */
 export const NOTIFICATION_TYPES = {

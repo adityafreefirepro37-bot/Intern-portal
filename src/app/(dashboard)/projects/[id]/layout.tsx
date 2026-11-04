@@ -8,6 +8,8 @@ import { ProjectTabs } from '@/features/work/components/project-tabs'
 import { ForbiddenError, NotFoundError } from '@/lib/errors'
 import { formatDay, fullName, pluralize } from '@/lib/utils'
 import { idSchema } from '@/lib/validation'
+import { AskAyava } from '@/features/ai/components/ask-ayava'
+import { aiOffered, CONTEXT_PROMPTS } from '@/server/ai/suggestions'
 import { requirePageContext } from '@/server/context'
 import { projectService } from '@/server/services/project.service'
 
@@ -49,6 +51,11 @@ export default async function ProjectLayout({ children, params }: LayoutProps<'/
           <h1 className="text-h1 text-balance">{project.name}</h1>
           <StatusBadge status={project.status} />
           <PriorityBadge priority={project.priority} />
+          {aiOffered(ctx) && (
+            <span className="ml-auto">
+              <AskAyava contextType="PROJECT" contextId={project.id} label={project.name} suggestions={CONTEXT_PROMPTS.PROJECT ?? []} />
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-small text-muted-foreground">
           <span className="inline-flex items-center gap-2">

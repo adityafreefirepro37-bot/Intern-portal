@@ -9,7 +9,7 @@ import { registerLearningPerformanceSubscribers } from './learning-performance-s
 /**
  * Built-in domain-event subscribers: turn work events into in-app
  * notifications. Registered once per process (lazily, on the first emit).
- * Email/push delivery (Phase 07) can subscribe to the same events.
+ * Email/push delivery (Phase 08) can subscribe to the same events.
  */
 
 async function taskInfo(taskId: string) {

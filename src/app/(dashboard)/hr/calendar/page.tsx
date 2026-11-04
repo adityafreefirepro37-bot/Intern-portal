@@ -50,7 +50,7 @@ export default async function HrCalendarPage({ searchParams }: PageProps<'/hr/ca
     <>
       <PageHeader
         title="HR calendar"
-        description="Key dates across the programme. Calendar sync arrives in Phase 07."
+        description="Key dates across the programme. Calendar sync arrives in Phase 08."
       />
       <HrNav items={hrNavItems(ctx)} active="/hr/calendar" />
       <Card>

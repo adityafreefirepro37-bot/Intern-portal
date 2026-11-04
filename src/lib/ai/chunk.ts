@@ -143,6 +143,8 @@ export function chunkDocument(sections: SourceSection[], options: ChunkOptions =
 
   for (const section of sections) {
     const page = section.page ?? null
+    // A chunk never spans pages, so a citation always names the right page.
+    if (fresh && page !== bufferPage) flush()
     for (const block of normalizeText(section.text).split(/\n{2,}/)) {
       const lines = block.split('\n')
       const first = lines[0]?.trim() ?? ''

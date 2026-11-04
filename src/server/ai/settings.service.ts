@@ -252,6 +252,21 @@ export const aiSettingsService = {
   },
 }
 
+export const aiJobs = {
+  /** Daily: conversation and usage retention, expired proposals, per organization. */
+  async applyRetention() {
+    const organizations = await prisma.organization.findMany({ select: { id: true } })
+    const totals = { conversations: 0, usageEvents: 0, expiredActions: 0 }
+    for (const organization of organizations) {
+      const result = await aiSettingsService.applyRetention(organization.id)
+      totals.conversations += result.conversations
+      totals.usageEvents += result.usageEvents
+      totals.expiredActions += result.expiredActions
+    }
+    return totals
+  },
+}
+
 /** Midnight today in the organization's time zone, as a UTC instant. */
 function dayStart(timeZone: string) {
   const parts = new Intl.DateTimeFormat('en-US', {

@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card'
 import { CompleteLessonButton, EnrollButton } from '@/features/learning/components/learner-actions'
 import { LessonText, LockedNotice } from '@/features/learning/components/learning-ui'
 import { CONTENT_TYPE_LABELS, formatMinutes } from '@/lib/learning/rules'
+import { AskAyava } from '@/features/ai/components/ask-ayava'
+import { aiOffered, CONTEXT_PROMPTS } from '@/server/ai/suggestions'
 import { requirePageContext } from '@/server/context'
 import { learningService } from '@/server/services/learning.service'
 
@@ -41,6 +43,11 @@ export default async function LessonPage({ params }: PageProps<'/learning/course
           { label: `Lesson ${view.position.index} of ${view.position.total}` },
         ]}
         description={lesson.description ?? undefined}
+        actions={
+          aiOffered(ctx) ? (
+            <AskAyava contextType="LEARNING" contextId={lesson.id} label={lesson.title} suggestions={CONTEXT_PROMPTS.LEARNING ?? []} allowStudyMode />
+          ) : undefined
+        }
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Badge variant="neutral">{CONTENT_TYPE_LABELS[lesson.content_type]}</Badge>

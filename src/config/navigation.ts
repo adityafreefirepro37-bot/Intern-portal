@@ -99,7 +99,7 @@ export const NAVIGATION: NavSection[] = [
         mobile: true,
       },
       { label: 'Workload', href: '/workload', icon: Gauge, permission: 'task.review' },
-      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '07' },
+      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '08' },
     ],
   },
   {
@@ -200,12 +200,15 @@ export const NAVIGATION: NavSection[] = [
     title: 'Communication',
     items: [
       { label: 'Announcements', href: '/announcements', icon: Megaphone, permission: 'announcement.read' },
-      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read', phase: '07' },
+      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read', phase: '08' },
     ],
   },
   {
     title: 'AI',
-    items: [{ label: 'AYAVA AI', href: '/ai', icon: Sparkles, permission: 'ai.use', phase: '08' }],
+    items: [
+      { label: 'AYAVA AI', href: '/ai', icon: Sparkles, permission: 'ai.use' },
+      { label: 'Knowledge base', href: '/knowledge', icon: Library, permission: 'knowledge.read' },
+    ],
   },
   {
     title: 'Analytics',
