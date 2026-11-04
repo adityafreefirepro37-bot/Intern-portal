@@ -97,7 +97,8 @@ export function AiWorkspace({
   )
 
   return (
-    <div className="grid h-[calc(100dvh-14rem)] min-h-[26rem] gap-4 md:h-[calc(100dvh-11rem)] lg:grid-cols-[15rem_minmax(0,1fr)]">
+    // Fits the viewport below the page header and above the phone's bottom navigation.
+    <div className="grid h-[calc(100dvh-23rem)] min-h-[22rem] gap-4 md:h-[calc(100dvh-14.5rem)] lg:grid-cols-[15rem_minmax(0,1fr)]">
       <aside className="hidden min-h-0 lg:block">{sidebar}</aside>
       <section className="flex min-h-0 flex-col rounded-xl border bg-card p-3 sm:p-4">
         <div className="mb-2 lg:hidden">
