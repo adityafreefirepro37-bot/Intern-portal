@@ -144,6 +144,27 @@ export const AUDIT_ACTIONS = {
   REVIEW_CORRECTED: 'review.corrected',
   DEVELOPMENT_PLAN_CREATED: 'development_plan.created',
   DEVELOPMENT_PLAN_UPDATED: 'development_plan.updated',
+  // AYAVA AI — no prompt or answer content is ever written to the audit log.
+  AI_CONVERSATION_CREATED: 'ai.conversation_created',
+  AI_CONVERSATION_DELETED: 'ai.conversation_deleted',
+  AI_QUERY_SENT: 'ai.query_sent',
+  AI_TOOL_CALLED: 'ai.tool_called',
+  AI_KNOWLEDGE_RETRIEVED: 'ai.knowledge_retrieved',
+  AI_ACTION_PROPOSED: 'ai.action_proposed',
+  AI_ACTION_CONFIRMED: 'ai.action_confirmed',
+  AI_ACTION_CANCELLED: 'ai.action_cancelled',
+  AI_ACTION_EXECUTED: 'ai.action_executed',
+  AI_ACTION_FAILED: 'ai.action_failed',
+  AI_RESTRICTED_REQUEST: 'ai.restricted_request',
+  AI_ERROR: 'ai.error',
+  AI_SETTINGS_UPDATED: 'ai.settings_updated',
+  KNOWLEDGE_DOCUMENT_ADDED: 'knowledge.document_added',
+  KNOWLEDGE_DOCUMENT_UPDATED: 'knowledge.document_updated',
+  KNOWLEDGE_VERSION_ADDED: 'knowledge.version_added',
+  KNOWLEDGE_DOCUMENT_PROCESSED: 'knowledge.document_processed',
+  KNOWLEDGE_DOCUMENT_ARCHIVED: 'knowledge.document_archived',
+  KNOWLEDGE_DOCUMENT_RESTORED: 'knowledge.document_restored',
+  KNOWLEDGE_DOCUMENT_DELETED: 'knowledge.document_deleted',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

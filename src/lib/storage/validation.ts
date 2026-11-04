@@ -12,7 +12,7 @@
  *    (sanitized) as a display name.
  */
 
-export type UploadCategory = 'document' | 'image' | 'attachment'
+export type UploadCategory = 'document' | 'image' | 'attachment' | 'knowledge'
 
 interface FileTypeRule {
   extensions: readonly string[]
@@ -47,6 +47,9 @@ export const FILE_TYPES: Record<string, FileTypeRule> = {
   'video/mp4': { extensions: ['.mp4'] },
   'text/plain': { extensions: ['.txt'] },
   'text/csv': { extensions: ['.csv'] },
+  // Knowledge base only; always served as a download (never rendered).
+  'text/markdown': { extensions: ['.md', '.markdown'] },
+  'text/html': { extensions: ['.html', '.htm'] },
 }
 
 export const CATEGORY_MIME_TYPES: Record<UploadCategory, readonly string[]> = {
@@ -57,7 +60,14 @@ export const CATEGORY_MIME_TYPES: Record<UploadCategory, readonly string[]> = {
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ],
   image: ['image/png', 'image/jpeg', 'image/webp'],
-  attachment: Object.keys(FILE_TYPES),
+  attachment: Object.keys(FILE_TYPES).filter((type) => type !== 'text/html' && type !== 'text/markdown'),
+  knowledge: [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'text/markdown',
+    'text/html',
+  ],
 }
 
 export interface UploadCandidate {

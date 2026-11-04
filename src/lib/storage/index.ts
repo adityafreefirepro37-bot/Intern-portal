@@ -38,7 +38,7 @@ export interface StoredFile {
   fileSize: number
 }
 
-const KEY_PATTERN = /^[0-9a-f-]{36}\/(document|image|attachment)\/\d{4}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/
+const KEY_PATTERN = /^[0-9a-f-]{36}\/(document|image|attachment|knowledge)\/\d{4}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/
 
 export class StorageService {
   constructor(

@@ -24,8 +24,8 @@ const nextConfig: NextConfig = {
   // user's home folder) would otherwise be mistaken for the project root.
   turbopack: { root: path.join(__dirname) },
   reactStrictMode: true,
-  // Prisma's engine must not be bundled into server chunks.
-  serverExternalPackages: ['@prisma/client', 'prisma'],
+  // Prisma's engine and the knowledge-base text extractors (PDF.js) load from node_modules, not bundled.
+  serverExternalPackages: ['@prisma/client', 'prisma', 'unpdf', 'mammoth'],
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },

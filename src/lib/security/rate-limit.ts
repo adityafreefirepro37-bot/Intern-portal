@@ -66,6 +66,12 @@ export const RATE_LIMITS = {
   invitationCreate: { windowMs: 60 * 60 * 1000, limit: 30 },
   invitationAccept: { windowMs: 15 * 60 * 1000, limit: 10 },
   sensitive: { windowMs: 60 * 1000, limit: 30 },
+  /** AYAVA AI questions per user (daily quotas are separate, in AI settings). */
+  aiChat: { windowMs: 60 * 1000, limit: 12 },
+  /** AI action confirmations per user. */
+  aiAction: { windowMs: 60 * 1000, limit: 10 },
+  /** Knowledge-base uploads / reprocessing per user (each one calls the embedding model). */
+  aiIngest: { windowMs: 10 * 60 * 1000, limit: 30 },
 } as const
 
 export type RateLimitName = keyof typeof RATE_LIMITS

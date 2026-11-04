@@ -75,6 +75,10 @@ const EXPECTED_TABLES = [
   'ai_conversations',
   'ai_messages',
   'knowledge_documents',
+  // Phase 07 — AYAVA AI
+  'knowledge_chunks',
+  'ai_usage_events',
+  'ai_action_requests',
   'audit_logs',
   'settings',
   'user_invitations',

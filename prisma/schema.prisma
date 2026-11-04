@@ -16,7 +16,7 @@
 //   (see prisma/migrations) because Prisma does not model them.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   // Loads nested relations (include/select) in one SQL query with JOINs
   // instead of one query per relation; each round trip to a hosted database
   // costs hundreds of milliseconds.
@@ -533,12 +533,76 @@ enum AiMessageRole {
   TOOL
 }
 
+/// PENDING is shown as "Uploaded".
 enum KnowledgeDocumentStatus {
   PENDING
   PROCESSING
   READY
   FAILED
   ARCHIVED
+}
+
+enum AiContextType {
+  GLOBAL
+  TASK
+  PROJECT
+  LEARNING
+  HR
+  PERFORMANCE
+  ONBOARDING
+  DOCUMENT
+}
+
+enum AiFeedbackRating {
+  HELPFUL
+  NOT_HELPFUL
+}
+
+enum AiFeature {
+  CHAT
+  EMBEDDING
+  INGESTION
+  KNOWLEDGE_SEARCH
+  ACTION
+}
+
+enum AiActionStatus {
+  PROPOSED
+  CONFIRMED
+  CANCELLED
+  EXECUTED
+  FAILED
+  EXPIRED
+}
+
+enum KnowledgeCategory {
+  HR
+  ONBOARDING
+  POLICIES
+  SOP
+  SECURITY
+  BRAND
+  MARKETING
+  ENGINEERING
+  DESIGN
+  LEARNING
+  PROJECT
+  GENERAL
+}
+
+enum KnowledgeSourceType {
+  UPLOAD
+  TEXT
+}
+
+/// Who may retrieve a knowledge document (applied in the retrieval query, before ranking).
+enum KnowledgeVisibility {
+  ORGANIZATION
+  DEPARTMENT
+  TEAM
+  ROLE
+  PROJECT
+  PRIVATE
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -581,6 +645,9 @@ model Organization {
   certificates         Certificate[]
   ai_conversations     AiConversation[]
   knowledge_documents  KnowledgeDocument[]
+  knowledge_chunks     KnowledgeChunk[]
+  ai_usage_events      AiUsageEvent[]
+  ai_action_requests   AiActionRequest[]
   audit_logs           AuditLog[]
   settings             Setting[]
   invitations          UserInvitation[]
@@ -682,6 +749,9 @@ model User {
   messages_sent           Message[]
   ai_conversations        AiConversation[]
   knowledge_uploaded      KnowledgeDocument[]
+  knowledge_updated       KnowledgeDocument[]       @relation("KnowledgeUpdatedBy")
+  ai_usage_events         AiUsageEvent[]
+  ai_action_requests      AiActionRequest[]
   audit_logs              AuditLog[]
   invitations_sent        UserInvitation[]          @relation("InvitationCreator")
   invitations_revoked     UserInvitation[]          @relation("InvitationRevoker")
@@ -773,6 +843,8 @@ model Role {
   role_permissions RolePermission[]
   user_roles       UserRole[]
   invitations      UserInvitation[]
+
+  knowledge_documents KnowledgeDocument[]
 
   @@unique([organization_id, slug])
   @@index([organization_id])
@@ -911,6 +983,8 @@ model Department {
   learning_paths     LearningPath[]
   performance_cycles PerformanceCycle[]
 
+  knowledge_documents KnowledgeDocument[]
+
   @@unique([organization_id, slug])
   @@index([organization_id])
   @@map("departments")
@@ -932,6 +1006,8 @@ model Team {
   department   Department?  @relation(fields: [department_id], references: [id], onDelete: SetNull)
   team_lead    User?        @relation("TeamLead", fields: [team_lead_id], references: [id], onDelete: SetNull)
   interns      Intern[]
+
+  knowledge_documents KnowledgeDocument[]
 
   @@unique([organization_id, slug])
   @@index([organization_id])
@@ -1251,6 +1327,8 @@ model Project {
   milestones   Milestone[]
   tasks        Task[]
   attachments  ProjectAttachment[]
+
+  knowledge_documents KnowledgeDocument[]
 
   @@unique([organization_id, slug])
   @@index([organization_id, status])
@@ -2859,21 +2937,27 @@ model CertificateVerification {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI & KNOWLEDGE (pipeline implemented in Prompt 08)
+// AI & KNOWLEDGE (Prompt 07 — AYAVA AI)
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// A private conversation: only its owner can read it (enforced in aiConversationService).
 model AiConversation {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String   @db.Uuid
-  user_id         String   @db.Uuid
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String        @db.Uuid
+  user_id         String        @db.Uuid
   title           String?
-  context_type    String?
-  created_at      DateTime @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  /// What the conversation is about; the server re-checks access to context_id on every message.
+  context_type    AiContextType @default(GLOBAL)
+  context_id      String?       @db.Uuid
+  archived_at     DateTime?     @db.Timestamptz(3)
+  created_at      DateTime      @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  messages     AiMessage[]
+  organization    Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user            User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages        AiMessage[]
+  action_requests AiActionRequest[]
+  usage_events    AiUsageEvent[]
 
   @@index([organization_id])
   @@index([user_id, updated_at])
@@ -2881,37 +2965,159 @@ model AiConversation {
 }
 
 model AiMessage {
-  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  conversation_id String        @db.Uuid
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String            @db.Uuid
   role            AiMessageRole
   content         String
   model           String?
-  created_at      DateTime      @default(now()) @db.Timestamptz(3)
+  provider        String?
+  tokens_input    Int?
+  tokens_output   Int?
+  /// Sources, tools, intent, latency, request id — never secrets or raw tool payloads.
+  metadata        Json?
+  feedback        AiFeedbackRating?
+  feedback_reason String?
+  feedback_at     DateTime?         @db.Timestamptz(3)
+  created_at      DateTime          @default(now()) @db.Timestamptz(3)
 
-  conversation AiConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  conversation    AiConversation    @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  action_requests AiActionRequest[]
 
   @@index([conversation_id, created_at])
   @@map("ai_messages")
 }
 
+/// Operational usage (requests, tokens, latency, errors) — no prompt or answer content.
+model AiUsageEvent {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id  String    @db.Uuid
+  user_id          String?   @db.Uuid
+  conversation_id  String?   @db.Uuid
+  feature          AiFeature
+  intent           String?
+  context_type     String?
+  role_slug        String?
+  provider         String?
+  model            String?
+  tokens_input     Int       @default(0)
+  tokens_output    Int       @default(0)
+  latency_ms       Int?
+  success          Boolean
+  error_code       String?
+  tools            String[]  @default([])
+  retrieved_chunks Int       @default(0)
+  created_at       DateTime  @default(now()) @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User?           @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  conversation AiConversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+
+  @@index([organization_id, created_at])
+  @@index([user_id, created_at])
+  @@map("ai_usage_events")
+}
+
+/// A write the AI proposed. Nothing runs until its owner confirms; the payload is re-validated then.
+model AiActionRequest {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String         @db.Uuid
+  user_id         String         @db.Uuid
+  conversation_id String?        @db.Uuid
+  message_id      String?        @db.Uuid
+  action_type     String
+  payload         Json
+  status          AiActionStatus @default(PROPOSED)
+  result          Json?
+  error           String?
+  expires_at      DateTime       @db.Timestamptz(3)
+  confirmed_at    DateTime?      @db.Timestamptz(3)
+  executed_at     DateTime?      @db.Timestamptz(3)
+  created_at      DateTime       @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversation AiConversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+  message      AiMessage?      @relation(fields: [message_id], references: [id], onDelete: SetNull)
+
+  @@index([user_id, status])
+  @@index([organization_id, created_at])
+  @@map("ai_action_requests")
+}
+
+/// A knowledge-base document version. Versions of one document share family_id;
+/// retrieval uses only the current, READY version the viewer may see.
 model KnowledgeDocument {
   id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organization_id String                  @db.Uuid
+  family_id       String                  @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version         Int                     @default(1)
+  is_current      Boolean                 @default(true)
   title           String
   description     String?
-  file_name       String
-  storage_path    String
-  mime_type       String
+  category        KnowledgeCategory       @default(GENERAL)
+  source_type     KnowledgeSourceType     @default(UPLOAD)
+  visibility      KnowledgeVisibility     @default(ORGANIZATION)
+  department_id   String?                 @db.Uuid
+  team_id         String?                 @db.Uuid
+  role_id         String?                 @db.Uuid
+  project_id      String?                 @db.Uuid
+  /// Policy date (e.g. "effective from"), shown with citations.
+  effective_date  DateTime?               @db.Date
+  file_name       String?
+  storage_path    String?
+  mime_type       String?
+  file_size       Int?
+  /// Normalized extracted text (or the typed text for TEXT documents).
+  content         String?
   status          KnowledgeDocumentStatus @default(PENDING)
+  error_message   String?
+  chunk_count     Int                     @default(0)
+  embedding_model String?
+  processed_at    DateTime?               @db.Timestamptz(3)
+  archived_at     DateTime?               @db.Timestamptz(3)
   uploaded_by     String?                 @db.Uuid
+  updated_by      String?                 @db.Uuid
   created_at      DateTime                @default(now()) @db.Timestamptz(3)
   updated_at      DateTime                @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  uploader     User?        @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  organization Organization     @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  uploader     User?            @relation(fields: [uploaded_by], references: [id], onDelete: SetNull)
+  updater      User?            @relation("KnowledgeUpdatedBy", fields: [updated_by], references: [id], onDelete: SetNull)
+  department   Department?      @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  team         Team?            @relation(fields: [team_id], references: [id], onDelete: SetNull)
+  role         Role?            @relation(fields: [role_id], references: [id], onDelete: SetNull)
+  project      Project?         @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  chunks       KnowledgeChunk[]
 
   @@index([organization_id, status])
+  @@index([organization_id, is_current, status])
+  @@index([family_id, version])
   @@map("knowledge_documents")
+}
+
+/// Retrieval unit. `embedding` is a plain real[] (no pgvector needed) scored by
+/// ayava_cosine_similarity(); `search` is a generated full-text vector for keyword search.
+model KnowledgeChunk {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                   @db.Uuid
+  document_id     String                   @db.Uuid
+  chunk_index     Int
+  heading         String?
+  page            Int?
+  content         String
+  token_count     Int
+  embedding       Float[]                  @default([]) @db.Real
+  embedding_model String?
+  search          Unsupported("tsvector")?
+  created_at      DateTime                 @default(now()) @db.Timestamptz(3)
+
+  organization Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  document     KnowledgeDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@unique([document_id, chunk_index])
+  @@index([organization_id])
+  @@map("knowledge_chunks")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -89,8 +89,19 @@ const envSchema = z.object({
   STORAGE_LOCAL_PATH: z.string().default('./.local/uploads'),
   STORAGE_MAX_UPLOAD_MB: z.coerce.number().positive().max(100).default(10),
 
-  AI_PROVIDER: optionalString,
+  // AYAVA AI. "nvidia" = NVIDIA NIM (build.nvidia.com); "openai" = OpenAI; "compatible" = any other
+  // OpenAI-compatible endpoint (set AI_BASE_URL). Blank = AI disabled.
+  AI_PROVIDER: choice(['nvidia', 'openai', 'compatible']),
   AI_API_KEY: optionalString,
+  AI_BASE_URL: webUrl('the provider API address, e.g. https://integrate.api.nvidia.com/v1'),
+  AI_MODEL: optionalString,
+  /** Tried once when the primary model fails (same provider — data never goes elsewhere). */
+  AI_FALLBACK_MODEL: optionalString,
+  /** Blank = provider default; "none" = keyword-only knowledge search. */
+  AI_EMBEDDING_MODEL: optionalString,
+  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.2),
+  AI_MAX_TOKENS: z.coerce.number().int().min(64).max(8192).default(1024),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).default(60_000),
 
   EMAIL_PROVIDER: choice(['resend', 'smtp']),
   EMAIL_API_KEY: optionalString,
@@ -131,6 +142,39 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
   return result.data
 }
 
+const AI_DEFAULTS = {
+  nvidia: {
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    model: 'meta/llama-3.3-70b-instruct',
+    embeddingModel: 'nvidia/nv-embedqa-e5-v5',
+  },
+  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', embeddingModel: 'text-embedding-3-small' },
+  compatible: { baseUrl: undefined, model: undefined, embeddingModel: undefined },
+} as const
+
+/** AI provider settings. `configured` is false until a provider, address, model and key exist. */
+export function aiConfig(env: Env) {
+  const provider = env.AI_PROVIDER
+  const defaults = provider ? AI_DEFAULTS[provider] : undefined
+  const baseUrl = env.AI_BASE_URL ?? defaults?.baseUrl
+  const model = env.AI_MODEL ?? defaults?.model
+  const embeddingModel =
+    env.AI_EMBEDDING_MODEL?.toLowerCase() === 'none' ? undefined : (env.AI_EMBEDDING_MODEL ?? defaults?.embeddingModel)
+  return {
+    provider,
+    // A local OpenAI-compatible server (e.g. Ollama) may not need a key.
+    configured: Boolean(provider && baseUrl && model && (env.AI_API_KEY || provider === 'compatible')),
+    baseUrl,
+    apiKey: env.AI_API_KEY,
+    model,
+    fallbackModel: env.AI_FALLBACK_MODEL,
+    embeddingModel,
+    temperature: env.AI_TEMPERATURE,
+    maxTokens: env.AI_MAX_TOKENS,
+    timeoutMs: env.AI_TIMEOUT_MS,
+  }
+}
+
 function buildConfig(env: Env) {
   const isProduction = env.NODE_ENV === 'production'
   return {
@@ -162,10 +206,7 @@ function buildConfig(env: Env) {
       localPath: env.STORAGE_LOCAL_PATH,
       maxUploadBytes: Math.floor(env.STORAGE_MAX_UPLOAD_MB * 1024 * 1024),
     },
-    ai: {
-      provider: env.AI_PROVIDER,
-      apiKey: env.AI_API_KEY,
-    },
+    ai: aiConfig(env),
     email: {
       provider: env.EMAIL_PROVIDER,
       apiKey: env.EMAIL_API_KEY,
