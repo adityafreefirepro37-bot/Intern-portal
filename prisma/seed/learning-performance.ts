@@ -841,6 +841,8 @@ export async function seedLearningPerformance(prisma: PrismaClient, input: Input
       reviewed_at: reviewed ? daysFrom(week, 5) : null,
       review_comment: reviewed ? 'Good progress this week — keep sharing blockers early.' : null,
     }
+    // Weeks are relative to today: a re-seed in a later week moves this row, so clear its old week first.
+    await prisma.weeklyCheckin.deleteMany({ where: { id: checkinId, week_start: { not: week } } })
     await prisma.weeklyCheckin.upsert({
       where: { intern_id_week_start: { intern_id: internIds[c.who], week_start: week } },
       update: data,
