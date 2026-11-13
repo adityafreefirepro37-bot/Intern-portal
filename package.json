@@ -30,6 +30,7 @@
     "email:test": "tsx --conditions=react-server scripts/email-test.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "5.22.0",
     "@prisma/client": "^5.22.0",
     "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-dialog": "^1.1.23",
@@ -50,6 +51,7 @@
     "mammoth": "1.13.0",
     "next": "16.3.5",
     "nodemailer": "^10.0.12",
+    "pg": "8.23.1",
     "prisma": "^5.22.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -64,6 +66,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "embedded-postgres": "^18.4.0-beta.17",

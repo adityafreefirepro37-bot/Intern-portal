@@ -20,7 +20,9 @@ generator client {
   // Loads nested relations (include/select) in one SQL query with JOINs
   // instead of one query per relation; each round trip to a hosted database
   // costs hundreds of milliseconds.
-  previewFeatures = ["relationJoins"]
+  // driverAdapters: queries go through node-postgres (src/lib/db/client.ts), one
+  // round trip each, even behind a transaction pooler.
+  previewFeatures = ["relationJoins", "driverAdapters"]
 }
 
 datasource db {

@@ -24,8 +24,8 @@ const nextConfig: NextConfig = {
   // user's home folder) would otherwise be mistaken for the project root.
   turbopack: { root: path.join(__dirname) },
   reactStrictMode: true,
-  // Prisma's engine and the knowledge-base text extractors (PDF.js) load from node_modules, not bundled.
-  serverExternalPackages: ['@prisma/client', 'prisma', 'unpdf', 'mammoth'],
+  // Prisma (engine + node-postgres adapter) and the knowledge-base text extractors (PDF.js) load from node_modules, not bundled.
+  serverExternalPackages: ['@prisma/client', 'prisma', '@prisma/adapter-pg', 'pg', 'unpdf', 'mammoth'],
   // Uploads go through Server Actions (default limit 1 MB). The storage service
   // enforces STORAGE_MAX_UPLOAD_MB (10 MB by default); 11 MB allows for multipart overhead.
   experimental: {

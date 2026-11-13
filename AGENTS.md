@@ -43,6 +43,8 @@ npm run build
 
 - Multi-tenant: every query is scoped to the organization from the server request context (src/server/context.ts)
 - Layering: pages/components → services (src/server/services) → repositories → Prisma; UI never imports the db client
+- Prisma runs through the node-postgres adapter (src/lib/db/pool.ts): one round trip per query; pool size DATABASE_POOL_MAX
+  (default 5). Raw SQL selecting catalog columns (type name) must cast them ::text. Benchmark pages: scripts/bench-pages.ts
 - Permissions are data (roles → role_permissions (with scope) → permissions); check permissions, never role names
 - Services call authorizationService.require() and use the scope filters in src/server/repositories/scope.ts
 - Auth is Supabase Auth, server-only; resolve the user with requirePageContext()/requireApiContext(); never trust client ids
