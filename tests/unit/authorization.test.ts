@@ -120,6 +120,8 @@ function record(
     organization: { id: ORG, name: 'Org', slug: 'org', timezone: 'Asia/Kolkata', logo_url: null },
     teams_led: [],
     departments_led: [],
+    intern: null,
+    _count: { interns_managed: 0, interns_mentored: 0, notifications: 0 },
     user_roles: roles.map((role, index) => ({
       role: {
         id: `role-${index}`,

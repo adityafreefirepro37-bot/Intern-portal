@@ -3,8 +3,15 @@ import { prisma } from '@/lib/db/client'
 
 const TOUCH_INTERVAL_MS = 5 * 60 * 1000
 
+export interface SessionRow {
+  id: string
+  user_id: string
+  revoked_at: Date | null
+  last_seen_at: Date
+}
+
 export const sessionRepository = {
-  findByAuthSessionId(authSessionId: string) {
+  findByAuthSessionId(authSessionId: string): Promise<SessionRow | null> {
     return prisma.userSession.findUnique({
       where: { auth_session_id: authSessionId },
       select: { id: true, user_id: true, revoked_at: true, last_seen_at: true },
@@ -22,8 +29,10 @@ export const sessionRepository = {
     organizationId: string
     ipAddress: string | null
     userAgent: string | null
+    /** The row if the caller already loaded it (saves a round trip); undefined = look it up. */
+    existing?: SessionRow | null
   }): Promise<{ revoked: boolean }> {
-    const existing = await this.findByAuthSessionId(input.authSessionId)
+    const existing = input.existing !== undefined ? input.existing : await this.findByAuthSessionId(input.authSessionId)
     if (!existing) {
       await prisma.userSession.upsert({
         where: { auth_session_id: input.authSessionId },

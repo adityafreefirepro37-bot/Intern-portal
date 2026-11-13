@@ -1101,11 +1101,9 @@ export const internService = {
 
   /** Relationship facts for navigation (cheap counts; no permission needed to know about yourself). */
   async navFacts(ctx: RequestContext) {
-    const [{ managed, mentored }, own] = await Promise.all([
-      this.relationCounts(ctx),
-      internRepository.findByUserId(ctx.organization.id, ctx.actor.userId),
-    ])
-    return { isIntern: Boolean(own), managesInterns: managed > 0, mentorsInterns: mentored > 0 }
+    // Loaded with the identity on every request (src/server/context.ts): no queries here.
+    const { isIntern, managesInterns, mentorsInterns } = ctx.shell
+    return { isIntern, managesInterns, mentorsInterns }
   },
 }
 

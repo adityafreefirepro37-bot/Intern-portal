@@ -41,6 +41,8 @@ export interface RequestContext {
   actor: Actor
   organization: CurrentOrganization
   authUser: { id: string; email: string | null; sessionId: string | null }
+  /** Shell facts loaded with the identity (no extra queries): navigation and the notification badge. */
+  shell: { isIntern: boolean; managesInterns: boolean; mentorsInterns: boolean; unreadNotifications: number }
 }
 
 export type AuthState =
@@ -90,6 +92,12 @@ export function toRequestContext(
       logoUrl: record.organization.logo_url,
     },
     authUser: { id: session.authUserId, email: session.email, sessionId: session.sessionId },
+    shell: {
+      isIntern: Boolean(record.intern && !record.intern.deleted_at),
+      managesInterns: record._count.interns_managed > 0,
+      mentorsInterns: record._count.interns_mentored > 0,
+      unreadNotifications: record._count.notifications,
+    },
   }
 }
 
@@ -113,7 +121,11 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
   const session = await getAuthProvider().getSession()
   if (!session) return { status: 'UNAUTHENTICATED' }
 
-  const record = await identityRepository.findByAuthUserId(session.authUserId)
+  // The identity and the session row don't depend on each other: one round trip, not two.
+  const [record, existingSession] = await Promise.all([
+    identityRepository.findByAuthUserId(session.authUserId),
+    session.sessionId ? sessionRepository.findByAuthSessionId(session.sessionId) : Promise.resolve(null),
+  ])
   const classification = classifyAccount(record, session, {
     requireEmailVerification: config.auth.requireEmailVerification,
   })
@@ -129,6 +141,7 @@ export const getAuthState = cache(async (): Promise<AuthState> => {
   if (session.sessionId) {
     const meta = await getRequestMeta()
     const { revoked } = await sessionRepository.touch({
+      existing: existingSession,
       authSessionId: session.sessionId,
       userId: record.id,
       organizationId: record.organization_id,

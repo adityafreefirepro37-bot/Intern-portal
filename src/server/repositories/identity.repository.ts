@@ -21,6 +21,16 @@ const actorSelect = {
   organization: { select: { id: true, name: true, slug: true, timezone: true, logo_url: true } },
   teams_led: { where: { is_active: true }, select: { id: true } },
   departments_led: { where: { is_active: true }, select: { id: true } },
+  // Shell facts (navigation, notification badge) come with the same query, so a page
+  // load doesn't need separate round trips for them.
+  intern: { select: { id: true, deleted_at: true } },
+  _count: {
+    select: {
+      interns_managed: { where: { deleted_at: null } },
+      interns_mentored: { where: { deleted_at: null } },
+      notifications: { where: { read_at: null } },
+    },
+  },
   user_roles: {
     select: {
       role: {

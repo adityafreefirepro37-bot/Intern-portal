@@ -181,25 +181,23 @@ export const notificationService = {
 
   async listRecent(ctx: RequestContext, take = 8) {
     if (!authorizationService.can(ctx, 'notification.read')) return { items: [], unread: 0 }
-    const where = { user_id: ctx.actor.userId, organization_id: ctx.organization.id }
-    const [items, unread] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        orderBy: { created_at: 'desc' },
-        take,
-        select: {
-          id: true,
-          type: true,
-          title: true,
-          body: true,
-          read_at: true,
-          created_at: true,
-          related_entity_type: true,
-          related_entity_id: true,
-        },
-      }),
-      prisma.notification.count({ where: { ...where, read_at: null } }),
-    ])
+    const items = await prisma.notification.findMany({
+      where: { user_id: ctx.actor.userId, organization_id: ctx.organization.id },
+      orderBy: { created_at: 'desc' },
+      take,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        body: true,
+        read_at: true,
+        created_at: true,
+        related_entity_type: true,
+        related_entity_id: true,
+      },
+    })
+    // The unread count comes with the identity query (see RequestContext.shell).
+    const unread = ctx.shell.unreadNotifications
     return {
       items: items.map((item) => ({
         ...item,
