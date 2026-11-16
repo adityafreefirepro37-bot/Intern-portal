@@ -28,10 +28,12 @@ export function CertificatePreview({
   className?: string
 }) {
   const wording = certificateWording(text)
-  const fs = (min: string, vw: string, max: string) => `clamp(${min}, ${vw}, ${max})`
+  // Sizes in % of the certificate's width (container query units), mirroring the PDF's point sizes.
+  const cq = (pct: number) => `${pct}cqw`
   return (
     <figure
       className={cn('relative overflow-hidden border-2 border-[#1c1b1b] bg-[#fdfcf8] p-[0.6%] text-[#1c1b1b] shadow-sm', className)}
+      style={{ containerType: 'inline-size' }}
       aria-label={`${wording.heading} for ${text.recipientName}`}
     >
       {/* Gradient band */}
@@ -45,37 +47,37 @@ export function CertificatePreview({
             className="pointer-events-none absolute left-1/2 top-[52%] w-[36%] -translate-x-1/2 -translate-y-1/2 opacity-[0.045]"
           />
           <img src="/brand/ayava-logo-light-bg.png" alt={text.organizationName} className="relative h-[17%] w-auto" />
-          <p className="relative mt-[2%] font-bold tracking-[0.18em]" style={{ fontSize: fs('1rem', '3.2vw', '2.4rem') }}>
+          <p className="relative mt-[2%] font-bold tracking-[0.18em]" style={{ fontSize: cq(4.75) }}>
             CERTIFICATE
           </p>
           <p
             className="relative mt-[1%] px-[6%] py-[0.6%] font-sans font-bold uppercase tracking-[0.22em] text-white"
-            style={{ background: GRADIENT, fontSize: fs('0.45rem', '0.95vw', '0.75rem') }}
+            style={{ background: GRADIENT, fontSize: cq(1.43) }}
           >
             {ribbonText(text)}
           </p>
-          <p className="relative mt-[2.5%] italic text-[#5b5b61]" style={{ fontSize: fs('0.6rem', '1.3vw', '0.95rem') }}>
+          <p className="relative mt-[2.5%] italic text-[#5b5b61]" style={{ fontSize: cq(1.72) }}>
             {wording.lead}
           </p>
-          <p className="relative mt-[1%] font-bold italic" style={{ fontSize: fs('1rem', '3.2vw', '2.3rem') }}>
+          <p className="relative mt-[1%] font-bold italic" style={{ fontSize: cq(4.5) }}>
             {text.recipientName || 'Recipient name'}
           </p>
           <span className="relative mt-[0.5%] h-[2px] w-[45%]" style={{ background: GRADIENT }} aria-hidden />
-          <p className="relative mt-[2.2%] max-w-[82%] leading-snug" style={{ fontSize: fs('0.6rem', '1.3vw', '0.95rem') }}>
+          <p className="relative mt-[2.2%] max-w-[82%] leading-snug" style={{ fontSize: cq(1.72) }}>
             {wording.body}
           </p>
           {text.citation && (
-            <p className="relative mt-[1%] max-w-[76%] italic text-[#5b5b61]" style={{ fontSize: fs('0.55rem', '1.15vw', '0.85rem') }}>
+            <p className="relative mt-[1%] max-w-[76%] italic text-[#5b5b61]" style={{ fontSize: cq(1.54) }}>
               “{text.citation}”
             </p>
           )}
           <div className="relative mt-auto grid w-full grid-cols-3 items-end gap-2 font-sans text-left">
             <div>
               <span className="block h-px w-[85%] bg-[#1c1b1b]" aria-hidden />
-              <p className="mt-1 font-bold" style={{ fontSize: fs('0.5rem', '1vw', '0.75rem') }}>
+              <p className="mt-1 font-bold" style={{ fontSize: cq(1.43) }}>
                 {signatoryName ?? 'Authorised signatory'}
               </p>
-              <p className="text-[#5b5b61]" style={{ fontSize: fs('0.45rem', '0.85vw', '0.65rem') }}>
+              <p className="text-[#5b5b61]" style={{ fontSize: cq(1.13) }}>
                 {signatoryTitle ?? text.organizationName}
               </p>
             </div>
@@ -85,19 +87,19 @@ export function CertificatePreview({
                   <img src="/brand/ayava-mark-dark-bg.png" alt="" className="w-[55%]" />
                 </span>
               </span>
-              <p className="mt-1 text-[#5b5b61]" style={{ fontSize: fs('0.45rem', '0.85vw', '0.65rem') }}>
+              <p className="mt-1 text-[#5b5b61]" style={{ fontSize: cq(1.13) }}>
                 {issuedAt ? `Issued ${formatCertificateDate(issuedAt)}` : 'Not yet issued'}
               </p>
             </div>
             <div className="flex flex-col items-end">
               <span
                 className="grid aspect-square w-[32%] min-w-8 place-items-center border border-[#c29945] bg-white text-[#5b5b61]"
-                style={{ fontSize: fs('0.35rem', '0.7vw', '0.55rem') }}
+                style={{ fontSize: cq(0.9) }}
                 aria-hidden
               >
                 QR
               </span>
-              <p className="mt-1 font-bold" style={{ fontSize: fs('0.45rem', '0.85vw', '0.65rem') }}>
+              <p className="mt-1 font-bold" style={{ fontSize: cq(1.0) }}>
                 No. {number}
               </p>
             </div>
@@ -105,7 +107,7 @@ export function CertificatePreview({
           {watermark && (
             <span
               className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-[22deg] font-sans font-black text-[#d33]/15"
-              style={{ fontSize: fs('2rem', '10vw', '6rem') }}
+              style={{ fontSize: cq(11) }}
               aria-hidden
             >
               {watermark}
