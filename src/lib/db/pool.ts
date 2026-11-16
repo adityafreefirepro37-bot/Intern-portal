@@ -46,6 +46,17 @@ export function poolConfigFromUrl(databaseUrl: string): PoolConfig {
   else if (sslmode === 'verify-full' || sslmode === 'verify-ca') ssl = { rejectUnauthorized: true }
   else ssl = { rejectUnauthorized: false }
 
+  // The adapter (5.22) sends DateTime values without an offset, so Postgres reads them in the
+  // session timezone: a server set to e.g. Asia/Kolkata (a local PostgreSQL on an Indian
+  // machine) would store every timestamp 5½ hours off. Start sessions in UTC. Connections
+  // through Supabase's pooler (Supavisor) are left as they were — its servers already run in
+  // UTC — rather than relying on the pooler forwarding startup options.
+  const supavisor = /\.pooler\.supabase\.com$/i.test(url.hostname)
+  const startupOptions = [
+    ...(supavisor ? [] : ['-c TimeZone=UTC']),
+    ...(schema && schema !== 'public' ? [`-c search_path=${schema}`] : []),
+  ]
+
   return {
     connectionString: url.toString(),
     ssl,
@@ -54,7 +65,7 @@ export function poolConfigFromUrl(databaseUrl: string): PoolConfig {
     idleTimeoutMillis: 30_000,
     // Idle connections don't keep a script or test run alive (a server stays up on its own).
     allowExitOnIdle: true,
-    ...(schema && schema !== 'public' ? { options: `-c search_path=${schema}` } : {}),
+    ...(startupOptions.length ? { options: startupOptions.join(' ') } : {}),
   }
 }
 
@@ -67,12 +78,5 @@ export function createPrismaClient(options: { url?: string; log?: Prisma.PrismaC
   const pool = new Pool(poolConfigFromUrl(url))
   // An idle connection the pooler closed must not crash the process; the pool replaces it.
   pool.on('error', () => {})
-  // The adapter (5.22) sends DateTime values without an offset, so Postgres reads them in the
-  // session timezone. Pin sessions to UTC, or a server set to e.g. Asia/Kolkata (a local
-  // PostgreSQL on an Indian machine) stores every timestamp 5½ hours off. Supabase is already
-  // UTC; behind its transaction pooler this is a harmless no-op. Queued before any other query.
-  pool.on('connect', (client) => {
-    client.query("SET TIME ZONE 'UTC'").catch(() => {})
-  })
   return new PrismaClient({ adapter: new PrismaPg(pool), log })
 }

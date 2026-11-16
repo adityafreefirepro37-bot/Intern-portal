@@ -52,9 +52,23 @@ function role(text: CertificateText) {
   return `${program}${team}`
 }
 
-/** "a Web Development Intern" / "an Engineering Intern". */
+/**
+ * "a Web Development Intern" / "an Engineering Intern" / "a UI/UX Intern" /
+ * "an SEO Intern". Goes by sound: acronyms by their first letter's name,
+ * "u" words like "user" / "unity" take "a".
+ */
 export function withArticle(title: string) {
-  return /^[aeiou]/i.test(title.trim()) ? `an ${title}` : `a ${title}`
+  const t = title.trim()
+  const first = t.split(/[\s/-]/)[0] ?? ''
+  let an: boolean
+  if (first.length > 1 && first === first.toUpperCase() && /^[A-Z]/.test(first)) {
+    an = 'AEFHILMNORSX'.includes(first[0]!)
+  } else if (/^u[bcdfghjklmnpqrstvwxyz][aeiou]/i.test(t)) {
+    an = false
+  } else {
+    an = /^[aeiou]/i.test(t)
+  }
+  return `${an ? 'an' : 'a'} ${t}`
 }
 
 /** Heading, lead-in and body of a certificate. */

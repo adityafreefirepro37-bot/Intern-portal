@@ -45,6 +45,11 @@ describe('certificate wording', () => {
   it('uses the right article and date format', () => {
     expect(withArticle('Engineering Intern')).toBe('an Engineering Intern')
     expect(withArticle('Design Intern')).toBe('a Design Intern')
+    expect(withArticle('UI/UX Intern')).toBe('a UI/UX Intern')
+    expect(withArticle('SEO Intern')).toBe('an SEO Intern')
+    expect(withArticle('HR Intern')).toBe('an HR Intern')
+    expect(withArticle('User Research Intern')).toBe('a User Research Intern')
+    expect(withArticle('Unreal Engine Intern')).toBe('an Unreal Engine Intern')
     expect(formatCertificateDate(new Date('2026-01-05T00:00:00Z'))).toBe('5 January 2026')
   })
 })

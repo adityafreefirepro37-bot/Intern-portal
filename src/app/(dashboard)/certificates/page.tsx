@@ -139,7 +139,7 @@ export default async function CertificatesPage({ searchParams }: PageProps<'/cer
                   </p>
                 </div>
                 <StatusBadge status={c.status} label={humanizeEnum(c.status)} />
-                <NewCertificate interns={[]} internId={c.internId} label="Prepare" size="sm" variant="outline" />
+                <NewCertificate interns={[]} internId={c.internId} internName={c.name} label="Prepare" size="sm" variant="outline" />
               </li>
             ))}
           </ul>

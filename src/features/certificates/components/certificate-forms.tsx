@@ -52,12 +52,14 @@ function TypeSelect({ id, defaultValue, onChange }: { id: string; defaultValue?:
 export function NewCertificate({
   interns,
   internId,
+  internName,
   label = 'New certificate',
   size,
   variant,
 }: {
   interns: { id: string; name: string; detail?: string | null }[]
   internId?: string
+  internName?: string
   label?: string
   size?: 'sm' | 'default'
   variant?: 'default' | 'outline'
@@ -83,7 +85,7 @@ export function NewCertificate({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Prepare a certificate</DialogTitle>
+            <DialogTitle>{internName ? `Prepare a certificate for ${internName}` : 'Prepare a certificate'}</DialogTitle>
             <DialogDescription>
               We fill in the name, role, team and dates from the intern’s record. You can check and edit everything before
               issuing.
