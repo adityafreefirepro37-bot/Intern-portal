@@ -10,6 +10,7 @@ import { AUDIT_ACTIONS } from './audit-actions'
 import { auditService } from './audit.service'
 import type { UploadFile } from './task-submission.service'
 import { resolveTaskAccess, type TaskAccess } from './work-access'
+import { extractMentionIds } from '@/lib/communication/mentions'
 
 /**
  * Collaboration inside a task: checklist, dependencies, comments (threads and
@@ -33,12 +34,8 @@ function requireWork(access: TaskAccess) {
   }
 }
 
-/** Mention markup produced by the comment box: @[Display Name](user-uuid). */
-const MENTION = /@\[([^\]]{1,80})\]\(([0-9a-f-]{36})\)/g
-
-export function extractMentionIds(body: string): string[] {
-  return [...new Set([...body.matchAll(MENTION)].map((match) => match[2]))]
-}
+/** Mention markup produced by the comment box: @[Display Name](user-uuid). Shared with messages. */
+export { extractMentionIds }
 
 /** People who take part in a task and can therefore be mentioned. */
 async function participantIds(access: TaskAccess) {

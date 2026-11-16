@@ -165,6 +165,18 @@ export const AUDIT_ACTIONS = {
   KNOWLEDGE_DOCUMENT_ARCHIVED: 'knowledge.document_archived',
   KNOWLEDGE_DOCUMENT_RESTORED: 'knowledge.document_restored',
   KNOWLEDGE_DOCUMENT_DELETED: 'knowledge.document_deleted',
+  MEETING_SCHEDULED: 'meeting.scheduled',
+  MEETING_UPDATED: 'meeting.updated',
+  MEETING_CANCELLED: 'meeting.cancelled',
+  CALENDAR_EVENT_SAVED: 'calendar.event_saved',
+  CALENDAR_EVENT_DELETED: 'calendar.event_deleted',
+  CHANNEL_CREATED: 'channel.created',
+  CHANNEL_UPDATED: 'channel.updated',
+  CHANNEL_ARCHIVED: 'channel.archived',
+  CHANNEL_MEMBERS_CHANGED: 'channel.members_changed',
+  MESSAGE_REMOVED_BY_MODERATOR: 'message.removed_by_moderator',
+  NOTIFICATION_PREFERENCES_UPDATED: 'notification.preferences_updated',
+  NOTIFICATION_DELIVERY_RETRIED: 'notification.delivery_retried',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

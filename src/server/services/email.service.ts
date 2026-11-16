@@ -113,6 +113,35 @@ export const emailService = {
     await getSmtpTransport().verify()
   },
 
+  /** Email copy of an in-app notification (title, optional detail, link back to the app). */
+  notificationMessage(input: {
+    to: string
+    firstName: string
+    organizationName: string
+    title: string
+    body: string | null
+    link: string
+    settingsLink: string
+  }): EmailMessage {
+    const subject = input.title.length > 140 ? `${input.title.slice(0, 137)}…` : input.title
+    const text = [
+      `Hi ${input.firstName},`,
+      '',
+      input.title,
+      ...(input.body ? ['', input.body] : []),
+      '',
+      `Open in AYAVA Intern OS: ${input.link}`,
+      '',
+      `You get this email because of your notification settings: ${input.settingsLink}`,
+    ].join('\n')
+    const html = `<p>Hi ${escapeHtml(input.firstName)},</p>
+<p><strong>${escapeHtml(input.title)}</strong></p>
+${input.body ? `<p style="white-space:pre-line">${escapeHtml(input.body)}</p>` : ''}
+<p><a href="${escapeHtml(input.link)}">Open in AYAVA Intern OS</a></p>
+<p style="color:#666;font-size:12px">${escapeHtml(input.organizationName)} · You get this email because of your <a href="${escapeHtml(input.settingsLink)}">notification settings</a>.</p>`
+    return { to: input.to, subject, text, html }
+  },
+
   invitationMessage(input: {
     to: string
     inviteUrl: string

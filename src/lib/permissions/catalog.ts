@@ -529,6 +529,8 @@ export const DEFAULT_ROLE_GRANTS: Record<SystemRoleSlug, RoleGrants> = {
       'goal.update',
       'checkin.read',
       'checkin.review',
+      // 1:1s and check-ins with their mentees (invitees limited to assigned interns).
+      'meeting.manage',
       // Mentor stage of reviews; the service shows mentors only their own section and the submitted self-review.
       'performance.read',
       'performance.update',

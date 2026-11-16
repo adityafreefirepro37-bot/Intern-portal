@@ -165,7 +165,7 @@ with a real key, including how the chosen model responds to injected instruction
 
 ## Not built yet
 
-- **Meetings:** summaries and preparation wait for the calendar work in Phase 08.
+- **Meetings:** meetings exist since Phase 08 (docs/communication.md); AI summaries and preparation are not built yet.
 - **More actions:** `create_task` and `create_subtasks` only. Goals, HR requests and drafted announcements are not yet
   available as confirmed actions (the AI can draft text for them).
 - **OCR** for scanned PDFs.

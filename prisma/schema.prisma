@@ -492,6 +492,25 @@ enum AnnouncementPriority {
   URGENT
 }
 
+enum MeetingStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+enum MeetingResponse {
+  PENDING
+  ACCEPTED
+  TENTATIVE
+  DECLINED
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 enum ChannelType {
   GENERAL
   PROJECT
@@ -683,6 +702,9 @@ model Organization {
   performance_cycles     PerformanceCycle[]
   development_plans      DevelopmentPlan[]
 
+  notification_preferences NotificationPreference[]
+  notification_deliveries  NotificationDelivery[]
+
   @@map("organizations")
 }
 
@@ -819,6 +841,12 @@ model User {
   review_revisions              PerformanceReviewRevision[]
   development_plans_created     DevelopmentPlan[]
   development_items_owned       DevelopmentPlanItem[]
+
+  meeting_invitations      MeetingAttendee[]
+  channel_memberships      ChannelMember[]          @relation("ChannelMemberUser")
+  channel_members_added    ChannelMember[]          @relation("ChannelMemberAdder")
+  notification_preferences NotificationPreference[]
+  notification_deliveries  NotificationDelivery[]
 
   @@unique([organization_id, email])
   @@index([organization_id, status])
@@ -2400,23 +2428,46 @@ model LearningSubmissionFile {
 // ─────────────────────────────────────────────────────────────────────────────
 
 model Meeting {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organization_id String   @db.Uuid
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String        @db.Uuid
   title           String
   description     String?
-  start_at        DateTime @db.Timestamptz(3)
-  end_at          DateTime @db.Timestamptz(3)
+  start_at        DateTime      @db.Timestamptz(3)
+  end_at          DateTime      @db.Timestamptz(3)
   location        String?
   meeting_url     String?
-  created_by      String?  @db.Uuid
-  created_at      DateTime @default(now()) @db.Timestamptz(3)
-  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  status          MeetingStatus @default(SCHEDULED)
+  cancelled_at    DateTime?     @db.Timestamptz(3)
+  cancel_reason   String?
+  created_by      String?       @db.Uuid
+  created_at      DateTime      @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  creator      User?        @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  organization Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator      User?             @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  attendees    MeetingAttendee[]
 
   @@index([organization_id, start_at])
+  @@index([created_by])
   @@map("meetings")
+}
+
+/// Who is invited to a meeting and their reply. The organizer is an attendee too.
+model MeetingAttendee {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  meeting_id   String          @db.Uuid
+  user_id      String          @db.Uuid
+  is_organizer Boolean         @default(false)
+  response     MeetingResponse @default(PENDING)
+  responded_at DateTime?       @db.Timestamptz(3)
+  created_at   DateTime        @default(now()) @db.Timestamptz(3)
+
+  meeting Meeting @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([meeting_id, user_id])
+  @@index([user_id])
+  @@map("meeting_attendees")
 }
 
 model CalendarEvent {
@@ -2427,6 +2478,9 @@ model CalendarEvent {
   event_type          CalendarEventType @default(OTHER)
   start_at            DateTime          @db.Timestamptz(3)
   end_at              DateTime?         @db.Timestamptz(3)
+  all_day             Boolean           @default(false)
+  location            String?
+  deleted_at          DateTime?         @db.Timestamptz(3)
   created_by          String?           @db.Uuid
   related_entity_type String?
   related_entity_id   String?           @db.Uuid
@@ -2852,13 +2906,58 @@ model Notification {
   related_entity_id   String?   @db.Uuid
   created_at          DateTime  @default(now()) @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization Organization           @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  deliveries   NotificationDelivery[]
 
   @@index([organization_id])
   @@index([user_id, read_at])
   @@index([created_at])
   @@map("notifications")
+}
+
+/// Per-person choice of where each notification category arrives.
+model NotificationPreference {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  user_id         String   @db.Uuid
+  category        String
+  in_app          Boolean  @default(true)
+  email           Boolean  @default(false)
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, category])
+  @@index([organization_id])
+  @@map("notification_preferences")
+}
+
+/// An email copy of a notification, queued and sent outside the request that created it.
+model NotificationDelivery {
+  id              String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                     @db.Uuid
+  notification_id String                     @db.Uuid
+  user_id         String                     @db.Uuid
+  channel         String                     @default("EMAIL")
+  status          NotificationDeliveryStatus @default(PENDING)
+  attempts        Int                        @default(0)
+  last_error      String?
+  sent_at         DateTime?                  @db.Timestamptz(3)
+  created_at      DateTime                   @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  notification Notification @relation(fields: [notification_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([status, created_at])
+  @@index([notification_id])
+  @@index([organization_id])
+  @@index([user_id])
+  @@map("notification_deliveries")
 }
 
 model Channel {
@@ -2869,25 +2968,49 @@ model Channel {
   description     String?
   channel_type    ChannelType @default(GENERAL)
   created_by      String?     @db.Uuid
+  archived_at     DateTime?   @db.Timestamptz(3)
+  last_message_at DateTime?   @db.Timestamptz(3)
   created_at      DateTime    @default(now()) @db.Timestamptz(3)
   updated_at      DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  creator      User?        @relation(fields: [created_by], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  creator      User?           @relation(fields: [created_by], references: [id], onDelete: SetNull)
   messages     Message[]
+  members      ChannelMember[]
 
   @@unique([organization_id, slug])
   @@map("channels")
 }
 
+/// Membership of a non-company channel (company channels are open to everyone);
+/// also tracks where each person has read up to, for unread counts.
+model ChannelMember {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channel_id   String    @db.Uuid
+  user_id      String    @db.Uuid
+  added_by     String?   @db.Uuid
+  last_read_at DateTime? @db.Timestamptz(3)
+  created_at   DateTime  @default(now()) @db.Timestamptz(3)
+
+  channel Channel @relation(fields: [channel_id], references: [id], onDelete: Cascade)
+  user    User    @relation("ChannelMemberUser", fields: [user_id], references: [id], onDelete: Cascade)
+  adder   User?   @relation("ChannelMemberAdder", fields: [added_by], references: [id], onDelete: SetNull)
+
+  @@unique([channel_id, user_id])
+  @@index([user_id])
+  @@map("channel_members")
+}
+
 model Message {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  channel_id String    @db.Uuid
-  sender_id  String    @db.Uuid
-  body       String
-  created_at DateTime  @default(now()) @db.Timestamptz(3)
-  updated_at DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
-  deleted_at DateTime? @db.Timestamptz(3)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  channel_id         String    @db.Uuid
+  sender_id          String    @db.Uuid
+  body               String
+  mentioned_user_ids String[]  @default([]) @db.Uuid
+  edited_at          DateTime? @db.Timestamptz(3)
+  created_at         DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at         DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  deleted_at         DateTime? @db.Timestamptz(3)
 
   channel Channel @relation(fields: [channel_id], references: [id], onDelete: Restrict)
   sender  User    @relation(fields: [sender_id], references: [id], onDelete: Restrict)

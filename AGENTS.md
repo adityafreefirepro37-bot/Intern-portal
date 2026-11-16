@@ -18,7 +18,9 @@ Phase 03 Intern management, HR directory & onboarding - COMPLETE
 Phase 04 Tasks, projects & work management - COMPLETE
 Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - COMPLETE. See docs/hr-operations.md.
 Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feedback, reviews) - COMPLETE.
-Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - see docs/ai.md. Next: Prompt 08. Roadmap: README.md#roadmap.
+Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - COMPLETE. See docs/ai.md.
+Phase 08 Communication (calendar, meetings, messages, notification preferences & email) - COMPLETE. See docs/communication.md.
+Next: Prompt 09 (analytics and certificates). Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
 

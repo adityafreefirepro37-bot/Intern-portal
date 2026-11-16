@@ -194,7 +194,7 @@ Domain events (`src/server/events/domain-events.ts`) are emitted after commit; b
 | `project.status_changed` | PROJECT_STATUS_CHANGED | members |
 | `project.milestone_due` (daily job) | PROJECT_MILESTONE_DUE | project leads |
 
-The actor is never notified of their own action. Email/push delivery and preferences are Phase 08. The daily job
+The actor is never notified of their own action. Email delivery and per-category preferences are described in docs/communication.md (no push notifications). The daily job
 (`npm run jobs:daily` / `POST /api/jobs/daily`) emits the due-soon, overdue and milestone events for exactly one day
 window, so a daily run notifies once.
 

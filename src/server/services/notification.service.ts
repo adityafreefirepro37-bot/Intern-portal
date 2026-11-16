@@ -2,14 +2,17 @@ import { z } from 'zod'
 import { prisma } from '@/lib/db/client'
 import { logger } from '@/lib/logging'
 import type { PermissionKey } from '@/lib/permissions'
+import { categoryOf } from '@/lib/notifications/categories'
 import { parseInput } from '@/lib/validation'
 import type { RequestContext } from '../context'
 import { authorizationService } from './authorization.service'
+import { notificationDeliveryService, preferencesFor } from './notification-delivery.service'
 
 /**
  * In-app notifications (the `notifications` table from Phase 01). Created by
- * domain-event subscribers (src/server/events/subscribers.ts); Phase 08 adds
- * email/push delivery and preferences on top of the same records.
+ * domain-event subscribers (src/server/events/subscribers.ts). Each person
+ * chooses per category whether they arrive in the app and/or by email
+ * (notification-delivery.service.ts).
  */
 export const NOTIFICATION_TYPES = {
   TASK_ASSIGNED: 'TASK_ASSIGNED',
@@ -66,6 +69,13 @@ export const NOTIFICATION_TYPES = {
   REVIEW_COMPLETED: 'REVIEW_COMPLETED',
   REVIEW_OVERDUE: 'REVIEW_OVERDUE',
   DEVELOPMENT_PLAN_CREATED: 'DEVELOPMENT_PLAN_CREATED',
+  MEETING_INVITED: 'MEETING_INVITED',
+  MEETING_UPDATED: 'MEETING_UPDATED',
+  MEETING_CANCELLED: 'MEETING_CANCELLED',
+  MEETING_RESPONSE: 'MEETING_RESPONSE',
+  MESSAGE_MENTION: 'MESSAGE_MENTION',
+  DIRECT_MESSAGE: 'DIRECT_MESSAGE',
+  CHANNEL_ADDED: 'CHANNEL_ADDED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -96,6 +106,8 @@ export type NotificationEntity =
   | 'feedback_request'
   | 'review'
   | 'development_plan'
+  | 'meeting'
+  | 'channel'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
@@ -119,6 +131,8 @@ export function notificationHref(entityType: string | null, entityId: string | n
   if (entityType === 'feedback_request') return `/performance/feedback?view=requests&highlight=${entityId}`
   if (entityType === 'review') return `/performance/reviews/${entityId}`
   if (entityType === 'development_plan') return `/performance/development/${entityId}`
+  if (entityType === 'meeting') return `/calendar/meetings/${entityId}`
+  if (entityType === 'channel') return `/messages/${entityId}`
   return null
 }
 
@@ -145,7 +159,10 @@ export const notificationService = {
   /**
    * Creates one notification per recipient (deduplicated; the actor is never
    * notified about their own action). Recipients must be active members of the
-   * organization. Failures are logged and never break the calling operation.
+   * organization. Each recipient's preference for the type's category decides
+   * whether it shows in the app (a muted one is stored already read, so it
+   * stays in history without a badge) and whether an email copy is queued.
+   * Failures are logged and never break the calling operation.
    */
   async notify(
     organizationId: string,
@@ -161,8 +178,18 @@ export const notificationService = {
         select: { id: true },
       })
       if (active.length === 0) return 0
-      const { count } = await prisma.notification.createMany({
-        data: active.map(({ id }) => ({
+      const preferences = await preferencesFor(
+        active.map(({ id }) => id),
+        categoryOf(input.type),
+      )
+      const recipients = active.filter(({ id }) => {
+        const p = preferences.get(id)!
+        return p.inApp || p.email
+      })
+      if (recipients.length === 0) return 0
+      const now = new Date()
+      const created = await prisma.notification.createManyAndReturn({
+        data: recipients.map(({ id }) => ({
           organization_id: organizationId,
           user_id: id,
           type: input.type,
@@ -170,9 +197,15 @@ export const notificationService = {
           body: input.body?.slice(0, 500) ?? null,
           related_entity_type: input.entityType,
           related_entity_id: input.entityId,
+          read_at: preferences.get(id)!.inApp ? null : now,
         })),
+        select: { id: true, user_id: true },
       })
-      return count
+      await notificationDeliveryService.queueEmail(
+        organizationId,
+        created.filter((n) => preferences.get(n.user_id)!.email),
+      )
+      return created.length
     } catch (error) {
       logger.error('Failed to create notifications', { type: input.type, error })
       return 0
@@ -204,6 +237,42 @@ export const notificationService = {
         href: notificationHref(item.related_entity_type, item.related_entity_id),
       })),
       unread,
+    }
+  },
+
+  /** The full notification history, newest first (50 per page). */
+  async history(ctx: RequestContext, options: { unreadOnly?: boolean; page?: number } = {}) {
+    authorizationService.require(ctx, 'notification.read')
+    const take = 50
+    const page = Math.max(1, Math.min(options.page ?? 1, 200))
+    const where = {
+      user_id: ctx.actor.userId,
+      organization_id: ctx.organization.id,
+      ...(options.unreadOnly ? { read_at: null } : {}),
+    }
+    const rows = await prisma.notification.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip: (page - 1) * take,
+      take: take + 1,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        body: true,
+        read_at: true,
+        created_at: true,
+        related_entity_type: true,
+        related_entity_id: true,
+      },
+    })
+    return {
+      page,
+      hasMore: rows.length > take,
+      items: rows.slice(0, take).map((item) => ({
+        ...item,
+        href: notificationHref(item.related_entity_type, item.related_entity_id),
+      })),
     }
   },
 

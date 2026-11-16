@@ -72,6 +72,8 @@ export const RATE_LIMITS = {
   aiAction: { windowMs: 60 * 1000, limit: 10 },
   /** Knowledge-base uploads / reprocessing per user (each one calls the embedding model). */
   aiIngest: { windowMs: 10 * 60 * 1000, limit: 30 },
+  /** Chat messages per user (well above normal typing; stops floods and scripts). */
+  messageSend: { windowMs: 60 * 1000, limit: 30 },
 } as const
 
 export type RateLimitName = keyof typeof RATE_LIMITS

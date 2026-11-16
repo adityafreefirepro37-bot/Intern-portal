@@ -26,7 +26,7 @@ export interface ShellNotification {
   href: string | null
 }
 
-/** In-app notifications (work events). Email and preferences arrive in Phase 08. */
+/** Recent in-app notifications; the full history and delivery settings live on /notifications. */
 export function NotificationBell({ items, unread }: { items: ShellNotification[]; unread: number }) {
   const router = useRouter()
   const [, startTransition] = React.useTransition()
@@ -93,6 +93,19 @@ export function NotificationBell({ items, unread }: { items: ShellNotification[]
             </DropdownMenuItem>
           ))
         )}
+        <DropdownMenuSeparator />
+        <div className="flex items-center justify-between px-2 py-1.5 text-caption font-medium">
+          <DropdownMenuItem asChild className="p-0 text-primary focus:bg-transparent">
+            <Link href="/notifications" className="hover:underline">
+              View all
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="p-0 text-muted-foreground focus:bg-transparent">
+            <Link href="/notifications?view=settings" className="hover:underline">
+              Settings
+            </Link>
+          </DropdownMenuItem>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   )

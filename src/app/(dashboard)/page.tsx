@@ -11,10 +11,12 @@ import { TaskStatusBreakdown } from '@/features/dashboard/components/task-status
 import { UpcomingTasks } from '@/features/dashboard/components/upcoming-tasks'
 import { MyInternshipCard, RelationSummaryCard } from '@/features/interns/components/dashboard-sections'
 import { DashboardWork } from '@/features/work/components/dashboard-work'
+import { formatTime } from '@/lib/hr/time'
 import { formatDate, greeting } from '@/lib/utils'
 import { requirePageContext } from '@/server/context'
 import { dashboardService, UPCOMING_WINDOW_DAYS } from '@/server/services/dashboard.service'
 import { internService } from '@/server/services/intern.service'
+import { meetingService } from '@/server/services/meeting.service'
 import { performanceDashboardService } from '@/server/services/performance-dashboard.service'
 
 export const metadata: Metadata = { title: 'Overview' }
@@ -22,10 +24,11 @@ export const metadata: Metadata = { title: 'Overview' }
 export default async function OverviewPage() {
   const ctx = await requirePageContext()
   const now = new Date()
-  const [overview, people, growth] = await Promise.all([
+  const [overview, people, growth, meetings] = await Promise.all([
     dashboardService.getOverview(ctx, now),
     internService.dashboardSummary(ctx),
     performanceDashboardService.attention(ctx),
+    meetingService.upcoming(ctx, 4),
   ])
   const { stats } = overview
   const firstName = ctx.actor.displayName.split(' ')[0]
@@ -164,6 +167,36 @@ export default async function OverviewPage() {
                     </li>
                   ))}
                 </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {ctx.actor.permissions.has('meeting.read') && (
+            <Card>
+              <CardHeader className="flex-row items-center justify-between gap-2">
+                <CardTitle>Upcoming meetings</CardTitle>
+                <Link href="/calendar" className="text-caption font-medium text-primary hover:underline">
+                  Calendar
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {meetings.length === 0 ? (
+                  <p className="text-small text-muted-foreground">No meetings coming up.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {meetings.map((m) => (
+                      <li key={m.id}>
+                        <Link href={`/calendar/meetings/${m.id}`} className="group block">
+                          <span className="block text-small font-medium group-hover:underline">{m.title}</span>
+                          <span className="text-caption text-muted-foreground">
+                            {formatDate(m.start_at, timeZone)} · {formatTime(m.start_at, timeZone)}
+                            {m.myResponse === 'PENDING' && ' · Awaiting your reply'}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardContent>
             </Card>
           )}

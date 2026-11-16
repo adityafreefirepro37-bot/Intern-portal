@@ -97,6 +97,12 @@ export interface DomainEventMap {
     recipientIds: string[]
   }
   'performance.development_plan_created': { planId: string; internUserId: string }
+  'meeting.scheduled': { meetingId: string; attendeeIds: string[] }
+  'meeting.updated': { meetingId: string; notifyIds: string[]; addedIds: string[]; removedIds: string[]; timeChanged: boolean }
+  'meeting.cancelled': { meetingId: string; attendeeIds: string[]; reason: string | null }
+  'meeting.responded': { meetingId: string; organizerId: string | null; response: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED' }
+  'message.posted': { messageId: string; channelId: string; mentionedUserIds: string[]; directRecipientIds: string[] }
+  'channel.members_added': { channelId: string; userIds: string[] }
 }
 
 export type DomainEventName = keyof DomainEventMap

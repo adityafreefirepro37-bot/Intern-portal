@@ -3,13 +3,14 @@ import { TASK_STATUS_LABELS } from '@/lib/work/tasks'
 import { PROJECT_STATUS_LABELS } from '@/lib/work/projects'
 import { NOTIFICATION_TYPES, notificationService } from '../services/notification.service'
 import { domainEvents } from './domain-events'
+import { registerCommunicationSubscribers } from './communication-subscribers'
 import { registerHrSubscribers } from './hr-subscribers'
 import { registerLearningPerformanceSubscribers } from './learning-performance-subscribers'
 
 /**
  * Built-in domain-event subscribers: turn work events into in-app
  * notifications. Registered once per process (lazily, on the first emit).
- * Email/push delivery (Phase 08) can subscribe to the same events.
+ * Email copies follow each person's notification preferences (notify()).
  */
 
 async function taskInfo(taskId: string) {
@@ -27,6 +28,7 @@ async function taskInfo(taskId: string) {
 export function registerSubscribers() {
   registerHrSubscribers()
   registerLearningPerformanceSubscribers()
+  registerCommunicationSubscribers()
 
   domainEvents.on('task.assigned', async ({ organizationId, actorUserId, payload }) => {
     const task = await taskInfo(payload.taskId)

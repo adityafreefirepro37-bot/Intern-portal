@@ -225,7 +225,7 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | 05     | **HR operations: attendance, leave, documents, requests, offboarding** — done |
 | 06     | **Learning & performance: courses, paths, quizzes, goals, check-ins, feedback, reviews** — done |
 | 07     | **AYAVA AI: assistant, knowledge base (RAG), confirmed actions** — done   |
-| 08     | Communication: messages, notification delivery (email/push, preferences), calendar, meetings |
+| 08     | **Communication: calendar, meetings, messages, notification preferences & email** — done |
 | 09     | Analytics and certificates                                                |
 | 10     | System administration: audit log tools, settings, role editor, MFA        |
 | 11     | Polish and launch                                                         |
@@ -235,6 +235,6 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 [Architecture](docs/architecture.md) · [Database](docs/database.md) · [Authentication](docs/authentication.md) ·
 [Authorization](docs/authorization.md) · [Security](docs/security.md) · [Development](docs/development.md) ·
 [Intern management](docs/intern-management.md) · [Onboarding](docs/onboarding.md) ·
-[Work management](docs/work-management.md) · [HR operations](docs/hr-operations.md) · [AYAVA AI](docs/ai.md)
+[Work management](docs/work-management.md) · [HR operations](docs/hr-operations.md) · [AYAVA AI](docs/ai.md) · [Communication](docs/communication.md)
 
 Internal use only — Ayava Creatives.

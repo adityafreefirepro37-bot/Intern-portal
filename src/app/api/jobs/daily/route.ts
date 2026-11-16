@@ -9,6 +9,7 @@ import { documentJobs } from '@/server/services/document.service'
 import { goalJobs } from '@/server/services/goal.service'
 import { internLifecycleService } from '@/server/services/intern-lifecycle.service'
 import { learningJobs } from '@/server/services/learning-analytics.service'
+import { notificationDeliveryService } from '@/server/services/notification-delivery.service'
 import { reviewJobs } from '@/server/services/performance-review.service'
 import { workJobsService } from '@/server/services/work-jobs.service'
 
@@ -34,6 +35,7 @@ function authorized(request: NextRequest): boolean {
  *   6. learning deadlines (due in 3 days / overdue), goal target-date reminders
  *   7. weekly check-in reminders (Monday: open, Friday: due) and overdue reviews
  *   8. AI retention: old conversations and usage records, expired proposals
+ *   9. Notification emails still waiting (each run sends up to 200)
  * Every step is idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
     const checkins = await checkinJobs.emitReminders()
     const reviews = await reviewJobs.emitOverdue()
     const ai = await aiJobs.applyRetention()
+    const emails = await notificationDeliveryService.flush(200)
     return jsonSuccess({
       endingSoon: endingSoon.marked,
       overdueEvents: overdue.emitted,
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
       ...checkins,
       ...reviews,
       aiRetention: ai,
+      notificationEmails: emails,
     })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })

@@ -595,6 +595,133 @@ export async function seedDemo(prisma: PrismaClient, ref: ReferenceData, now = n
     },
   })
 
+  // Meetings (times in UTC; 04:30 UTC = 10:00 IST) with replies, an organization event,
+  // a team channel and a few messages.
+  const meetingSeeds = [
+    {
+      key: 'one-on-one',
+      title: 'Weekly 1:1',
+      description: 'Progress on the website tasks, blockers, next week.',
+      offset: 1,
+      hourUtc: 4,
+      minutes: 30,
+      organizer: 'mentor',
+      attendees: [{ key: 'intern', response: 'ACCEPTED' as const }],
+      url: 'https://meet.google.com/abc-defg-hij',
+    },
+    {
+      key: 'design-review',
+      title: 'Design review: landing page',
+      description: 'Walk through the new hero and pricing sections.',
+      offset: 3,
+      hourUtc: 9,
+      minutes: 60,
+      organizer: 'manager',
+      attendees: [
+        { key: 'intern', response: 'PENDING' as const },
+        { key: 'mentor', response: 'TENTATIVE' as const },
+        { key: 'hr', response: 'DECLINED' as const },
+      ],
+      location: 'Studio room',
+    },
+  ]
+  for (const m of meetingSeeds) {
+    const id = seedId(`meeting:${m.key}`)
+    const start = daysFrom(now, m.offset, m.hourUtc)
+    await prisma.meeting.upsert({
+      where: { id },
+      update: { start_at: start, end_at: new Date(start.getTime() + m.minutes * 60_000), status: 'SCHEDULED' },
+      create: {
+        id,
+        organization_id: orgId,
+        title: m.title,
+        description: m.description,
+        start_at: start,
+        end_at: new Date(start.getTime() + m.minutes * 60_000),
+        location: m.location ?? null,
+        meeting_url: m.url ?? null,
+        created_by: userIds[m.organizer],
+      },
+    })
+    for (const a of [{ key: m.organizer, response: 'ACCEPTED' as const, organizer: true }, ...m.attendees.map((x) => ({ ...x, organizer: false }))]) {
+      await prisma.meetingAttendee.upsert({
+        where: { meeting_id_user_id: { meeting_id: id, user_id: userIds[a.key] } },
+        update: {},
+        create: {
+          meeting_id: id,
+          user_id: userIds[a.key],
+          is_organizer: a.organizer,
+          response: a.response,
+          responded_at: a.response === 'PENDING' ? null : now,
+        },
+      })
+    }
+  }
+  await prisma.calendarEvent.upsert({
+    where: { id: seedId('event:all-hands') },
+    update: { start_at: daysFrom(now, 7, 10), end_at: daysFrom(now, 7, 11) },
+    create: {
+      id: seedId('event:all-hands'),
+      organization_id: orgId,
+      title: 'Monthly all-hands',
+      description: 'Company updates and intern showcase.',
+      event_type: 'OTHER',
+      start_at: daysFrom(now, 7, 10),
+      end_at: daysFrom(now, 7, 11),
+      location: 'Main hall',
+      created_by: userIds.hr,
+    },
+  })
+  const general = await prisma.channel.findUniqueOrThrow({
+    where: { organization_id_slug: { organization_id: orgId, slug: 'general' } },
+    select: { id: true },
+  })
+  const webChannel = await prisma.channel.upsert({
+    where: { organization_id_slug: { organization_id: orgId, slug: 'web-team' } },
+    update: {},
+    create: {
+      organization_id: orgId,
+      slug: 'web-team',
+      name: 'web-team',
+      description: 'Website build: questions, links and quick updates',
+      channel_type: 'TEAM',
+      created_by: userIds.admin,
+    },
+    select: { id: true },
+  })
+  for (const key of ['admin', 'manager', 'mentor', 'intern']) {
+    await prisma.channelMember.upsert({
+      where: { channel_id_user_id: { channel_id: webChannel.id, user_id: userIds[key] } },
+      update: {},
+      create: { channel_id: webChannel.id, user_id: userIds[key], added_by: userIds.admin },
+    })
+  }
+  const messageSeeds = [
+    { key: 'g1', channel: general.id, sender: 'hr', hoursAgo: 26, body: 'Welcome to the new interns joining this week! Say hi 👋' },
+    { key: 'g2', channel: general.id, sender: 'intern', hoursAgo: 25, body: 'Thanks! Excited to be here.' },
+    { key: 'w1', channel: webChannel.id, sender: 'manager', hoursAgo: 5, body: 'Staging is updated with the new navigation. Please review before Thursday.' },
+    { key: 'w2', channel: webChannel.id, sender: 'mentor', hoursAgo: 4, body: `Looks good. @[Aanya Sharma](${userIds.intern}) can you check the mobile menu?` },
+  ]
+  for (const msg of messageSeeds) {
+    const createdAt = new Date(now.getTime() - msg.hoursAgo * 3_600_000)
+    await prisma.message.upsert({
+      where: { id: seedId(`message:${msg.key}`) },
+      update: {},
+      create: {
+        id: seedId(`message:${msg.key}`),
+        channel_id: msg.channel,
+        sender_id: userIds[msg.sender],
+        body: msg.body,
+        mentioned_user_ids: msg.key === 'w2' ? [userIds.intern] : [],
+        created_at: createdAt,
+        updated_at: createdAt,
+      },
+    })
+  }
+  for (const channelId of [general.id, webChannel.id]) {
+    await prisma.channel.update({ where: { id: channelId }, data: { last_message_at: new Date(now.getTime() - 4 * 3_600_000) } })
+  }
+
   // ── Audit trail for the records above (marked as seed-generated) ──────────
   const auditSeeds = [
     {

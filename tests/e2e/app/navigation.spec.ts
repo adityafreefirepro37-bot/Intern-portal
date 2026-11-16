@@ -53,10 +53,12 @@ test.describe('overview dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Upcoming deadlines' })).toBeVisible()
   })
 
-  test('marks unbuilt quick actions with their phase instead of faking them', async ({ page }) => {
+  test('quick actions open working pages', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('link', { name: 'Create task' })).toBeVisible()
-    await expect(page.locator('[aria-disabled="true"]', { hasText: 'Schedule meeting' })).toContainText('Phase 08')
+    await page.getByRole('link', { name: 'Schedule meeting' }).click()
+    await expect(page).toHaveURL(/\/calendar\?schedule=1/)
+    await expect(page.getByRole('dialog', { name: 'Schedule a meeting' })).toBeVisible()
   })
 })
 

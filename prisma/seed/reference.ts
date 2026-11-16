@@ -243,6 +243,19 @@ export async function seedReference(prisma: PrismaClient) {
 
   const onboarding = await seedOnboardingReference(prisma, { organizationId: orgId, departmentIds })
 
+  // Company-wide channel (Messages); open to everyone in the organization.
+  await prisma.channel.upsert({
+    where: { organization_id_slug: { organization_id: orgId, slug: 'general' } },
+    update: {},
+    create: {
+      organization_id: orgId,
+      slug: 'general',
+      name: 'general',
+      description: 'Company-wide conversation',
+      channel_type: 'GENERAL',
+    },
+  })
+
   return {
     organizationId: orgId,
     policyIds: onboarding.policyIds,

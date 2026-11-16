@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Bell,
   Award,
   BarChart3,
   BookOpen,
@@ -99,7 +100,7 @@ export const NAVIGATION: NavSection[] = [
         mobile: true,
       },
       { label: 'Workload', href: '/workload', icon: Gauge, permission: 'task.review' },
-      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read', phase: '08' },
+      { label: 'Calendar', href: '/calendar', icon: CalendarDays, permission: 'calendar.read' },
     ],
   },
   {
@@ -200,7 +201,8 @@ export const NAVIGATION: NavSection[] = [
     title: 'Communication',
     items: [
       { label: 'Announcements', href: '/announcements', icon: Megaphone, permission: 'announcement.read' },
-      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read', phase: '08' },
+      { label: 'Messages', href: '/messages', icon: MessagesSquare, permission: 'message.read' },
+      { label: 'Notifications', href: '/notifications', icon: Bell, permission: 'notification.read' },
     ],
   },
   {

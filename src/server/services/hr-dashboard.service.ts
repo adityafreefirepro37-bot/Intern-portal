@@ -327,7 +327,11 @@ export const hrDashboardService = {
         : Promise.resolve([]),
       authorizationService.can(ctx, 'meeting.read')
         ? prisma.meeting.findMany({
-            where: { organization_id: ctx.organization.id, start_at: { gte: start, lt: addDays(end, 1) } },
+            where: {
+              organization_id: ctx.organization.id,
+              status: 'SCHEDULED',
+              start_at: { gte: start, lt: addDays(end, 1) },
+            },
             select: { id: true, title: true, start_at: true },
           })
         : Promise.resolve([]),
@@ -398,7 +402,7 @@ export const hrDashboardService = {
         date: todayKeyIn(m.start_at, ctx.organization.timezone),
         kind: 'MEETING',
         title: m.title,
-        href: null,
+        href: `/calendar/meetings/${m.id}`,
       })
     events.sort((a, b) => a.date.localeCompare(b.date) || a.kind.localeCompare(b.kind))
     return {
