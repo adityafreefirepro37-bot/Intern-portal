@@ -33,10 +33,19 @@ intern and course (a partial unique index enforces it). Turn this off under
 ## The PDF
 
 Rendered on demand from the frozen columns (`src/server/certificates/pdf.ts`,
-pdf-lib): A4 landscape, double frame, organization mark, heading, recipient,
-wording per type (`src/lib/certificates/content.ts`), optional citation,
-signatory, issue date, certificate number and a QR code linking to the
-verification page. Rendering is deterministic (fixed metadata dates), so every
+pdf-lib), in the Ayava Creatives identity: A4 landscape; charcoal frame with the
+logo's green → teal → blue gradient band, gold hairline and corner ornaments;
+the Ayava Creatives logo; "CERTIFICATE" over a gradient ribbon ("of Completion",
+"of Excellence"…); the recipient with a gradient underline; wording per type
+(`src/lib/certificates/content.ts`), optional citation; signatory; a seal with the
+logo mark and "CREATE • CONNECT • CONVERT"; issue date, certificate number and a
+QR code linking to the verification page.
+
+**Brand images** come from ayavacreatives.com (`public/brand/`: the full logo for
+light backgrounds plus the A mark cropped from the light and dark versions). They
+are embedded into `src/server/certificates/brand-assets.ts` so rendering never
+reads files at runtime; after replacing the PNGs (e.g. with a higher-resolution
+or SVG-exported logo) run `node scripts/certificate-brand-assets.mjs`. Rendering is deterministic (fixed metadata dates), so every
 download of the same certificate is byte-identical. The standard PDF fonts cover
 Latin-1 only: other scripts are replaced (names should be entered in Latin
 script on the draft).

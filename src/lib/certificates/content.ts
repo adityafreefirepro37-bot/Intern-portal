@@ -109,6 +109,14 @@ export function certificateWording(text: CertificateText): { heading: string; le
   }
 }
 
+/** The words on the ribbon under "CERTIFICATE". */
+export function ribbonText(text: Pick<CertificateText, 'type' | 'courseTitle'>): string {
+  if (text.courseTitle) return 'of Completion'
+  return { COMPLETION: 'of Completion', EXPERIENCE: 'of Experience', EXCELLENCE: 'of Excellence', PARTICIPATION: 'of Participation' }[
+    text.type
+  ]
+}
+
 /** Permanent numbers: AYV-CERT-2026-0007. */
 export function certificateNumber(year: number, sequence: number): string {
   return `AYV-CERT-${year}-${String(sequence).padStart(4, '0')}`

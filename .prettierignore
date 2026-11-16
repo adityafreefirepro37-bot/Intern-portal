@@ -12,3 +12,6 @@ prisma/migrations
 .cursor
 .devin
 *.md
+
+# Generated base64 brand images for certificates
+src/server/certificates/brand-assets.ts

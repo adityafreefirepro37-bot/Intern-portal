@@ -30,7 +30,9 @@ describe('programme analytics', () => {
     expect(data.work.createdByMonth.reduce((a, b) => a + b, 0)).toBe(data.work.created)
     expect(data.pipeline.joinedByMonth.reduce((a, b) => a + b, 0)).toBe(data.pipeline.joined)
     for (const r of [data.work.onTimeRate, data.attendance.rate, data.learning.completionRate]) {
-      if (r !== null) expect(r).toBeGreaterThanOrEqual(0), expect(r).toBeLessThanOrEqual(100)
+      if (r === null) continue
+      expect(r).toBeGreaterThanOrEqual(0)
+      expect(r).toBeLessThanOrEqual(100)
     }
     // Seeded data has tasks and attendance for interns.
     expect(data.work.created + data.work.completed).toBeGreaterThan(0)
