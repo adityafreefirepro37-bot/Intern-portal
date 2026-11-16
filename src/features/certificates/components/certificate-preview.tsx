@@ -68,10 +68,10 @@ export function CertificatePreview({
           </div>
           <div className="flex flex-col items-center">
             <span
-              className="flex aspect-square w-[34%] min-w-8 items-center justify-center rounded-full border-2 border-[#b88f3d] text-[clamp(0.35rem,0.7vw,0.55rem)] font-bold tracking-wider text-[#b88f3d]"
+              className="flex aspect-square w-[34%] min-w-8 items-center justify-center rounded-full border-2 border-[#b88f3d] font-serif text-[clamp(0.55rem,1.1vw,0.9rem)] font-bold text-[#b88f3d]"
               aria-hidden
             >
-              VERIFIED
+              {mark}
             </span>
             <p className="mt-1 text-[clamp(0.45rem,0.9vw,0.65rem)] text-[#66667a]">
               {issuedAt ? `Issued ${formatCertificateDate(issuedAt)}` : 'Not yet issued'}

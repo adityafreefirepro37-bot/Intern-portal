@@ -47,6 +47,20 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
   return lines
 }
 
+/** Wraps into as few lines as `maxWidth` allows, then evens them out (no one-word last line). */
+function balancedWrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const lines = wrap(text, font, size, maxWidth)
+  if (lines.length < 2) return lines
+  let low = maxWidth / lines.length
+  let high = maxWidth
+  for (let i = 0; i < 12; i++) {
+    const mid = (low + high) / 2
+    if (wrap(text, font, size, mid).length > lines.length) low = mid
+    else high = mid
+  }
+  return wrap(text, font, size, high)
+}
+
 function centered(page: PDFPage, text: string, y: number, font: PDFFont, size: number, color = INK, spacing = 0) {
   const safe = pdfSafe(text)
   const width = font.widthOfTextAtSize(safe, size) + spacing * Math.max(safe.length - 1, 0)
@@ -132,13 +146,13 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
 
   // Body and citation.
   let y = height - 310
-  for (const line of wrap(pdfSafe(wording.body), serif, 15, width - 220)) {
+  for (const line of balancedWrap(pdfSafe(wording.body), serif, 15, width - 220)) {
     centered(page, line, y, serif, 15, INK)
     y -= 21
   }
   if (input.citation) {
     y -= 4
-    for (const line of wrap(pdfSafe(`“${input.citation}”`), serifItalic, 13, width - 260).slice(0, 3)) {
+    for (const line of balancedWrap(pdfSafe(`“${input.citation}”`), serifItalic, 13, width - 260).slice(0, 3)) {
       centered(page, line, y, serifItalic, 13, MUTED)
       y -= 18
     }
@@ -152,7 +166,8 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
 
   page.drawCircle({ x: width / 2, y: footerY + 22, size: 30, borderColor: GOLD, borderWidth: 2 })
   page.drawCircle({ x: width / 2, y: footerY + 22, size: 24, borderColor: GOLD, borderWidth: 0.6 })
-  centered(page, 'VERIFIED', footerY + 18, sansBold, 8, GOLD, 1)
+  // Seal: the organization's initials (it decorates; the QR code is what verifies).
+  centered(page, mark, footerY + 17, serifBold, 15, GOLD, 1)
   const issued = input.issuedAt ? `Issued ${formatCertificateDate(new Date(Date.UTC(input.issuedAt.getUTCFullYear(), input.issuedAt.getUTCMonth(), input.issuedAt.getUTCDate())))}` : 'Not yet issued'
   centered(page, issued, footerY - 22, sans, 10, MUTED)
 

@@ -44,6 +44,12 @@ script on the draft).
 `GET /api/certificates/:id/pdf` (`?inline=1` to view in the browser) follows the
 same access rules as the certificate page.
 
+## Samples
+
+`docs/certificate-samples/` has a PDF and a PNG preview for each type (completion, experience,
+excellence, participation, course), watermarked SAMPLE with a placeholder number. Rebuild them after
+design changes with `npx tsx scripts/certificate-samples.ts`.
+
 ## Public verification — `/verify` and `/verify/:code`
 
 No sign-in. Shows valid / revoked / not found plus only what the certificate
