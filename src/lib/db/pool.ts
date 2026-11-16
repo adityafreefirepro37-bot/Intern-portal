@@ -67,5 +67,12 @@ export function createPrismaClient(options: { url?: string; log?: Prisma.PrismaC
   const pool = new Pool(poolConfigFromUrl(url))
   // An idle connection the pooler closed must not crash the process; the pool replaces it.
   pool.on('error', () => {})
+  // The adapter (5.22) sends DateTime values without an offset, so Postgres reads them in the
+  // session timezone. Pin sessions to UTC, or a server set to e.g. Asia/Kolkata (a local
+  // PostgreSQL on an Indian machine) stores every timestamp 5½ hours off. Supabase is already
+  // UTC; behind its transaction pooler this is a harmless no-op. Queued before any other query.
+  pool.on('connect', (client) => {
+    client.query("SET TIME ZONE 'UTC'").catch(() => {})
+  })
   return new PrismaClient({ adapter: new PrismaPg(pool), log })
 }
