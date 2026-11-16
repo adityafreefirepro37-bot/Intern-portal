@@ -485,6 +485,8 @@ export const DEFAULT_ROLE_GRANTS: Record<SystemRoleSlug, RoleGrants> = {
       'performance.create',
       'performance.update',
       'offboarding.read',
+      // Programme analytics limited to the interns they manage (no export).
+      'analytics.read',
     ]),
     ...grants('OWN', ['hr_request.create', 'hr_request.read']),
   },

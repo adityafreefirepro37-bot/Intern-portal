@@ -55,6 +55,9 @@
   --chart-4: oklch(0.6 0.15 25);
   --chart-5: oklch(0.6 0.11 155);
   --chart-6: oklch(0.75 0.01 275);
+  /* Two-series trend charts (analytics). Validated: CVD ΔE 14.8, contrast ≥ 3:1 on the card. */
+  --viz-1: oklch(0.55 0.16 282);
+  --viz-2: oklch(0.62 0.12 200);
 
   --radius: 0.625rem;
 }
@@ -93,6 +96,9 @@
     --chart-4: oklch(0.72 0.14 25);
     --chart-5: oklch(0.74 0.11 155);
     --chart-6: oklch(0.5 0.012 275);
+    /* Dark steps inside the dark lightness band (L 0.48–0.67); CVD ΔE 11.6. */
+    --viz-1: oklch(0.62 0.15 283);
+    --viz-2: oklch(0.66 0.11 200);
   }
 }
 
@@ -129,6 +135,8 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-chart-6: var(--chart-6);
+  --color-viz-1: var(--viz-1);
+  --color-viz-2: var(--viz-2);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;

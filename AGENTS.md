@@ -21,7 +21,8 @@ Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feed
 Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - COMPLETE. See docs/ai.md.
 Phase 08 Communication (calendar, meetings, messages, notification preferences & email) - COMPLETE. See docs/communication.md.
 Phase 09 part 1 Certificates (issue, revoke, PDF, public /verify, course certificates) - COMPLETE. See docs/certificates.md.
-Next: Phase 09 part 2 (analytics). Roadmap: README.md#roadmap.
+Phase 09 part 2 Analytics (programme analytics, scoped, CSV export) - COMPLETE. See docs/analytics.md.
+Next: Prompt 10 (system administration). Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
 

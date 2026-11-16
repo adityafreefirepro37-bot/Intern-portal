@@ -214,7 +214,7 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Analytics',
-    items: [{ label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'analytics.read', phase: '09' }],
+    items: [{ label: 'Analytics', href: '/analytics', icon: BarChart3, permission: 'analytics.read' }],
   },
   {
     title: 'System',
