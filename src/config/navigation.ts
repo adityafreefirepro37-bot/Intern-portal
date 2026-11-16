@@ -194,7 +194,7 @@ export const NAVIGATION: NavSection[] = [
       },
       { label: 'Ending Internships', href: '/hr/offboarding', icon: CalendarClock, permission: 'offboarding.read' },
       { label: 'My Requests', href: '/requests', icon: LifeBuoy, permission: 'hr_request.create' },
-      { label: 'Certificates', href: '/certificates', icon: Award, permission: 'certificate.read', phase: '09' },
+      { label: 'Certificates', scopedLabel: 'My certificates', href: '/certificates', icon: Award, permission: 'certificate.read' },
     ],
   },
   {

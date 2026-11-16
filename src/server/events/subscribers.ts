@@ -3,6 +3,7 @@ import { TASK_STATUS_LABELS } from '@/lib/work/tasks'
 import { PROJECT_STATUS_LABELS } from '@/lib/work/projects'
 import { NOTIFICATION_TYPES, notificationService } from '../services/notification.service'
 import { domainEvents } from './domain-events'
+import { registerCertificateSubscribers } from './certificate-subscribers'
 import { registerCommunicationSubscribers } from './communication-subscribers'
 import { registerHrSubscribers } from './hr-subscribers'
 import { registerLearningPerformanceSubscribers } from './learning-performance-subscribers'
@@ -29,6 +30,7 @@ export function registerSubscribers() {
   registerHrSubscribers()
   registerLearningPerformanceSubscribers()
   registerCommunicationSubscribers()
+  registerCertificateSubscribers()
 
   domainEvents.on('task.assigned', async ({ organizationId, actorUserId, payload }) => {
     const task = await taskInfo(payload.taskId)

@@ -40,6 +40,7 @@ import { offboardingService } from '@/server/services/offboarding.service'
 import { internService } from '@/server/services/intern.service'
 import { onboardingService } from '@/server/services/onboarding.service'
 import { LearningTab, PerformanceTab } from '@/features/interns/components/learning-performance-tabs'
+import { CertificatesTab } from '@/features/certificates/components/certificates-tab'
 
 export const metadata: Metadata = { title: 'Intern' }
 
@@ -76,6 +77,7 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
     ...(ctx.actor.permissions.has('learning.read') ? [{ key: 'learning', label: 'Learning' }] : []),
     ...(ctx.actor.permissions.has('performance.read') ? [{ key: 'performance', label: 'Performance' }] : []),
     ...(can.viewDocuments ? [{ key: 'documents', label: 'Documents' }] : []),
+    ...(ctx.actor.permissions.has('certificate.read') ? [{ key: 'certificates', label: 'Certificates' }] : []),
     ...(can.seeSensitive ? [{ key: 'hr', label: 'HR record' }] : []),
     ...(can.viewActivity ? [{ key: 'activity', label: 'Activity' }] : []),
   ]
@@ -305,6 +307,7 @@ export default async function InternProfilePage({ params, searchParams }: PagePr
       {tab === 'performance' && <PerformanceTab ctx={ctx} internId={profile.id} isSelf={relation.isSelf} />}
 
       {tab === 'documents' && <DocumentsTab ctx={ctx} internId={profile.id} />}
+      {tab === 'certificates' && <CertificatesTab ctx={ctx} internId={profile.id} />}
       {tab === 'hr' && <HrRecordTab ctx={ctx} internId={profile.id} showOffboarding={can.viewOffboarding} />}
       {tab === 'activity' && <ActivityTab ctx={ctx} internId={profile.id} />}
     </>

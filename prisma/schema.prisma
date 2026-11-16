@@ -841,6 +841,9 @@ model User {
   review_revisions              PerformanceReviewRevision[]
   development_plans_created     DevelopmentPlan[]
   development_items_owned       DevelopmentPlanItem[]
+  certificates_created          Certificate[]                  @relation("CertificateCreator")
+  certificates_issued           Certificate[]                  @relation("CertificateIssuer")
+  certificates_revoked          Certificate[]                  @relation("CertificateRevoker")
 
   meeting_invitations      MeetingAttendee[]
   channel_memberships      ChannelMember[]          @relation("ChannelMemberUser")
@@ -1987,6 +1990,7 @@ model Course {
   quizzes           Quiz[]
   assignments       LearningAssignment[]
   enrollments       CourseEnrollment[]
+  certificates      Certificate[]
   learning_progress LearningProgress[]
   path_courses      LearningPathCourse[]
   plan_items        LearningPlanItem[]     @relation("PlanItemCourse")
@@ -3024,26 +3028,53 @@ model Message {
 // CERTIFICATES
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// A certificate's text is frozen in its own columns (recipient, programme, period,
+/// signatory…), so an issued certificate never changes when profiles do; the PDF is
+/// rendered from these columns on demand. Drafts carry a provisional number
+/// (DRAFT-…); issuing assigns the permanent AYV-CERT-YYYY-NNNN number.
 model Certificate {
   id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organization_id    String            @db.Uuid
   intern_id          String            @db.Uuid
   internship_id      String?           @db.Uuid
+  /// Course certificates (learning) point at the completed course.
+  course_id          String?           @db.Uuid
   certificate_number String            @unique
   certificate_type   CertificateType   @default(COMPLETION)
+  recipient_name     String            @default("")
+  /// Role or course shown on the certificate, e.g. "Web Development Intern".
+  program_title      String?
+  department_name    String?
+  period_start       DateTime?         @db.Date
+  period_end         DateTime?         @db.Date
+  /// Optional citation, e.g. what an excellence certificate recognises.
+  citation           String?
+  signatory_name     String?
+  signatory_title    String?
+  organization_name  String            @default("")
   issued_at          DateTime?         @db.Timestamptz(3)
+  issued_by          String?           @db.Uuid
   file_path          String?
   status             CertificateStatus @default(DRAFT)
+  revoked_at         DateTime?         @db.Timestamptz(3)
+  revoked_by         String?           @db.Uuid
+  revoke_reason      String?
+  created_by         String?           @db.Uuid
   created_at         DateTime          @default(now()) @db.Timestamptz(3)
   updated_at         DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
 
   organization  Organization              @relation(fields: [organization_id], references: [id], onDelete: Restrict)
   intern        Intern                    @relation(fields: [intern_id], references: [id], onDelete: Restrict)
   internship    Internship?               @relation(fields: [internship_id], references: [id], onDelete: Restrict)
+  course        Course?                   @relation(fields: [course_id], references: [id], onDelete: Restrict)
+  creator       User?                     @relation("CertificateCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  issuer        User?                     @relation("CertificateIssuer", fields: [issued_by], references: [id], onDelete: SetNull)
+  revoker       User?                     @relation("CertificateRevoker", fields: [revoked_by], references: [id], onDelete: SetNull)
   verifications CertificateVerification[]
 
   @@index([organization_id, status])
   @@index([intern_id])
+  @@index([course_id])
   @@map("certificates")
 }
 

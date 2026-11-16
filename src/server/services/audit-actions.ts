@@ -177,6 +177,11 @@ export const AUDIT_ACTIONS = {
   MESSAGE_REMOVED_BY_MODERATOR: 'message.removed_by_moderator',
   NOTIFICATION_PREFERENCES_UPDATED: 'notification.preferences_updated',
   NOTIFICATION_DELIVERY_RETRIED: 'notification.delivery_retried',
+  CERTIFICATE_DRAFT_SAVED: 'certificate.draft_saved',
+  CERTIFICATE_DRAFT_DELETED: 'certificate.draft_deleted',
+  CERTIFICATE_ISSUED: 'certificate.issued',
+  CERTIFICATE_REVOKED: 'certificate.revoked',
+  CERTIFICATE_SETTINGS_UPDATED: 'certificate.settings_updated',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

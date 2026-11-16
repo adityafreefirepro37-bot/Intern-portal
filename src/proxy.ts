@@ -25,6 +25,8 @@ const PUBLIC_PATHS = [
   '/invite',
   '/auth',
   '/api/health',
+  // Public certificate verification (rate-limited; shows only what the certificate states).
+  '/verify',
 ]
 const SIGNED_IN_BOUNCE = ['/login', '/forgot-password']
 

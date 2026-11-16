@@ -20,7 +20,8 @@ Phase 05 HR operations (attendance, leave, documents, requests, offboarding) - C
 Phase 06 Learning & performance (courses, paths, quizzes, goals, check-ins, feedback, reviews) - COMPLETE.
 Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - COMPLETE. See docs/ai.md.
 Phase 08 Communication (calendar, meetings, messages, notification preferences & email) - COMPLETE. See docs/communication.md.
-Next: Prompt 09 (analytics and certificates). Roadmap: README.md#roadmap.
+Phase 09 part 1 Certificates (issue, revoke, PDF, public /verify, course certificates) - COMPLETE. See docs/certificates.md.
+Next: Phase 09 part 2 (analytics). Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
 

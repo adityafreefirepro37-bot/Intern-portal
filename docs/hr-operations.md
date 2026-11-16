@@ -94,8 +94,8 @@ scheduled announcements go live at their time and are published + notified by th
 
 `/hr/offboarding` lists active internships ending within 7/14/30 days (or past their end date) with open tasks,
 required-document completion, certificate status and the offboarding checklist. HR starts a checklist from the default
-items in HR settings (`offboarding_checklists`, one per intern; `offboarding_items`). Performance reviews, exit
-interviews and certificate issuance arrive in later phases (shown as such).
+items in HR settings (`offboarding_checklists`, one per intern; `offboarding_items`). Exit interviews arrive in a
+later phase; certificates are prepared and issued from Certificates (docs/certificates.md).
 
 ## HR dashboard, calendar and analytics
 

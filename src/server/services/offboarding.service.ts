@@ -20,8 +20,8 @@ import { settingsService } from './settings.service'
 /**
  * Ending internships and offboarding preparation. This is the foundation:
  * a per-intern checklist plus the facts HR needs before an internship ends
- * (open work, documents, latest review, certificate). Exit interviews, certificates and
- * experience letters are generated in later phases.
+ * (open work, documents, latest review, certificate — issued from /certificates). Exit interviews and
+ * experience letters (beyond the experience certificate) are not built.
  */
 
 const OPEN_TASK = { notIn: ['COMPLETED', 'CANCELLED'] as ('COMPLETED' | 'CANCELLED')[] }
@@ -62,7 +62,12 @@ export const offboardingService = {
         user: { select: personSelect },
         department: { select: { name: true } },
         manager: { select: personSelect },
-        certificates: { orderBy: { created_at: 'desc' }, take: 1, select: { status: true, certificate_type: true } },
+        certificates: {
+          where: { course_id: null, status: { not: 'REVOKED' } },
+          orderBy: { created_at: 'desc' },
+          take: 1,
+          select: { id: true, status: true, certificate_type: true },
+        },
         // Latest structured review (Phase 06) — HR sees whether the final review is done.
         performance_reviews: {
           where: { template_id: { not: null } },

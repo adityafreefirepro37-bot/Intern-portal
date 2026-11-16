@@ -110,9 +110,13 @@ export default async function OffboardingPage({ searchParams }: PageProps<'/hr/o
                       <dt className="text-caption text-muted-foreground">Certificate</dt>
                       <dd>
                         {row.certificate ? (
-                          <StatusBadge status={row.certificate.status} />
+                          <Link href={`/certificates/${row.certificate.id}`}>
+                            <StatusBadge status={row.certificate.status} />
+                          </Link>
                         ) : (
-                          <span className="text-muted-foreground">Not issued</span>
+                          <Link href={`/interns/${row.id}?tab=certificates`} className="font-medium text-primary hover:underline">
+                            Prepare
+                          </Link>
                         )}
                       </dd>
                     </div>

@@ -74,6 +74,8 @@ export const RATE_LIMITS = {
   aiIngest: { windowMs: 10 * 60 * 1000, limit: 30 },
   /** Chat messages per user (well above normal typing; stops floods and scripts). */
   messageSend: { windowMs: 60 * 1000, limit: 30 },
+  /** Public certificate checks per IP (stops code guessing). */
+  certificateVerify: { windowMs: 10 * 60 * 1000, limit: 40 },
 } as const
 
 export type RateLimitName = keyof typeof RATE_LIMITS

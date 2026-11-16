@@ -103,6 +103,8 @@ export interface DomainEventMap {
   'meeting.responded': { meetingId: string; organizerId: string | null; response: 'ACCEPTED' | 'TENTATIVE' | 'DECLINED' }
   'message.posted': { messageId: string; channelId: string; mentionedUserIds: string[]; directRecipientIds: string[] }
   'channel.members_added': { channelId: string; userIds: string[] }
+  'certificate.issued': { certificateId: string; recipientUserId: string; number: string }
+  'certificate.revoked': { certificateId: string; recipientUserId: string; number: string }
 }
 
 export type DomainEventName = keyof DomainEventMap

@@ -76,6 +76,8 @@ export const NOTIFICATION_TYPES = {
   MESSAGE_MENTION: 'MESSAGE_MENTION',
   DIRECT_MESSAGE: 'DIRECT_MESSAGE',
   CHANNEL_ADDED: 'CHANNEL_ADDED',
+  CERTIFICATE_ISSUED: 'CERTIFICATE_ISSUED',
+  CERTIFICATE_REVOKED: 'CERTIFICATE_REVOKED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -108,6 +110,7 @@ export type NotificationEntity =
   | 'development_plan'
   | 'meeting'
   | 'channel'
+  | 'certificate'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
@@ -133,6 +136,7 @@ export function notificationHref(entityType: string | null, entityId: string | n
   if (entityType === 'development_plan') return `/performance/development/${entityId}`
   if (entityType === 'meeting') return `/calendar/meetings/${entityId}`
   if (entityType === 'channel') return `/messages/${entityId}`
+  if (entityType === 'certificate') return `/certificates/${entityId}`
   return null
 }
 
