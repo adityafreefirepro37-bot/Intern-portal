@@ -3051,6 +3051,8 @@ model Certificate {
   citation           String?
   signatory_name     String?
   signatory_title    String?
+  /// Private storage key of the signatory's signature image, frozen with the draft.
+  signature_path     String?
   organization_name  String            @default("")
   issued_at          DateTime?         @db.Timestamptz(3)
   issued_by          String?           @db.Uuid

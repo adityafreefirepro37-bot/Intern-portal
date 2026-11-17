@@ -53,6 +53,23 @@ script on the draft).
 `GET /api/certificates/:id/pdf` (`?inline=1` to view in the browser) follows the
 same access rules as the certificate page.
 
+## Signature
+
+Certificates → Settings → **Signature**: upload a photo or scan of the default
+signatory's signature (dark pen on white paper). The browser removes the paper
+(soft edges kept), crops to the ink and shows a preview; the server accepts a PNG
+up to 1 MB that pdf-lib can place, stores it privately (`image` storage), and only
+serves it to certificate creators (settings) or to people who can open a
+certificate that carries it. Rules:
+
+- The signature belongs to the default signatory: a draft gets it only while its
+  signatory name matches the default; renaming the signatory on a draft drops it.
+- Each certificate keeps its own copy (`certificates.signature_path`), so issued
+  certificates keep their signature when the default changes.
+- Changing the default signatory's name clears the saved signature (a new one
+  must be uploaded); removing it keeps existing certificates' signatures.
+- Uploads and removals are audited (`certificate.signature_updated`).
+
 ## Government programme logos (MSME, Digital India)
 
 The Ministry of MSME logo (which contains the State Emblem) and the Digital India

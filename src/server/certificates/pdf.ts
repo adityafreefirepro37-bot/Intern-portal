@@ -24,6 +24,8 @@ export interface CertificatePdfInput extends CertificateText {
    * settings enable them with an approval reference (see certificate.service).
    */
   partnerLogos?: PartnerLogo[]
+  /** The signatory's signature (PNG with a transparent background, or JPEG). */
+  signatureImage?: Uint8Array | null
 }
 
 export type PartnerLogo = 'msme' | 'digitalIndia'
@@ -309,6 +311,15 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
 
   // Footer: signature (left), seal + date (centre), QR + number (right).
   const footerY = 96
+  if (input.signatureImage) {
+    // The signature sits on the line, centred over it, scaled to fit 170 × 52 pt.
+    const isPng = input.signatureImage[0] === 0x89 && input.signatureImage[1] === 0x50
+    const image = isPng ? await doc.embedPng(input.signatureImage) : await doc.embedJpg(input.signatureImage)
+    const scale = Math.min(170 / image.width, 52 / image.height)
+    const w = image.width * scale
+    const h = image.height * scale
+    page.drawImage(image, { x: 194 - w / 2, y: footerY + 28, width: w, height: h })
+  }
   page.drawLine({ start: { x: 96, y: footerY + 30 }, end: { x: 292, y: footerY + 30 }, thickness: 0.8, color: INK })
   page.drawCircle({ x: 96, y: footerY + 30, size: 1.6, color: GOLD })
   page.drawCircle({ x: 292, y: footerY + 30, size: 1.6, color: GOLD })

@@ -147,6 +147,7 @@ export interface DraftValues {
   signatoryName: string | null
   signatoryTitle: string | null
   isCourse: boolean
+  hasSignature: boolean
 }
 
 export function DraftEditor({ draft }: { draft: DraftValues }) {
@@ -176,7 +177,16 @@ export function DraftEditor({ draft }: { draft: DraftValues }) {
         <Field label="To" htmlFor={`${id}-end`} error={state.fields?.periodEnd}>
           <Input id={`${id}-end`} name="periodEnd" type="date" defaultValue={v?.periodEnd ?? draft.periodEnd} />
         </Field>
-        <Field label="Signatory name" htmlFor={`${id}-sig`} error={state.fields?.signatoryName}>
+        <Field
+          label="Signatory name"
+          htmlFor={`${id}-sig`}
+          error={state.fields?.signatoryName}
+          hint={
+            draft.hasSignature
+              ? 'Their signature is printed above the name.'
+              : 'No signature image: only the default signatory’s saved signature can be printed.'
+          }
+        >
           <Input id={`${id}-sig`} name="signatoryName" maxLength={120} defaultValue={v?.signatoryName ?? draft.signatoryName ?? ''} />
         </Field>
         <Field label="Signatory title" htmlFor={`${id}-sigt`} error={state.fields?.signatoryTitle}>

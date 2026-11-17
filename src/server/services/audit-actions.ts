@@ -182,6 +182,7 @@ export const AUDIT_ACTIONS = {
   CERTIFICATE_ISSUED: 'certificate.issued',
   CERTIFICATE_REVOKED: 'certificate.revoked',
   CERTIFICATE_SETTINGS_UPDATED: 'certificate.settings_updated',
+  CERTIFICATE_SIGNATURE_UPDATED: 'certificate.signature_updated',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

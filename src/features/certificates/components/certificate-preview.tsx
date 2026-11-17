@@ -18,6 +18,7 @@ export function CertificatePreview({
   signatoryTitle,
   watermark,
   partnerLogos = [],
+  signatureUrl = null,
   className,
 }: {
   text: CertificateText
@@ -28,6 +29,8 @@ export function CertificatePreview({
   watermark?: string | null
   /** Approved government programme marks (see certificate settings). */
   partnerLogos?: ('msme' | 'digitalIndia')[]
+  /** Where to load the signature image from (a private route), if the certificate has one. */
+  signatureUrl?: string | null
   className?: string
 }) {
   const wording = certificateWording(text)
@@ -81,7 +84,14 @@ export function CertificatePreview({
             </p>
           )}
           <div className="relative mt-auto grid w-full grid-cols-3 items-end gap-2 font-sans text-left">
-            <div>
+            <div className="relative">
+              {signatureUrl && (
+                <img
+                  src={signatureUrl}
+                  alt={`Signature of ${signatoryName ?? 'the signatory'}`}
+                  className="absolute bottom-full left-[42.5%] h-[260%] max-w-[85%] -translate-x-1/2 object-contain object-bottom"
+                />
+              )}
               <span className="block h-px w-[85%] bg-[#1c1b1b]" aria-hidden />
               <p className="mt-1 font-bold" style={{ fontSize: cq(1.43) }}>
                 {signatoryName ?? 'Authorised signatory'}

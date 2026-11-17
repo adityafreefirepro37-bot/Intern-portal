@@ -89,6 +89,7 @@ export default async function CertificatePage({ params }: PageProps<'/certificat
             signatoryTitle={c.signatory_title}
             watermark={c.status === 'DRAFT' ? 'DRAFT' : c.status === 'REVOKED' ? 'REVOKED' : null}
             partnerLogos={partnerLogos}
+            signatureUrl={c.hasSignature ? `/api/certificates/${c.id}/signature` : null}
           />
           {c.canEdit && (
             <Card>
@@ -110,6 +111,7 @@ export default async function CertificatePage({ params }: PageProps<'/certificat
                     signatoryName: c.signatory_name,
                     signatoryTitle: c.signatory_title,
                     isCourse: Boolean(c.course),
+                    hasSignature: c.hasSignature,
                   }}
                 />
               </CardContent>

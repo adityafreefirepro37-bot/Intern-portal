@@ -9,6 +9,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { inputClassName } from '@/components/ui/input'
 import { CertificateSettingsForm, CopyLinkButton, NewCertificate } from '@/features/certificates/components/certificate-forms'
+import { SignatureUpload } from '@/features/certificates/components/signature-upload'
 import { SubTabs } from '@/features/hr/components/hr-nav'
 import { CERTIFICATE_TYPE_LABELS, CERTIFICATE_TYPES, formatCertificateDate, type CertificateTypeValue } from '@/lib/certificates/content'
 import { cn, formatDate, humanizeEnum } from '@/lib/utils'
@@ -112,8 +113,9 @@ export default async function CertificatesPage({ searchParams }: PageProps<'/cer
           <CardHeader>
             <CardTitle>Certificate settings</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="grid max-w-xl gap-6">
             <CertificateSettingsForm settings={settings} />
+            <SignatureUpload hasSignature={Boolean(settings.signaturePath)} signatoryName={settings.signatoryName} />
           </CardContent>
         </Card>
       )}

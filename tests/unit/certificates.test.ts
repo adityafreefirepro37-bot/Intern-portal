@@ -7,6 +7,7 @@ import {
   withArticle,
   type CertificateText,
 } from '@/lib/certificates/content'
+import { MARK_LIGHT_BG_PNG } from '@/server/certificates/brand-assets'
 import { pdfSafe, renderCertificatePdf } from '@/server/certificates/pdf'
 
 const base: CertificateText = {
@@ -94,6 +95,13 @@ describe('certificate PDF', () => {
     const plain = await renderCertificatePdf(input)
     expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true)
     expect(a.length).toBeGreaterThan(plain.length)
+  })
+
+  it('places a signature image above the signatory', async () => {
+    const plain = await renderCertificatePdf(input)
+    const signed = await renderCertificatePdf({ ...input, signatureImage: new Uint8Array(Buffer.from(MARK_LIGHT_BG_PNG, 'base64')) })
+    expect(signed.length).toBeGreaterThan(plain.length + 1000)
+    await expect(renderCertificatePdf({ ...input, signatureImage: new Uint8Array([1, 2, 3]) })).rejects.toThrow()
   })
 
   it('handles names outside the standard PDF fonts and drafts', async () => {

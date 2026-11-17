@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { ValidationError } from '@/lib/errors'
 import { requireApiContext } from '../context'
 import { certificateService } from '../services/certificate.service'
 import { formError, formFields, safeValues, type FormState } from './form-state'
@@ -63,5 +64,25 @@ export async function saveCertificateSettingsAction(_previous: FormState, formDa
   return run(formData, async (fields) => {
     await certificateService.saveSettings(await requireApiContext(), fields)
     return { message: 'Certificate settings saved.' }
+  })
+}
+
+export async function uploadCertificateSignatureAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  return run(formData, async () => {
+    const file = formData.get('signature')
+    if (!(file instanceof File) || file.size === 0) throw new ValidationError('Choose an image of the signature', { signature: 'Required' })
+    await certificateService.uploadSignature(await requireApiContext(), {
+      name: file.name,
+      type: file.type,
+      bytes: new Uint8Array(await file.arrayBuffer()),
+    })
+    return { message: 'Signature saved. New certificates for this signatory will carry it.' }
+  })
+}
+
+export async function removeCertificateSignatureAction(_previous: FormState, formData: FormData): Promise<FormState> {
+  return run(formData, async () => {
+    await certificateService.removeSignature(await requireApiContext())
+    return { message: 'Signature removed. Certificates already prepared keep theirs.' }
   })
 }

@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { Prisma } from '@prisma/client'
+import { PDFDocument } from 'pdf-lib'
 import { z } from 'zod'
 import { config } from '@/lib/config'
 import { prisma } from '@/lib/db/client'
@@ -12,6 +13,8 @@ import {
   type CertificateTypeValue,
 } from '@/lib/certificates/content'
 import { parseDateOnly } from '@/lib/interns/dates'
+import { logger } from '@/lib/logging'
+import { getStorageService } from '@/lib/storage'
 import { fullName } from '@/lib/utils/format'
 import { isoDateSchema, parseInput } from '@/lib/validation'
 import type { RequestContext } from '../context'
@@ -52,6 +55,8 @@ export interface CertificateSettings {
    */
   msmeLogo: { enabled: boolean; approvalRef: string | null }
   digitalIndiaLogo: { enabled: boolean; approvalRef: string | null }
+  /** Private storage key of the default signatory's signature image. */
+  signaturePath: string | null
 }
 
 function partnerLogos(settings: CertificateSettings): PartnerLogo[] {
@@ -127,6 +132,7 @@ const certificateSelect = {
   citation: true,
   signatory_name: true,
   signatory_title: true,
+  signature_path: true,
   organization_name: true,
   status: true,
   issued_at: true,
@@ -172,6 +178,7 @@ function present(ctx: RequestContext, row: CertificateRow) {
     canEdit: row.status === 'DRAFT' && canCreate,
     canIssue: row.status === 'DRAFT' && canCreate,
     canRevoke: row.status === 'ISSUED' && Boolean(authorizationService.scopeOf(ctx, 'certificate.revoke')),
+    hasSignature: Boolean(row.signature_path),
   }
 }
 export type CertificateView = ReturnType<typeof present>
@@ -188,6 +195,32 @@ async function readSettings(organizationId: string): Promise<CertificateSettings
     autoCourse: value.autoCourse ?? true,
     msmeLogo: { enabled: Boolean(value.msmeLogo?.enabled), approvalRef: value.msmeLogo?.approvalRef ?? null },
     digitalIndiaLogo: { enabled: Boolean(value.digitalIndiaLogo?.enabled), approvalRef: value.digitalIndiaLogo?.approvalRef ?? null },
+    signaturePath: value.signaturePath ?? null,
+  }
+}
+
+async function writeSettings(organizationId: string, value: CertificateSettings) {
+  await prisma.setting.upsert({
+    where: { organization_id_key: { organization_id: organizationId, key: SETTINGS_KEY } },
+    update: { value: value as unknown as Prisma.InputJsonValue },
+    create: { organization_id: organizationId, key: SETTINGS_KEY, value: value as unknown as Prisma.InputJsonValue },
+  })
+}
+
+/** The default signature goes with the default signatory only — never under someone else's name. */
+function signatureFor(settings: CertificateSettings, signatoryName: string | null | undefined) {
+  return settings.signaturePath && signatoryName && signatoryName === settings.signatoryName ? settings.signaturePath : null
+}
+
+const SIGNATURE_MAX_BYTES = 1024 * 1024
+/** PNG or JPEG bytes, or null when the stored file is unreadable (the certificate renders without it). */
+async function loadSignature(path: string | null): Promise<Uint8Array | null> {
+  if (!path) return null
+  try {
+    return await getStorageService().download(path)
+  } catch (error) {
+    logger.warn('Certificate signature could not be loaded', { error })
+    return null
   }
 }
 
@@ -395,6 +428,7 @@ export const certificateService = {
       })
       if (!existing) throw new NotFoundError('Certificate')
       if (existing.status !== 'DRAFT') throw new ValidationError('Issued certificates can’t be edited — revoke and issue a new one')
+      const current = await readSettings(ctx.organization.id)
       await prisma.certificate.update({
         where: { id: existing.id },
         data: {
@@ -407,6 +441,7 @@ export const certificateService = {
           citation: data.citation ?? null,
           signatory_name: data.signatoryName ?? null,
           signatory_title: data.signatoryTitle ?? null,
+          signature_path: signatureFor(current, data.signatoryName),
         },
       })
       await auditService.logForContext(ctx, {
@@ -441,6 +476,7 @@ export const certificateService = {
         citation: data.citation ?? null,
         signatory_name: data.signatoryName ?? settings.signatoryName,
         signatory_title: data.signatoryTitle ?? settings.signatoryTitle,
+        signature_path: signatureFor(settings, data.signatoryName ?? settings.signatoryName),
         organization_name: facts.organizationName,
         created_by: ctx.actor.userId,
       },
@@ -535,6 +571,7 @@ export const certificateService = {
     if (certificate.status === 'REVOKED' && !authorizationService.can(ctx, 'certificate.revoke')) {
       throw new NotFoundError('Certificate')
     }
+    const signatureImage = await loadSignature(certificate.signature_path)
     const bytes = await renderCertificatePdf({
       type: certificate.certificate_type as CertificateTypeValue,
       recipientName: certificate.recipient_name,
@@ -553,6 +590,7 @@ export const certificateService = {
       watermark: certificate.status === 'DRAFT' ? 'DRAFT' : certificate.status === 'REVOKED' ? 'REVOKED' : null,
       // Current settings, not frozen at issue: if an approval is withdrawn, the marks disappear from every download.
       partnerLogos: partnerLogos(settings),
+      signatureImage,
     })
     const safeName = certificate.recipient_name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '') || 'certificate'
     const filename = certificate.status === 'DRAFT' ? `${safeName}-certificate-draft.pdf` : `${safeName}-${certificate.certificate_number}.pdf`
@@ -624,6 +662,71 @@ export const certificateService = {
     return readSettings(ctx.organization.id)
   },
 
+  /**
+   * Stores the default signatory's signature (a PNG prepared in the browser:
+   * background removed, cropped). Kept privately; earlier files are kept too,
+   * because certificates already prepared still use them.
+   */
+  async uploadSignature(ctx: RequestContext, file: { name: string; type: string; bytes: Uint8Array }) {
+    authorizationService.require(ctx, 'certificate.create')
+    if (file.bytes.byteLength > SIGNATURE_MAX_BYTES) throw new ValidationError('Signature image too large', { signature: 'At most 1 MB' })
+    if (file.type !== 'image/png') throw new ValidationError('Upload the signature as a PNG', { signature: 'PNG only' })
+    // Must be an image pdf-lib can place on the certificate.
+    try {
+      const probe = await PDFDocument.create()
+      const image = await probe.embedPng(file.bytes)
+      if (image.width < 40 || image.height < 15) throw new Error('too small')
+    } catch {
+      throw new ValidationError('That image can’t be used as a signature', { signature: 'Use a clear PNG of the signature' })
+    }
+    const settings = await readSettings(ctx.organization.id)
+    if (!settings.signatoryName) {
+      throw new ValidationError('Save the signatory’s name first', { signature: 'Set the default signatory name, then upload their signature' })
+    }
+    const stored = await getStorageService().upload({
+      organizationId: ctx.organization.id,
+      category: 'image',
+      fileName: 'signature.png',
+      mimeType: 'image/png',
+      data: file.bytes,
+    })
+    await writeSettings(ctx.organization.id, { ...settings, signaturePath: stored.storagePath })
+    await auditService.logForContext(ctx, {
+      action: AUDIT_ACTIONS.CERTIFICATE_SIGNATURE_UPDATED,
+      resourceType: 'organization',
+      resourceId: ctx.organization.id,
+      metadata: { signatory: settings.signatoryName, removed: false },
+    })
+  },
+
+  async removeSignature(ctx: RequestContext) {
+    authorizationService.require(ctx, 'certificate.create')
+    const settings = await readSettings(ctx.organization.id)
+    await writeSettings(ctx.organization.id, { ...settings, signaturePath: null })
+    await auditService.logForContext(ctx, {
+      action: AUDIT_ACTIONS.CERTIFICATE_SIGNATURE_UPDATED,
+      resourceType: 'organization',
+      resourceId: ctx.organization.id,
+      metadata: { signatory: settings.signatoryName, removed: true },
+    })
+  },
+
+  /** The default signature image (settings preview; certificate creators only). */
+  async defaultSignature(ctx: RequestContext) {
+    authorizationService.require(ctx, 'certificate.create')
+    const bytes = await loadSignature((await readSettings(ctx.organization.id)).signaturePath)
+    if (!bytes) throw new NotFoundError('Signature')
+    return bytes
+  },
+
+  /** A certificate's own signature image (for its on-page preview; same access as the certificate). */
+  async certificateSignature(ctx: RequestContext, certificateId: string) {
+    const certificate = await this.get(ctx, certificateId)
+    const bytes = await loadSignature(certificate.signature_path)
+    if (!bytes) throw new NotFoundError('Signature')
+    return bytes
+  },
+
   async saveSettings(ctx: RequestContext, input: unknown) {
     authorizationService.require(ctx, 'certificate.create')
     const data = parseInput(settingsSchema, input)
@@ -633,12 +736,13 @@ export const certificateService = {
       autoCourse: data.autoCourse,
       msmeLogo: { enabled: data.msmeLogo, approvalRef: data.msmeApprovalRef ?? null },
       digitalIndiaLogo: { enabled: data.digitalIndiaLogo, approvalRef: data.digitalIndiaApprovalRef ?? null },
+      signaturePath: null,
     }
-    await prisma.setting.upsert({
-      where: { organization_id_key: { organization_id: ctx.organization.id, key: SETTINGS_KEY } },
-      update: { value: value as unknown as Prisma.InputJsonValue },
-      create: { organization_id: ctx.organization.id, key: SETTINGS_KEY, value: value as unknown as Prisma.InputJsonValue },
-    })
+    // The signature is managed by its own upload / remove calls, and belongs to one
+    // person: a new default signatory name drops it rather than reuse it under their name.
+    const before = await readSettings(ctx.organization.id)
+    value.signaturePath = before.signatoryName === value.signatoryName ? before.signaturePath : null
+    await writeSettings(ctx.organization.id, value)
     await auditService.logForContext(ctx, {
       action: AUDIT_ACTIONS.CERTIFICATE_SETTINGS_UPDATED,
       resourceType: 'organization',
@@ -694,6 +798,7 @@ export const certificateJobs = {
             period_end: new Date(Date.UTC(completed.getUTCFullYear(), completed.getUTCMonth(), completed.getUTCDate())),
             signatory_name: settings.signatoryName,
             signatory_title: settings.signatoryTitle,
+            signature_path: signatureFor(settings, settings.signatoryName),
             organization_name: facts.organizationName,
           },
           select: { id: true },

@@ -1,6 +1,7 @@
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import type { RequestContext } from '@/server/context'
 import { AUDIT_ACTIONS } from '@/server/services/audit-actions'
+import { MARK_LIGHT_BG_PNG } from '@/server/certificates/brand-assets'
 import { certificateJobs, certificateService } from '@/server/services/certificate.service'
 import { NOTIFICATION_TYPES } from '@/server/services/notification.service'
 import { contextFor, prisma, uniqueSuffix } from './helpers'
@@ -140,6 +141,37 @@ describe('certificates', () => {
       select: { metadata: true },
     })
     expect(JSON.stringify(audit?.metadata)).toContain('MSME/2026/9')
+  })
+
+  it('prints the default signatory’s signature, frozen per draft and never under another name', async () => {
+    const png = { name: 'signature.png', type: 'image/png', bytes: new Uint8Array(Buffer.from(MARK_LIGHT_BG_PNG, 'base64')) }
+    await certificateService.saveSettings(hr, { signatoryName: '', signatoryTitle: '', autoCourse: 'on' })
+    await expect(certificateService.uploadSignature(hr, png)).rejects.toBeInstanceOf(ValidationError)
+
+    await certificateService.saveSettings(hr, { signatoryName: 'Kavya Nair', signatoryTitle: 'Head of People', autoCourse: 'on' })
+    await expect(certificateService.uploadSignature(hr, { ...png, bytes: new Uint8Array([1, 2, 3]) })).rejects.toBeInstanceOf(ValidationError)
+    await expect(certificateService.uploadSignature(hr, { ...png, type: 'image/jpeg' })).rejects.toBeInstanceOf(ValidationError)
+    await expect(certificateService.uploadSignature(intern, png)).rejects.toBeInstanceOf(ForbiddenError)
+    await certificateService.uploadSignature(hr, png)
+    expect((await certificateService.defaultSignature(hr)).length).toBe(png.bytes.length)
+
+    // A new draft for the default signatory carries the signature; another signatory doesn't.
+    const signed = await certificateService.saveDraft(hr, { internId, type: 'COMPLETION' })
+    expect((await certificateService.get(hr, signed.id)).hasSignature).toBe(true)
+    const plainPdf = await certificateService.pdf(hr, signed.id)
+    await certificateService.saveDraft(hr, { certificateId: signed.id, type: 'COMPLETION', recipientName: 'Aanya Sharma', signatoryName: 'Someone Else' })
+    expect((await certificateService.get(hr, signed.id)).hasSignature).toBe(false)
+    expect((await certificateService.pdf(hr, signed.id)).bytes.length).toBeLessThan(plainPdf.bytes.length)
+
+    // Issued certificates keep their signature after the default changes.
+    const kept = await certificateService.saveDraft(hr, { internId, type: 'EXPERIENCE' })
+    await certificateService.issue(hr, kept.id)
+    await certificateService.saveSettings(hr, { signatoryName: 'New Head', signatoryTitle: 'HR', autoCourse: 'on' })
+    expect((await certificateService.settings(hr)).signaturePath).toBeNull()
+    expect((await certificateService.get(intern, kept.id)).hasSignature).toBe(true)
+    expect((await certificateService.certificateSignature(intern, kept.id)).length).toBe(png.bytes.length)
+
+    await certificateService.saveSettings(hr, { signatoryName: 'Kavya Nair', signatoryTitle: 'Head of People', autoCourse: 'on' })
   })
 
   it('lists interns who are due a certificate', async () => {
