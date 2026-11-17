@@ -88,6 +88,14 @@ describe('certificate PDF', () => {
     expect(Buffer.from(a).toString('latin1')).toContain('/Count 1')
   })
 
+  it('places approved partner logos and still renders deterministically', async () => {
+    const a = await renderCertificatePdf({ ...input, partnerLogos: ['msme', 'digitalIndia'] })
+    const b = await renderCertificatePdf({ ...input, partnerLogos: ['digitalIndia', 'msme'] })
+    const plain = await renderCertificatePdf(input)
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true)
+    expect(a.length).toBeGreaterThan(plain.length)
+  })
+
   it('handles names outside the standard PDF fonts and drafts', async () => {
     expect(pdfSafe('Zoë Ångström')).toBe('Zoë Ångström'.normalize('NFKD').replace(/[̀-ͯ]/g, ''))
     expect(pdfSafe('आन्या')).toMatch(/^\?+$/)

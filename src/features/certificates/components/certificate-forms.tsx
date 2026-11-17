@@ -293,10 +293,56 @@ export function CopyLinkButton({ url, label = 'Copy verification link' }: { url:
   )
 }
 
+type PartnerSetting = { enabled: boolean; approvalRef: string | null }
+
+function PartnerLogoField({
+  id,
+  name,
+  label,
+  image,
+  setting,
+  error,
+}: {
+  id: string
+  name: 'msme' | 'digitalIndia'
+  label: string
+  image: string
+  setting: PartnerSetting
+  error?: string
+}) {
+  return (
+    <fieldset className="grid gap-3 rounded-lg border p-3">
+      <legend className="px-1 text-small font-medium">{label}</legend>
+      <div className="flex items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand image */}
+        <img src={image} alt="" className="h-10 w-auto rounded bg-white p-1" />
+        <label className="flex items-start gap-2 text-small">
+          <input type="checkbox" name={`${name}Logo`} defaultChecked={setting.enabled} className="mt-0.5 size-4 accent-primary" />
+          <span>Show on certificates</span>
+        </label>
+      </div>
+      <Field
+        label="Approval reference"
+        htmlFor={`${id}-${name}-ref`}
+        error={error}
+        hint="Letter or permission number of the written approval to use this logo. Required to show it."
+      >
+        <Input id={`${id}-${name}-ref`} name={`${name}ApprovalRef`} maxLength={200} defaultValue={setting.approvalRef ?? ''} />
+      </Field>
+    </fieldset>
+  )
+}
+
 export function CertificateSettingsForm({
   settings,
 }: {
-  settings: { signatoryName: string | null; signatoryTitle: string | null; autoCourse: boolean }
+  settings: {
+    signatoryName: string | null
+    signatoryTitle: string | null
+    autoCourse: boolean
+    msmeLogo: PartnerSetting
+    digitalIndiaLogo: PartnerSetting
+  }
 }) {
   const [state, action] = useFormAction(saveCertificateSettingsAction)
   const id = React.useId()
@@ -316,6 +362,22 @@ export function CertificateSettingsForm({
           <span className="block text-caption text-muted-foreground">When an intern completes a course, they get a certificate of completion for it.</span>
         </span>
       </label>
+      <div className="grid gap-3">
+        <p className="text-small font-medium">Government programme logos</p>
+        <p className="text-caption text-muted-foreground">
+          These marks may only be used with written permission from the issuing authority. Each stays off until you enter
+          the approval reference; use the official logo file supplied with the approval.
+        </p>
+        <PartnerLogoField id={id} name="msme" label="Ministry of MSME logo" image="/brand/partner-msme.png" setting={settings.msmeLogo} error={state.fields?.msmeApprovalRef} />
+        <PartnerLogoField
+          id={id}
+          name="digitalIndia"
+          label="Digital India logo"
+          image="/brand/partner-digital-india.png"
+          setting={settings.digitalIndiaLogo}
+          error={state.fields?.digitalIndiaApprovalRef}
+        />
+      </div>
       <SubmitButton className="justify-self-start" pendingLabel="Saving…">
         Save settings
       </SubmitButton>

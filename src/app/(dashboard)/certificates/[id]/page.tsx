@@ -38,6 +38,7 @@ export default async function CertificatePage({ params }: PageProps<'/certificat
     if (error instanceof ForbiddenError) return <AccessDenied what="certificates" />
     throw error
   }
+  const partnerLogos = await certificateService.partnerLogos(ctx)
   const tz = ctx.organization.timezone
   const isHr = Boolean(authorizationService.scopeOf(ctx, 'certificate.create'))
   const title = c.course ? `Course certificate — ${c.course.title}` : `${CERTIFICATE_TYPE_LABELS[c.certificate_type as CertificateTypeValue]} certificate`
@@ -87,6 +88,7 @@ export default async function CertificatePage({ params }: PageProps<'/certificat
             signatoryName={c.signatory_name}
             signatoryTitle={c.signatory_title}
             watermark={c.status === 'DRAFT' ? 'DRAFT' : c.status === 'REVOKED' ? 'REVOKED' : null}
+            partnerLogos={partnerLogos}
           />
           {c.canEdit && (
             <Card>

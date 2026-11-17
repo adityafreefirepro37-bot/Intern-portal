@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type Color, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib'
 import QRCode from 'qrcode'
 import { certificateWording, formatCertificateDate, ribbonText, type CertificateText } from '@/lib/certificates/content'
-import { LOGO_LIGHT_BG_PNG, MARK_DARK_BG_PNG, MARK_LIGHT_BG_PNG } from './brand-assets'
+import { LOGO_LIGHT_BG_PNG, MARK_DARK_BG_PNG, MARK_LIGHT_BG_PNG, PARTNER_DIGITAL_INDIA_PNG, PARTNER_MSME_PNG } from './brand-assets'
 
 /**
  * Renders a certificate as an A4 landscape PDF in the Ayava Creatives identity:
@@ -19,7 +19,15 @@ export interface CertificatePdfInput extends CertificateText {
   verificationUrl: string | null
   /** DRAFT / REVOKED / SAMPLE watermark across the page. */
   watermark?: string | null
+  /**
+   * Government programme marks beside the logo. Only passed when certificate
+   * settings enable them with an approval reference (see certificate.service).
+   */
+  partnerLogos?: PartnerLogo[]
 }
+
+export type PartnerLogo = 'msme' | 'digitalIndia'
+const PARTNER_PNG: Record<PartnerLogo, string> = { msme: PARTNER_MSME_PNG, digitalIndia: PARTNER_DIGITAL_INDIA_PNG }
 
 // Ayava Creatives palette (sampled from the logo).
 const INK = rgb(0x1c / 255, 0x1b / 255, 0x1b / 255)
@@ -256,6 +264,17 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
   const logoH = 84
   const logoW = (logo.width / logo.height) * logoH
   page.drawImage(logo, { x: cx - logoW / 2, y: H - 52 - logoH, width: logoW, height: logoH })
+
+  // Approved partner marks: MSME on the left, Digital India on the right, level with the logo.
+  // Fixed order, whatever order they were passed in, so the document stays deterministic.
+  for (const key of (['msme', 'digitalIndia'] as const).filter((k) => input.partnerLogos?.includes(k))) {
+    const image = await doc.embedPng(Buffer.from(PARTNER_PNG[key], 'base64'))
+    const h = 44
+    const w = Math.min((image.width / image.height) * h, 120)
+    const left = key === 'msme'
+    const x = left ? 140 : W - 140 - w
+    page.drawImage(image, { x, y: H - 52 - logoH / 2 - ((image.height / image.width) * w) / 2, width: w, height: (image.height / image.width) * w })
+  }
 
   // Title and ribbon.
   centered(page, 'CERTIFICATE', cx, H - 186, serifBold, 40, INK, 7)

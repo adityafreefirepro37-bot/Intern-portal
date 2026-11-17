@@ -33,6 +33,8 @@ const samples: [string, CertificatePdfInput][] = [
   ],
   ['participation', { ...common, type: 'PARTICIPATION' }],
   ['course', { ...common, type: 'COMPLETION', courseTitle: 'Brand Strategy Fundamentals', programTitle: 'Brand Strategy Fundamentals', periodStart: null }],
+  // Mock-up to attach to logo-use applications (MSME / Digital India): shows where the marks would go.
+  ['logo-application-mockup', { ...common, type: 'COMPLETION', partnerLogos: ['msme', 'digitalIndia'] }],
 ]
 
 async function main() {

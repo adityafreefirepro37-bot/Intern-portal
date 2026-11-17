@@ -53,6 +53,23 @@ script on the draft).
 `GET /api/certificates/:id/pdf` (`?inline=1` to view in the browser) follows the
 same access rules as the certificate page.
 
+## Government programme logos (MSME, Digital India)
+
+The Ministry of MSME logo (which contains the State Emblem) and the Digital India
+logo may only be used with written permission from the issuing authority (the
+Ministry's logo SOP; NeGD's Digital India logo guidelines). Certificates →
+Settings has a switch for each, and a switch only takes effect together with the
+approval reference (letter / permission number), which is kept in settings and
+the audit log. Placement: MSME top-left, Digital India top-right, level with the
+Ayava logo. The setting is read at download time, not frozen at issue, so turning
+a logo off (e.g. if permission is withdrawn) removes it from every certificate.
+
+The bundled files (`public/brand/partner-*.png`) are placeholders for mock-ups;
+when approval arrives, replace them with the official files supplied with it and
+run `node scripts/certificate-brand-assets.mjs`. The sample
+`certificate-logo-application-mockup-sample.pdf` shows the placement for an
+application.
+
 ## Samples
 
 `docs/certificate-samples/` has a PDF and a PNG preview for each type (completion, experience,

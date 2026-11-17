@@ -15,7 +15,7 @@ import { parseDateOnly } from '@/lib/interns/dates'
 import { fullName } from '@/lib/utils/format'
 import { isoDateSchema, parseInput } from '@/lib/validation'
 import type { RequestContext } from '../context'
-import { renderCertificatePdf } from '../certificates/pdf'
+import { renderCertificatePdf, type PartnerLogo } from '../certificates/pdf'
 import { domainEvents } from '../events/domain-events'
 import { counterRepository } from '../repositories/lifecycle.repository'
 import { internScope } from '../repositories/scope'
@@ -46,6 +46,19 @@ export interface CertificateSettings {
   signatoryName: string | null
   signatoryTitle: string | null
   autoCourse: boolean
+  /**
+   * Government programme marks. Each can be shown only with the reference of the
+   * written approval to use it (letter / permission number), kept for the record.
+   */
+  msmeLogo: { enabled: boolean; approvalRef: string | null }
+  digitalIndiaLogo: { enabled: boolean; approvalRef: string | null }
+}
+
+function partnerLogos(settings: CertificateSettings): PartnerLogo[] {
+  return [
+    ...(settings.msmeLogo.enabled && settings.msmeLogo.approvalRef ? (['msme'] as const) : []),
+    ...(settings.digitalIndiaLogo.enabled && settings.digitalIndiaLogo.approvalRef ? (['digitalIndia'] as const) : []),
+  ]
 }
 
 const optionalDate = z
@@ -68,11 +81,25 @@ const draftSchema = z.strictObject({
   signatoryTitle: optionalText(160),
 })
 
-const settingsSchema = z.strictObject({
-  signatoryName: optionalText(120),
-  signatoryTitle: optionalText(160),
-  autoCourse: z.preprocess((value) => value === 'on' || value === 'true' || value === true, z.boolean()),
-})
+const checkbox = z.preprocess((value) => value === 'on' || value === 'true' || value === true, z.boolean())
+const settingsSchema = z
+  .strictObject({
+    signatoryName: optionalText(120),
+    signatoryTitle: optionalText(160),
+    autoCourse: checkbox,
+    msmeLogo: checkbox,
+    msmeApprovalRef: optionalText(200),
+    digitalIndiaLogo: checkbox,
+    digitalIndiaApprovalRef: optionalText(200),
+  })
+  .superRefine((data, ctx) => {
+    if (data.msmeLogo && !data.msmeApprovalRef) {
+      ctx.addIssue({ code: 'custom', path: ['msmeApprovalRef'], message: 'Enter the approval reference before showing the MSME logo' })
+    }
+    if (data.digitalIndiaLogo && !data.digitalIndiaApprovalRef) {
+      ctx.addIssue({ code: 'custom', path: ['digitalIndiaApprovalRef'], message: 'Enter the approval reference before showing the Digital India logo' })
+    }
+  })
 
 const revokeSchema = z.strictObject({
   certificateId: z.uuid(),
@@ -159,6 +186,8 @@ async function readSettings(organizationId: string): Promise<CertificateSettings
     signatoryName: value.signatoryName ?? null,
     signatoryTitle: value.signatoryTitle ?? null,
     autoCourse: value.autoCourse ?? true,
+    msmeLogo: { enabled: Boolean(value.msmeLogo?.enabled), approvalRef: value.msmeLogo?.approvalRef ?? null },
+    digitalIndiaLogo: { enabled: Boolean(value.digitalIndiaLogo?.enabled), approvalRef: value.digitalIndiaLogo?.approvalRef ?? null },
   }
 }
 
@@ -502,7 +531,7 @@ export const certificateService = {
 
   /** The PDF. Drafts carry a DRAFT watermark; revoked certificates a REVOKED one (and only HR can download them). */
   async pdf(ctx: RequestContext, certificateId: string) {
-    const certificate = await this.get(ctx, certificateId)
+    const [certificate, settings] = await Promise.all([this.get(ctx, certificateId), readSettings(ctx.organization.id)])
     if (certificate.status === 'REVOKED' && !authorizationService.can(ctx, 'certificate.revoke')) {
       throw new NotFoundError('Certificate')
     }
@@ -522,6 +551,8 @@ export const certificateService = {
       signatoryTitle: certificate.signatory_title,
       verificationUrl: certificate.verificationUrl,
       watermark: certificate.status === 'DRAFT' ? 'DRAFT' : certificate.status === 'REVOKED' ? 'REVOKED' : null,
+      // Current settings, not frozen at issue: if an approval is withdrawn, the marks disappear from every download.
+      partnerLogos: partnerLogos(settings),
     })
     const safeName = certificate.recipient_name.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '') || 'certificate'
     const filename = certificate.status === 'DRAFT' ? `${safeName}-certificate-draft.pdf` : `${safeName}-${certificate.certificate_number}.pdf`
@@ -582,6 +613,12 @@ export const certificateService = {
     }
   },
 
+  /** Which approved partner marks certificates show (for the on-page preview). */
+  async partnerLogos(ctx: RequestContext): Promise<PartnerLogo[]> {
+    authorizationService.require(ctx, 'certificate.read')
+    return partnerLogos(await readSettings(ctx.organization.id))
+  },
+
   async settings(ctx: RequestContext) {
     authorizationService.require(ctx, 'certificate.create')
     return readSettings(ctx.organization.id)
@@ -594,6 +631,8 @@ export const certificateService = {
       signatoryName: data.signatoryName ?? null,
       signatoryTitle: data.signatoryTitle ?? null,
       autoCourse: data.autoCourse,
+      msmeLogo: { enabled: data.msmeLogo, approvalRef: data.msmeApprovalRef ?? null },
+      digitalIndiaLogo: { enabled: data.digitalIndiaLogo, approvalRef: data.digitalIndiaApprovalRef ?? null },
     }
     await prisma.setting.upsert({
       where: { organization_id_key: { organization_id: ctx.organization.id, key: SETTINGS_KEY } },
@@ -604,7 +643,12 @@ export const certificateService = {
       action: AUDIT_ACTIONS.CERTIFICATE_SETTINGS_UPDATED,
       resourceType: 'organization',
       resourceId: ctx.organization.id,
-      metadata: { autoCourse: value.autoCourse, hasSignatory: Boolean(value.signatoryName) },
+      metadata: {
+        autoCourse: value.autoCourse,
+        hasSignatory: Boolean(value.signatoryName),
+        msmeLogo: value.msmeLogo,
+        digitalIndiaLogo: value.digitalIndiaLogo,
+      },
     })
   },
 }

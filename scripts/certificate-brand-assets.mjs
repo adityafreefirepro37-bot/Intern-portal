@@ -8,6 +8,9 @@ const files = {
   LOGO_LIGHT_BG: 'public/brand/ayava-logo-light-bg.png',
   MARK_LIGHT_BG: 'public/brand/ayava-mark-light-bg.png',
   MARK_DARK_BG: 'public/brand/ayava-mark-dark-bg.png',
+  // Government programme marks: shown only when enabled in certificate settings with an approval reference.
+  PARTNER_MSME: 'public/brand/partner-msme.png',
+  PARTNER_DIGITAL_INDIA: 'public/brand/partner-digital-india.png',
 }
 
 const lines = [

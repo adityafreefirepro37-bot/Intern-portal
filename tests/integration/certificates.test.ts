@@ -123,6 +123,25 @@ describe('certificates', () => {
     await certificateService.saveSettings(hr, { signatoryName: 'Kavya Nair', signatoryTitle: 'Head of People', autoCourse: 'on' })
   })
 
+  it('shows government programme logos only with an approval reference', async () => {
+    const base = { signatoryName: 'Kavya Nair', signatoryTitle: 'Head of People', autoCourse: 'on' }
+    await expect(certificateService.saveSettings(hr, { ...base, msmeLogo: 'on' })).rejects.toBeInstanceOf(ValidationError)
+    await expect(certificateService.saveSettings(hr, { ...base, digitalIndiaLogo: 'on', digitalIndiaApprovalRef: '' })).rejects.toBeInstanceOf(ValidationError)
+    expect(await certificateService.partnerLogos(intern)).toEqual([])
+
+    await certificateService.saveSettings(hr, { ...base, digitalIndiaLogo: 'on', digitalIndiaApprovalRef: 'NeGD/LOGO/2026/123' })
+    expect(await certificateService.partnerLogos(intern)).toEqual(['digitalIndia'])
+    // A reference alone (box unticked) shows nothing.
+    await certificateService.saveSettings(hr, { ...base, msmeApprovalRef: 'MSME/2026/9' })
+    expect(await certificateService.partnerLogos(hr)).toEqual([])
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: AUDIT_ACTIONS.CERTIFICATE_SETTINGS_UPDATED },
+      orderBy: { created_at: 'desc' },
+      select: { metadata: true },
+    })
+    expect(JSON.stringify(audit?.metadata)).toContain('MSME/2026/9')
+  })
+
   it('lists interns who are due a certificate', async () => {
     const candidates = await certificateService.candidates(hr)
     for (const c of candidates) expect(['COMPLETED', 'ALUMNI', 'ENDING_SOON', 'ACTIVE']).toContain(c.status)

@@ -17,6 +17,7 @@ export function CertificatePreview({
   signatoryName,
   signatoryTitle,
   watermark,
+  partnerLogos = [],
   className,
 }: {
   text: CertificateText
@@ -25,6 +26,8 @@ export function CertificatePreview({
   signatoryName: string | null
   signatoryTitle: string | null
   watermark?: string | null
+  /** Approved government programme marks (see certificate settings). */
+  partnerLogos?: ('msme' | 'digitalIndia')[]
   className?: string
 }) {
   const wording = certificateWording(text)
@@ -47,6 +50,12 @@ export function CertificatePreview({
             className="pointer-events-none absolute left-1/2 top-[52%] w-[36%] -translate-x-1/2 -translate-y-1/2 opacity-[0.045]"
           />
           <img src="/brand/ayava-logo-light-bg.png" alt={text.organizationName} className="relative h-[17%] w-auto" />
+          {partnerLogos.includes('msme') && (
+            <img src="/brand/partner-msme.png" alt="Ministry of MSME" className="absolute left-[16%] top-[7%] h-[7.5%] w-auto" />
+          )}
+          {partnerLogos.includes('digitalIndia') && (
+            <img src="/brand/partner-digital-india.png" alt="Digital India" className="absolute right-[16%] top-[7%] h-[7.5%] w-auto" />
+          )}
           <p className="relative mt-[2%] font-bold tracking-[0.18em]" style={{ fontSize: cq(4.75) }}>
             CERTIFICATE
           </p>
