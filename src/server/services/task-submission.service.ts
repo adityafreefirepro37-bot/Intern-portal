@@ -213,6 +213,9 @@ export const taskSubmissionService = {
         where: { parent_task_id: task.id, deleted_at: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
       })
       if (openSubtasks > 0) throw new ValidationError('Finish or cancel the subtasks before approving')
+      // Interns' work: the version's proctored assessment must be passed (or waived).
+      const { assessmentService } = await import('./assessment.service')
+      await assessmentService.assertApprovable(version.id)
     }
     const status = approve ? 'APPROVED' : 'CHANGES_REQUESTED'
     const to: TaskStatus = approve ? 'COMPLETED' : 'CHANGES_REQUESTED'

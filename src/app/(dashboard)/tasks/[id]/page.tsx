@@ -29,7 +29,9 @@ import { minutesToHours } from '@/lib/work/workload'
 import { AskAyava } from '@/features/ai/components/ask-ayava'
 import { aiOffered, CONTEXT_PROMPTS } from '@/server/ai/suggestions'
 import { requirePageContext } from '@/server/context'
+import { assessmentService } from '@/server/services/assessment.service'
 import { taskService } from '@/server/services/task.service'
+import { AssessmentStrip } from '@/features/assessments/components/assessment-badges'
 
 export const metadata: Metadata = { title: 'Task' }
 
@@ -72,6 +74,7 @@ export default async function TaskPage({ params }: PageProps<'/tasks/[id]'>) {
     throw error
   }
   const { task, can, deadline, progress, submissions, comments, options, participants, targets, activity } = detail
+  const assessment = await assessmentService.forTask(ctx, task.id).catch(() => null)
   const tz = ctx.organization.timezone
   const closed = task.status === 'COMPLETED' || task.status === 'CANCELLED'
   const projectMembers = options.assignees
@@ -218,6 +221,7 @@ export default async function TaskPage({ params }: PageProps<'/tasks/[id]'>) {
           )}
 
           <Section title="Submission & review">
+            {assessment && <AssessmentStrip assessment={assessment} isIntern={assessment.intern_user_id === ctx.actor.userId} />}
             <SubmissionPanel
               taskId={task.id}
               taskStatus={task.status}

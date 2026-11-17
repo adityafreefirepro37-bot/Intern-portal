@@ -16,6 +16,7 @@ const STATUS_TONES: Record<string, BadgeVariant> = {
   VERIFIED: 'success',
   RESOLVED: 'success',
   DONE: 'success',
+  GRADED: 'success',
   COMPLETE: 'success',
   // in motion
   ACTIVE: 'primary',
@@ -46,11 +47,15 @@ const STATUS_TONES: Record<string, BadgeVariant> = {
   MISSING: 'warning',
   REQUIRED: 'warning',
   WAITING_FOR_USER: 'warning',
+  AWAITING_APPROVAL: 'warning',
+  READY: 'warning',
   // idle / archived
   BACKLOG: 'neutral',
   PLANNED: 'neutral',
   SELECTED: 'neutral',
   DRAFT: 'neutral',
+  PREPARING: 'neutral',
+  WAIVED: 'outline',
   HOLIDAY: 'neutral',
   WEEKEND: 'neutral',
   NOT_STARTED: 'neutral',

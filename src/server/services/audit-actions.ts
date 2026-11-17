@@ -183,6 +183,12 @@ export const AUDIT_ACTIONS = {
   CERTIFICATE_REVOKED: 'certificate.revoked',
   CERTIFICATE_SETTINGS_UPDATED: 'certificate.settings_updated',
   CERTIFICATE_SIGNATURE_UPDATED: 'certificate.signature_updated',
+  ASSESSMENT_QUESTIONS_SAVED: 'assessment.questions_saved',
+  ASSESSMENT_APPROVED: 'assessment.approved',
+  ASSESSMENT_STARTED: 'assessment.started',
+  ASSESSMENT_GRADED: 'assessment.graded',
+  ASSESSMENT_WAIVED: 'assessment.waived',
+  ASSESSMENT_RECORDING_VIEWED: 'assessment.recording_viewed',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

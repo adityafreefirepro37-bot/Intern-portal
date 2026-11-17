@@ -122,6 +122,16 @@ test('flow 3: manager requests changes, intern resubmits, manager approves', asy
   await expect(intern.getByText('Version 2', { exact: true })).toBeVisible()
   await intern.context().close()
 
+  // Each intern submission comes with a proctored assessment; HR waives this one (the assessment flow has its own tests).
+  const hr = await as(browser, 'hr', taskUrl)
+  await hr.getByRole('link', { name: 'Open', exact: true }).click()
+  await hr.getByRole('button', { name: 'Waive assessment' }).click()
+  dialog = hr.getByRole('dialog')
+  await dialog.getByLabel('Reason').fill('Reviewed in the end-to-end test.')
+  await dialog.getByRole('button', { name: 'Waive' }).click()
+  await expect(hr.getByText('Waived', { exact: true }).first()).toBeVisible()
+  await hr.context().close()
+
   await manager.reload()
   await manager.getByRole('button', { name: 'Review version 2' }).click()
   dialog = manager.getByRole('dialog')

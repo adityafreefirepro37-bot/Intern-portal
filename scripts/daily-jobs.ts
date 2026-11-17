@@ -8,6 +8,7 @@
  *   - learning deadline / overdue and goal target-date reminders
  *   - weekly check-in reminders (Mon / Fri) and overdue performance reviews
  *   - notification emails still waiting to be sent
+ *   - assessments: timed-out attempts submitted, recordings past retention deleted
  *
  *   npm run jobs:daily
  *
@@ -28,6 +29,7 @@ async function main() {
   const { reviewJobs } = await import('../src/server/services/performance-review.service')
   const { aiJobs } = await import('../src/server/ai/settings.service')
   const { notificationDeliveryService } = await import('../src/server/services/notification-delivery.service')
+  const { assessmentJobs } = await import('../src/server/services/assessment.service')
   const { prisma } = await import('../src/lib/db/client')
   try {
     const endingSoon = await internLifecycleService.markEndingSoon()
@@ -41,6 +43,7 @@ async function main() {
     const reviews = await reviewJobs.emitOverdue()
     const ai = await aiJobs.applyRetention()
     const emails = await notificationDeliveryService.flush(200)
+    const assessments = await assessmentJobs.maintenance()
     console.log(`Ending soon: ${endingSoon.marked} intern(s) updated. Overdue onboarding events: ${overdue.emitted}.`)
     console.log(
       `Tasks due tomorrow: ${deadlines.dueSoon}. Newly overdue: ${deadlines.overdue}. Milestones due: ${deadlines.milestonesDue}.`,
@@ -58,6 +61,7 @@ async function main() {
       `AI retention: ${ai.conversations} conversation(s) and ${ai.usageEvents} usage record(s) removed, ${ai.expiredActions} proposal(s) expired.`,
     )
     console.log(`Notification emails: ${emails.sent} sent, ${emails.failed} failed, ${emails.skipped} skipped.`)
+    console.log(`Assessments: ${assessments.autoSubmitted} timed-out attempt(s) submitted, ${assessments.recordingsDeleted} recording chunk(s) deleted.`)
   } finally {
     await prisma.$disconnect()
   }

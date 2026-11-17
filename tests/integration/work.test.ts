@@ -2,6 +2,7 @@ import { setAuthProviderForTesting } from '@/lib/auth/provider'
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors'
 import { addDays, formatDateOnly, todayIn } from '@/lib/interns/dates'
 import type { RequestContext } from '@/server/context'
+import { assessmentService } from '@/server/services/assessment.service'
 import { AUDIT_ACTIONS } from '@/server/services/audit-actions'
 import { milestoneService } from '@/server/services/milestone.service'
 import { projectLifecycleService } from '@/server/services/project-lifecycle.service'
@@ -27,6 +28,12 @@ afterAll(async () => {
 
 const PDF = new TextEncoder().encode('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n')
 const pdf = (name = 'work.pdf') => ({ name, type: 'application/pdf', bytes: PDF })
+
+/** Intern submissions carry an assessment; these tests are about the review flow, so HR waives it. */
+async function waiveAssessment(by: RequestContext, taskId: string) {
+  const a = await prisma.taskAssessment.findFirstOrThrow({ where: { task_id: taskId, status: { not: 'CANCELLED' } }, orderBy: { created_at: 'desc' } })
+  await assessmentService.waive(by, { assessmentId: a.id, reason: 'Covered by the review-flow test' })
+}
 
 let manager: RequestContext // Arjun: Marketing manager (not on the website project)
 let intern: RequestContext // Aanya
@@ -122,6 +129,9 @@ describe('work management flow (manager → intern → review)', () => {
       pdf('hero-v2.pdf'),
     ])
     expect(v2.version).toBe(2)
+    // The submission's assessment must be passed (or waived) first.
+    await expect(taskSubmissionService.review(manager, { taskId, decision: 'APPROVE' })).rejects.toBeInstanceOf(ValidationError)
+    await waiveAssessment(hr, taskId)
     await taskSubmissionService.review(manager, { taskId, decision: 'APPROVE' })
 
     task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } })
@@ -378,6 +388,7 @@ describe('security', () => {
       ForbiddenError,
     )
     // HR (organization-wide reviewer, not involved) can.
+    await waiveAssessment(hr, id)
     await taskSubmissionService.review(hr, { taskId: id, decision: 'APPROVE' })
   })
 

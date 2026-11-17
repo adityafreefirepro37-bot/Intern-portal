@@ -38,7 +38,7 @@ export interface StoredFile {
   fileSize: number
 }
 
-const KEY_PATTERN = /^[0-9a-f-]{36}\/(document|image|attachment|knowledge)\/\d{4}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/
+const KEY_PATTERN = /^[0-9a-f-]{36}\/(document|image|attachment|knowledge|recording)\/\d{4}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/
 
 export class StorageService {
   constructor(
@@ -74,6 +74,20 @@ export class StorageService {
       mimeType,
       fileSize: input.data.byteLength,
     }
+  }
+
+  /**
+   * Proctoring video chunks (WebM). Only a recording's first chunk carries the WebM
+   * header, so chunks are size-checked rather than signature-checked; the key is
+   * server-generated and the files are only ever served back by authorized routes.
+   */
+  async uploadRecording(organizationId: string, data: Uint8Array): Promise<string> {
+    if (data.byteLength === 0 || data.byteLength > 8 * 1024 * 1024) {
+      throw new ValidationError('Recording chunk rejected', { file: 'Empty or larger than 8 MB' })
+    }
+    const key = `${organizationId}/recording/${new Date().getUTCFullYear()}/${randomUUID()}.webm`
+    await this.provider.put(key, data, 'video/webm')
+    return key
   }
 
   async download(storagePath: string): Promise<Uint8Array> {

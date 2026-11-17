@@ -78,6 +78,10 @@ export const NOTIFICATION_TYPES = {
   CHANNEL_ADDED: 'CHANNEL_ADDED',
   CERTIFICATE_ISSUED: 'CERTIFICATE_ISSUED',
   CERTIFICATE_REVOKED: 'CERTIFICATE_REVOKED',
+  ASSESSMENT_APPROVAL_NEEDED: 'ASSESSMENT_APPROVAL_NEEDED',
+  ASSESSMENT_READY: 'ASSESSMENT_READY',
+  ASSESSMENT_SUBMITTED: 'ASSESSMENT_SUBMITTED',
+  ASSESSMENT_GRADED: 'ASSESSMENT_GRADED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -111,6 +115,7 @@ export type NotificationEntity =
   | 'meeting'
   | 'channel'
   | 'certificate'
+  | 'assessment'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
@@ -137,6 +142,7 @@ export function notificationHref(entityType: string | null, entityId: string | n
   if (entityType === 'meeting') return `/calendar/meetings/${entityId}`
   if (entityType === 'channel') return `/messages/${entityId}`
   if (entityType === 'certificate') return `/certificates/${entityId}`
+  if (entityType === 'assessment') return `/assessments/${entityId}`
   return null
 }
 

@@ -492,6 +492,27 @@ enum AnnouncementPriority {
   URGENT
 }
 
+enum AssessmentStatus {
+  PREPARING
+  AWAITING_APPROVAL
+  READY
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+  WAIVED
+  CANCELLED
+}
+
+enum AssessmentQuestionKind {
+  MULTIPLE_CHOICE
+  SHORT_ANSWER
+}
+
+enum ProctorStream {
+  CAMERA
+  SCREEN
+}
+
 enum MeetingStatus {
   SCHEDULED
   CANCELLED
@@ -580,6 +601,7 @@ enum AiFeedbackRating {
 }
 
 enum AiFeature {
+  ASSESSMENT
   CHAT
   EMBEDDING
   INGESTION
@@ -704,6 +726,7 @@ model Organization {
 
   notification_preferences NotificationPreference[]
   notification_deliveries  NotificationDelivery[]
+  task_assessments         TaskAssessment[]
 
   @@map("organizations")
 }
@@ -844,6 +867,8 @@ model User {
   certificates_created          Certificate[]                  @relation("CertificateCreator")
   certificates_issued           Certificate[]                  @relation("CertificateIssuer")
   certificates_revoked          Certificate[]                  @relation("CertificateRevoker")
+  assessments_taken             TaskAssessment[]               @relation("AssessmentIntern")
+  assessment_attempts           AssessmentAttempt[]
 
   meeting_invitations      MeetingAttendee[]
   channel_memberships      ChannelMember[]          @relation("ChannelMemberUser")
@@ -1454,6 +1479,8 @@ model Task {
   dependents   TaskDependency[]    @relation("TaskDependents")
   time_entries TaskTimeEntry[]
 
+  assessments TaskAssessment[]
+
   @@index([organization_id, status])
   @@index([organization_id, priority])
   @@index([project_id, status, position])
@@ -1566,6 +1593,8 @@ model SubmissionVersion {
   creator     User?            @relation(fields: [created_by], references: [id], onDelete: SetNull)
   reviewer    User?            @relation("VersionReviewer", fields: [reviewed_by], references: [id], onDelete: SetNull)
   attachments TaskAttachment[]
+
+  assessment TaskAssessment?
 
   @@unique([submission_id, version_number])
   @@map("submission_versions")
@@ -3473,4 +3502,154 @@ model CodeCounter {
 
   @@id([organization_id, key])
   @@map("code_counters")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK ASSESSMENTS (proctored check of each submitted task version)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// One assessment per submitted version of an intern's task: AI-drafted
+/// questions approved by a reviewer, taken under proctoring, graded, and
+/// required (passed or waived) before the version can be approved.
+model TaskAssessment {
+  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id       String           @db.Uuid
+  task_id               String           @db.Uuid
+  submission_version_id String           @unique @db.Uuid
+  intern_user_id        String           @db.Uuid
+  status                AssessmentStatus @default(PREPARING)
+  /// AI or MANUAL (who wrote the questions).
+  source                String           @default("AI")
+  generation_error      String?
+  time_limit_minutes    Int              @default(15)
+  pass_percent          Int              @default(60)
+  /// Full-screen exits / tab switches allowed before the attempt is submitted automatically.
+  max_violations        Int              @default(3)
+  approved_by           String?          @db.Uuid
+  approved_at           DateTime?        @db.Timestamptz(3)
+  waived_by             String?          @db.Uuid
+  waived_at             DateTime?        @db.Timestamptz(3)
+  waive_reason          String?
+  score_percent         Int?
+  passed                Boolean?
+  /// 0–100, higher is cleaner; computed from the proctoring timeline.
+  integrity_score       Int?
+  graded_by             String?          @db.Uuid
+  graded_at             DateTime?        @db.Timestamptz(3)
+  created_at            DateTime         @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  task         Task                 @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  version      SubmissionVersion    @relation(fields: [submission_version_id], references: [id], onDelete: Cascade)
+  intern       User                 @relation("AssessmentIntern", fields: [intern_user_id], references: [id], onDelete: Restrict)
+  questions    AssessmentQuestion[]
+  attempt      AssessmentAttempt?
+
+  @@index([organization_id, status])
+  @@index([task_id])
+  @@index([intern_user_id, status])
+  @@map("task_assessments")
+}
+
+model AssessmentQuestion {
+  id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessment_id  String                 @db.Uuid
+  position       Int
+  kind           AssessmentQuestionKind
+  prompt         String
+  options        String[]               @default([])
+  /// Index of the right option (multiple choice). Never sent to the intern's browser.
+  correct_option Int?
+  points         Int                    @default(1)
+  /// What a good short answer covers (for grading).
+  rubric         String?
+
+  assessment TaskAssessment     @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+  answers    AssessmentAnswer[]
+
+  @@index([assessment_id, position])
+  @@map("assessment_questions")
+}
+
+model AssessmentAttempt {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assessment_id   String    @unique @db.Uuid
+  user_id         String    @db.Uuid
+  consent_at      DateTime  @db.Timestamptz(3)
+  consent_version String
+  started_at      DateTime  @db.Timestamptz(3)
+  deadline_at     DateTime  @db.Timestamptz(3)
+  submitted_at    DateTime? @db.Timestamptz(3)
+  auto_submitted  Boolean   @default(false)
+  submit_reason   String?
+  violations      Int       @default(0)
+  last_seen_at    DateTime? @db.Timestamptz(3)
+  ip_address      String?
+  user_agent      String?
+  /// What the browser reported for the shared screen ("monitor" = entire screen).
+  screen_surface  String?
+  created_at      DateTime  @default(now()) @db.Timestamptz(3)
+
+  assessment TaskAssessment     @relation(fields: [assessment_id], references: [id], onDelete: Cascade)
+  user       User               @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  answers    AssessmentAnswer[]
+  events     ProctorEvent[]
+  recordings ProctorRecording[]
+
+  @@index([user_id])
+  @@map("assessment_attempts")
+}
+
+model AssessmentAnswer {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attempt_id  String   @db.Uuid
+  question_id String   @db.Uuid
+  choice      Int?
+  text        String?
+  /// AI-suggested points and reasoning for short answers; the reviewer decides `points`.
+  ai_points   Float?
+  ai_feedback String?
+  points      Float?
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  attempt  AssessmentAttempt  @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  question AssessmentQuestion @relation(fields: [question_id], references: [id], onDelete: Cascade)
+
+  @@unique([attempt_id, question_id])
+  @@map("assessment_answers")
+}
+
+/// Proctoring timeline: full-screen exits, tab switches, pastes, camera / screen loss, noise…
+model ProctorEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attempt_id  String   @db.Uuid
+  type        String
+  occurred_at DateTime @db.Timestamptz(3)
+  detail      Json?
+  created_at  DateTime @default(now()) @db.Timestamptz(3)
+
+  attempt AssessmentAttempt @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+
+  @@index([attempt_id, occurred_at])
+  @@map("proctor_events")
+}
+
+/// A ~10 s WebM chunk of the camera (+ microphone) or screen recording. Chunks of
+/// one stream concatenate into one playable file. Deleted after the retention period.
+model ProctorRecording {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  attempt_id   String        @db.Uuid
+  stream       ProctorStream
+  sequence     Int
+  storage_path String
+  bytes        Int
+  created_at   DateTime      @default(now()) @db.Timestamptz(3)
+  deleted_at   DateTime?     @db.Timestamptz(3)
+
+  attempt AssessmentAttempt @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+
+  @@unique([attempt_id, stream, sequence])
+  @@index([created_at])
+  @@map("proctor_recordings")
 }

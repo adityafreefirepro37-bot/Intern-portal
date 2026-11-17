@@ -42,6 +42,7 @@ export const DEFAULT_PREFERENCE: Record<NotificationCategory, { inApp: boolean; 
 
 const PREFIXES: [string, NotificationCategory][] = [
   ['TASK_', 'tasks'],
+  ['ASSESSMENT_', 'tasks'],
   ['PROJECT_', 'projects'],
   ['MEETING_', 'meetings'],
   ['MESSAGE_', 'messages'],
