@@ -22,6 +22,7 @@ Phase 07 AYAVA AI (assistant, knowledge base, confirmed actions) - COMPLETE. See
 Phase 08 Communication (calendar, meetings, messages, notification preferences & email) - COMPLETE. See docs/communication.md.
 Phase 09 part 1 Certificates (issue, revoke, PDF, public /verify, course certificates) - COMPLETE. See docs/certificates.md.
 Phase 09 part 2 Analytics (programme analytics, scoped, CSV export) - COMPLETE. See docs/analytics.md.
+Proctored task assessments (AI-drafted, mentor-approved, recorded camera/mic/screen, approval gate) - COMPLETE. See docs/assessments.md.
 Next: Prompt 10 (system administration). Roadmap: README.md#roadmap.
 
 ## Quick Start Commands
@@ -61,6 +62,8 @@ npm run build
   (manual) or taskSubmissionService (submit/review); project status only via projectLifecycleService
 - AI reads application data only through src/server/ai/tools.ts (each tool calls the normal service); prompts live only in
   src/lib/ai/prompts.ts; writes are proposals (ai_action_requests) that run after confirmation; never add an AI action for HR decisions
+- Assessment rules live in src/server/services/assessment.service.ts; an intern submission is approvable only when its
+  assessment is passed or waived (assertApprovable); recordings are reviewer-only, audited, deleted after 30 days
 - Unbuilt features show a "Phase NN" placeholder or disabled control — no fake functionality
 - `_archive/` holds files from the earlier partial attempt; not compiled — safe to delete once reviewed
 
