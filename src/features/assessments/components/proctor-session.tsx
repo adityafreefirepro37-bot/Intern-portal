@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { AlertTriangle, Camera, CheckCircle2, Clock, Maximize, Mic, MonitorUp, ShieldCheck } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/input'
-import { CHUNK_SECONDS, RECORDING_RETENTION_DAYS, type ProctorEventType } from '@/lib/assessments/integrity'
+import { AWAY_SECONDS, CHUNK_SECONDS, RECORDING_RETENTION_DAYS, type ProctorEventType } from '@/lib/assessments/integrity'
 import { cn } from '@/lib/utils'
 import { saveAssessmentAnswersAction, startAssessmentAction, submitAssessmentAction } from '@/server/actions/assessments'
 
@@ -267,8 +267,33 @@ export function ProctorSession({
   React.useEffect(() => {
     if (phase !== 'running' || !state) return
     const onVisibility = () => log(document.hidden ? 'TAB_HIDDEN' : 'TAB_VISIBLE')
+    // Focus moving to another window (e.g. Alt+Tab while staying in full screen): a short flicker is only logged;
+    // staying away longer than AWAY_SECONDS is a violation. Tab switches are already counted as TAB_HIDDEN.
+    let awaySince = 0
+    let awayCounted = false
+    let awayTimer: ReturnType<typeof setTimeout> | undefined
     const onBlur = () => {
-      if (!document.hidden) log('WINDOW_BLUR')
+      if (document.hidden || finished.current) return
+      log('WINDOW_BLUR')
+      awaySince = Date.now()
+      awayCounted = false
+      clearTimeout(awayTimer)
+      awayTimer = setTimeout(() => {
+        if (document.hidden || document.hasFocus() || finished.current) return
+        awayCounted = true
+        log('AWAY_FROM_WINDOW', { after: AWAY_SECONDS })
+        void flushEvents()
+      }, AWAY_SECONDS * 1000)
+    }
+    const onFocus = () => {
+      clearTimeout(awayTimer)
+      if (!awaySince) return
+      const seconds = Math.round((Date.now() - awaySince) / 100) / 10
+      awaySince = 0
+      log('WINDOW_FOCUS', { seconds })
+      if (awayCounted && !finished.current) {
+        setBlocked(`You switched to another window for ${Math.round(seconds)} seconds. This counts as a violation.`)
+      }
     }
     const onFullscreen = () => {
       if (!document.fullscreenElement && !finished.current) {
@@ -311,6 +336,7 @@ export function ProctorSession({
     }
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
     document.addEventListener('fullscreenchange', onFullscreen)
     document.addEventListener('paste', onPaste, true)
     document.addEventListener('copy', onCopy, true)
@@ -332,6 +358,8 @@ export function ProctorSession({
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
+      clearTimeout(awayTimer)
       document.removeEventListener('fullscreenchange', onFullscreen)
       document.removeEventListener('paste', onPaste, true)
       document.removeEventListener('copy', onCopy, true)
@@ -381,6 +409,12 @@ export function ProctorSession({
 
   async function reenterFullscreen() {
     await root.current?.requestFullscreen().catch(() => undefined)
+  }
+
+  /** After a counted absence: carry on (back in full screen first if needed). */
+  async function continueAfterAway() {
+    if (!document.fullscreenElement) await reenterFullscreen()
+    if (document.fullscreenElement) setBlocked(null)
   }
 
   async function reshareScreen() {
@@ -445,7 +479,8 @@ export function ProctorSession({
               </li>
               <li>
                 <strong>Rules:</strong> stay in full screen on this tab; don’t switch tabs, windows or apps; work alone in a quiet place; no pasting. Leaving full
-                screen, switching tabs or stopping screen sharing counts as a violation — after {maxViolations} the assessment is submitted automatically.
+                screen, switching tabs, staying in another window for more than a few seconds or stopping screen sharing counts as a violation — after{' '}
+                {maxViolations} the assessment is submitted automatically.
               </li>
             </ul>
           </div>
@@ -590,6 +625,8 @@ export function ProctorSession({
             </p>
             {blocked.startsWith('Screen sharing') ? (
               <Button onClick={reshareScreen}>Share entire screen again</Button>
+            ) : blocked.startsWith('You switched') ? (
+              <Button onClick={continueAfterAway}>Continue the assessment</Button>
             ) : (
               <Button onClick={reenterFullscreen}>Return to full screen</Button>
             )}

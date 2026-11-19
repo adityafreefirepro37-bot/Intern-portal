@@ -211,7 +211,9 @@ describe('task assessments', () => {
     await assessmentService.approve(mentor, assessment.id)
     const { attemptId } = await assessmentService.start(intern, { assessmentId: assessment.id, consent: true, screenSurface: 'monitor' }, meta)
     const at = new Date().toISOString()
-    expect(await assessmentService.recordEvents(intern, { attemptId, events: [{ type: 'FULLSCREEN_EXIT', at }] })).toEqual({ violations: 1, submitted: false })
+    // A short focus loss is only logged; staying in another window counts.
+    expect(await assessmentService.recordEvents(intern, { attemptId, events: [{ type: 'WINDOW_BLUR', at }, { type: 'WINDOW_FOCUS', at, detail: { seconds: 1.2 } }] })).toEqual({ violations: 0, submitted: false })
+    expect(await assessmentService.recordEvents(intern, { attemptId, events: [{ type: 'AWAY_FROM_WINDOW', at, detail: { after: 3 } }] })).toEqual({ violations: 1, submitted: false })
     expect(await assessmentService.recordEvents(intern, { attemptId, events: [{ type: 'SCREEN_SHARE_STOPPED', at }] })).toEqual({ violations: 2, submitted: true })
     const attempt = await prisma.assessmentAttempt.findUniqueOrThrow({ where: { id: attemptId } })
     expect(attempt).toMatchObject({ auto_submitted: true, submit_reason: 'Too many violations (2)' })

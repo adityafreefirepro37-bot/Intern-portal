@@ -13,6 +13,8 @@ export const CHUNK_SECONDS = 10
 export const UPLOAD_GRACE_MS = 3 * 60_000
 /** Answers saved this long after the deadline still count (network latency). */
 export const DEADLINE_GRACE_MS = 30_000
+/** Focus away from the assessment window for longer than this counts as a violation. */
+export const AWAY_SECONDS = 3
 
 export const PROCTOR_EVENT_TYPES = [
   'STARTED',
@@ -22,6 +24,8 @@ export const PROCTOR_EVENT_TYPES = [
   'TAB_HIDDEN',
   'TAB_VISIBLE',
   'WINDOW_BLUR',
+  'WINDOW_FOCUS',
+  'AWAY_FROM_WINDOW',
   'PASTE_BLOCKED',
   'COPY_BLOCKED',
   'CONTEXT_MENU_BLOCKED',
@@ -42,7 +46,7 @@ export const PROCTOR_EVENT_TYPES = [
 export type ProctorEventType = (typeof PROCTOR_EVENT_TYPES)[number]
 
 /** Events that count towards the attempt's violation limit (auto-submit when exceeded). */
-export const VIOLATION_TYPES: readonly ProctorEventType[] = ['FULLSCREEN_EXIT', 'TAB_HIDDEN', 'SCREEN_SHARE_STOPPED']
+export const VIOLATION_TYPES: readonly ProctorEventType[] = ['FULLSCREEN_EXIT', 'TAB_HIDDEN', 'SCREEN_SHARE_STOPPED', 'AWAY_FROM_WINDOW']
 
 export const EVENT_LABELS: Record<ProctorEventType, string> = {
   STARTED: 'Started the assessment',
@@ -52,6 +56,8 @@ export const EVENT_LABELS: Record<ProctorEventType, string> = {
   TAB_HIDDEN: 'Switched away from the tab',
   TAB_VISIBLE: 'Came back to the tab',
   WINDOW_BLUR: 'Focus moved to another window',
+  WINDOW_FOCUS: 'Focus came back',
+  AWAY_FROM_WINDOW: 'Stayed in another window (over 3 s)',
   PASTE_BLOCKED: 'Tried to paste (blocked)',
   COPY_BLOCKED: 'Tried to copy (blocked)',
   CONTEXT_MENU_BLOCKED: 'Right-click (blocked)',
@@ -77,7 +83,8 @@ const WEIGHTS: Partial<Record<ProctorEventType, { each: number; cap: number }>> 
   SCREEN_SHARE_STOPPED: { each: 20, cap: 40 },
   CAMERA_LOST: { each: 15, cap: 30 },
   MIC_LOST: { each: 10, cap: 20 },
-  WINDOW_BLUR: { each: 4, cap: 16 },
+  WINDOW_BLUR: { each: 2, cap: 8 },
+  AWAY_FROM_WINDOW: { each: 12, cap: 36 },
   PASTE_BLOCKED: { each: 6, cap: 18 },
   COPY_BLOCKED: { each: 2, cap: 6 },
   DEVTOOLS_KEY_BLOCKED: { each: 8, cap: 16 },

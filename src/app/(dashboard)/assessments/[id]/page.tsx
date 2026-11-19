@@ -127,7 +127,8 @@ function InternView({ a }: { a: View }) {
               </li>
               <li className="flex gap-2">
                 <MonitorUp className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-                You share your entire screen and stay in full screen. Leaving full screen, switching tabs or stopping the share is recorded; after{' '}
+                You share your entire screen and stay in full screen. Leaving full screen, switching tabs, staying in another window for more than a few
+                seconds or stopping the share is recorded; after{' '}
                 {a.max_violations} of these the assessment submits automatically.
               </li>
               <li className="flex gap-2">
@@ -410,6 +411,9 @@ async function ReviewerView({ a, tz, organizationId }: { a: View; tz: string; or
                         <span>
                           {violation && <AlertTriangle className="mr-1 inline size-3" aria-hidden />}
                           {EVENT_LABELS[e.type as ProctorEventType] ?? humanizeEnum(e.type)}
+                          {e.type === 'WINDOW_FOCUS' && typeof (e.detail as { seconds?: unknown } | null)?.seconds === 'number' && (
+                            <span className="text-muted-foreground"> (away {(e.detail as { seconds: number }).seconds} s)</span>
+                          )}
                         </span>
                       </li>
                     )

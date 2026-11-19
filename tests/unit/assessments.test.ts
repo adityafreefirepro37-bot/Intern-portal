@@ -15,6 +15,13 @@ describe('integrity score', () => {
     expect(integrityScore({ counts: { TAB_HIDDEN: 10 }, ...full }).score).toBe(64)
   })
 
+  it('counts time in another window as a violation, while short focus losses cost little', () => {
+    expect(VIOLATION_TYPES).toContain('AWAY_FROM_WINDOW')
+    expect(VIOLATION_TYPES).not.toContain('WINDOW_BLUR')
+    expect(integrityScore({ counts: { AWAY_FROM_WINDOW: 1 }, ...full }).score).toBe(88)
+    expect(integrityScore({ counts: { WINDOW_BLUR: 10 }, ...full }).score).toBe(92)
+  })
+
   it('flags missing recording as a risk', () => {
     const r = integrityScore({ counts: {}, durationSeconds: 600, cameraSeconds: 100, screenSeconds: 600 })
     expect(r.score).toBe(75)

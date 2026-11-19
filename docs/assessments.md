@@ -43,7 +43,9 @@ once its assessment is graded and passed, or waived.
   window blur, stopped screen share / camera / microphone, more than one screen,
   sustained sound, paste / copy / right-click / developer-tools keys (blocked),
   offline. `FULLSCREEN_EXIT`, `TAB_HIDDEN` and `SCREEN_SHARE_STOPPED` count as
-  violations; leaving full screen or stopping the share blocks the questions until fixed.
+  violations, and so does `AWAY_FROM_WINDOW`: focus in another window (e.g. Alt+Tab while still in full screen)
+  for more than `AWAY_SECONDS` (3 s). Shorter focus losses are only logged; each return logs `WINDOW_FOCUS` with the
+  seconds away. Leaving full screen, stopping the share or a counted absence blocks the questions until acknowledged.
 - Answers autosave; the countdown uses the server clock; events flush every 5 s.
 
 Browsers cannot truly stop someone switching tabs or using a second device — the
