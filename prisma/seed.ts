@@ -6,7 +6,9 @@
  * 1. Reference data (organization, permissions, roles, departments, positions,
  *    leave types, settings) — runs in every environment, idempotent.
  * 2. Demo data (fictional people, projects, tasks, courses) — development and
- *    test only; skipped when NODE_ENV=production.
+ *    test only: skipped when NODE_ENV=production, and skipped for any database
+ *    that is not on this machine (e.g. the hosted Supabase one) unless
+ *    SEED_DEMO=true. Real portals must never receive demo data.
  * 3. Optional: when SEED_DEV_PASSWORD and Supabase admin credentials are set,
  *    creates matching Supabase Auth users for the development accounts and
  *    links them via users.auth_user_id. Passwords are never stored in this
@@ -23,6 +25,20 @@ loadEnvConfig(process.cwd())
 
 const prisma = new PrismaClient()
 const isProduction = process.env.NODE_ENV === 'production'
+
+/** Demo data only for a database on this machine (local dev and tests), or when explicitly asked for. */
+function demoAllowed() {
+  if (isProduction) return { ok: false, why: 'NODE_ENV=production' }
+  if (process.env.SEED_DEMO?.trim().toLowerCase() === 'true') return { ok: true, why: '' }
+  let host = ''
+  try {
+    host = new URL(process.env.DATABASE_URL ?? '').hostname
+  } catch {
+    return { ok: false, why: 'DATABASE_URL is not a valid URL' }
+  }
+  const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host) || host.endsWith('.localhost')
+  return local ? { ok: true, why: '' } : { ok: false, why: `database ${host} is not local (set SEED_DEMO=true to override)` }
+}
 
 async function linkSupabaseAuthUsers(userIds: Record<string, string>) {
   const url = process.env.SUPABASE_URL?.trim()
@@ -73,8 +89,9 @@ async function main() {
       `${Object.keys(reference.departmentIds).length} departments, ${Object.keys(reference.positionIds).length} positions`,
   )
 
-  if (isProduction) {
-    console.log('NODE_ENV=production: demo data and development accounts skipped.')
+  const demoCheck = demoAllowed()
+  if (!demoCheck.ok) {
+    console.log(`Demo data and development accounts skipped: ${demoCheck.why}.`)
     return
   }
 

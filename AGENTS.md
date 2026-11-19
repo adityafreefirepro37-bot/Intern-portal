@@ -80,3 +80,4 @@ No passwords are stored in this database. With Supabase keys + SEED_DEV_PASSWORD
 matching Supabase users with that password (development only). Production bootstrap: `npm run admin:invite`.
 
 ⚠️ NEVER set SEED_DEV_PASSWORD in production, and use a separate Supabase project for production!
+The seed adds demo data only to a local database (localhost) unless SEED_DEMO=true; the live portal holds real data only.
