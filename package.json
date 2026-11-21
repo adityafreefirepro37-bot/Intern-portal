@@ -27,6 +27,8 @@
     "postinstall": "prisma generate",
     "admin:invite": "tsx scripts/invite-admin.ts",
     "jobs:daily": "tsx --conditions=react-server scripts/daily-jobs.ts",
+    "jobs:worker": "tsx --conditions=react-server scripts/worker-jobs.ts",
+    "scheduler:setup": "tsx scripts/setup-scheduler.ts",
     "email:test": "tsx --conditions=react-server scripts/email-test.ts"
   },
   "dependencies": {

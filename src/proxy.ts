@@ -27,6 +27,9 @@ const PUBLIC_PATHS = [
   '/api/health',
   // Public certificate verification (rate-limited; shows only what the certificate states).
   '/verify',
+  // A business's private Growth audit page (unguessable link, noindex) and its view / opt-out calls.
+  '/audit',
+  '/api/audit',
 ]
 const SIGNED_IN_BOUNCE = ['/login', '/forgot-password']
 

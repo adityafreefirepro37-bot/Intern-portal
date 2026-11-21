@@ -6,6 +6,7 @@ import {
   type PermissionScope,
   type SystemRoleSlug,
 } from '../../src/lib/permissions/catalog'
+import { INDUSTRIES } from '../../src/lib/leads/catalog'
 import { seedOnboardingReference } from './onboarding'
 import { AYAVA_ORGANIZATION_ID } from './ids'
 
@@ -254,6 +255,21 @@ export async function seedReference(prisma: PrismaClient) {
       description: 'Company-wide conversation',
       channel_type: 'GENERAL',
     },
+  })
+
+  // Growth industry catalogue. New industries are added; existing rows keep an admin's edits.
+  await prisma.leadIndustry.createMany({
+    data: INDUSTRIES.map((industry, position) => ({
+      organization_id: orgId,
+      key: industry.key,
+      name: industry.name,
+      position,
+      search_terms: industry.terms,
+      osm_tags: industry.osmTags,
+      checks: industry.checks,
+      priority: industry.priority,
+    })),
+    skipDuplicates: true,
   })
 
   return {

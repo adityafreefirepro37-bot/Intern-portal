@@ -189,6 +189,13 @@ export const AUDIT_ACTIONS = {
   ASSESSMENT_GRADED: 'assessment.graded',
   ASSESSMENT_WAIVED: 'assessment.waived',
   ASSESSMENT_RECORDING_VIEWED: 'assessment.recording_viewed',
+  LEAD_SETTINGS_UPDATED: 'lead.settings_updated',
+  LEAD_INDUSTRY_UPDATED: 'lead.industry_updated',
+  LEAD_CREATED: 'lead.created',
+  LEAD_UPDATED: 'lead.updated',
+  LEAD_ASSIGNED: 'lead.assigned',
+  LEAD_RESEARCH_REQUESTED: 'lead.research_requested',
+  LEAD_OPTED_OUT: 'lead.opted_out',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]

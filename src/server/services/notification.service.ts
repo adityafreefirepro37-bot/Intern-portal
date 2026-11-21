@@ -82,6 +82,8 @@ export const NOTIFICATION_TYPES = {
   ASSESSMENT_READY: 'ASSESSMENT_READY',
   ASSESSMENT_SUBMITTED: 'ASSESSMENT_SUBMITTED',
   ASSESSMENT_GRADED: 'ASSESSMENT_GRADED',
+  LEAD_ASSIGNED: 'LEAD_ASSIGNED',
+  LEAD_AUDIT_VIEWED: 'LEAD_AUDIT_VIEWED',
 } as const
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
 
@@ -116,6 +118,7 @@ export type NotificationEntity =
   | 'channel'
   | 'certificate'
   | 'assessment'
+  | 'lead'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
@@ -143,6 +146,7 @@ export function notificationHref(entityType: string | null, entityId: string | n
   if (entityType === 'channel') return `/messages/${entityId}`
   if (entityType === 'certificate') return `/certificates/${entityId}`
   if (entityType === 'assessment') return `/assessments/${entityId}`
+  if (entityType === 'lead') return `/growth/leads/${entityId}`
   return null
 }
 

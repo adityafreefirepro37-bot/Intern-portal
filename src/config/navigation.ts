@@ -29,7 +29,9 @@ import {
   MessageSquareHeart,
   MessagesSquare,
   Palmtree,
+  Radar,
   ScrollText,
+  SlidersHorizontal,
   ShieldCheck,
   Settings,
   Sparkles,
@@ -149,6 +151,13 @@ export const NAVIGATION: NavSection[] = [
         permission: 'learning.read',
         minScope: 'ASSIGNED',
       },
+    ],
+  },
+  {
+    title: 'Growth',
+    items: [
+      { label: 'Leads', scopedLabel: 'My leads', href: '/growth/leads', icon: Radar, permission: 'lead.read' },
+      { label: 'Growth settings', href: '/growth/settings', icon: SlidersHorizontal, permission: 'lead.manage', minScope: 'ORGANIZATION' },
     ],
   },
   {

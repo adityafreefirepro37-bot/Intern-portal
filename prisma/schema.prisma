@@ -602,6 +602,7 @@ enum AiFeedbackRating {
 
 enum AiFeature {
   ASSESSMENT
+  LEADS
   CHAT
   EMBEDDING
   INGESTION
@@ -727,6 +728,12 @@ model Organization {
   notification_preferences NotificationPreference[]
   notification_deliveries  NotificationDelivery[]
   task_assessments         TaskAssessment[]
+
+  lead_industries   LeadIndustry[]
+  lead_searches     LeadSearch[]
+  leads             Lead[]
+  lead_suppressions LeadSuppression[]
+  lead_api_usage    LeadApiUsage[]
 
   @@map("organizations")
 }
@@ -869,6 +876,8 @@ model User {
   certificates_revoked          Certificate[]                  @relation("CertificateRevoker")
   assessments_taken             TaskAssessment[]               @relation("AssessmentIntern")
   assessment_attempts           AssessmentAttempt[]
+  leads_assigned                Lead[]                         @relation("LeadAssignee")
+  lead_searches_created         LeadSearch[]                   @relation("LeadSearchCreator")
 
   meeting_invitations      MeetingAttendee[]
   channel_memberships      ChannelMember[]          @relation("ChannelMemberUser")
@@ -3652,4 +3661,204 @@ model ProctorRecording {
   @@unique([attempt_id, stream, sequence])
   @@index([created_at])
   @@map("proctor_recordings")
+}
+
+// ─── Growth: lead sourcing, auto-audit and scoring ──────────────────────────
+
+enum LeadSource {
+  GOOGLE_PLACES
+  OPENSTREETMAP
+  MANUAL
+}
+
+enum LeadStatus {
+  NEW
+  REVIEWED
+  READY
+  NOT_A_FIT
+  DO_NOT_CONTACT
+}
+
+enum LeadTier {
+  HOT
+  WARM
+  SKIP
+}
+
+enum LeadResearchStatus {
+  PENDING
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum BackgroundJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+/// An industry Ayava targets: search terms, extra audit checks and priority (seeded from src/lib/leads/catalog.ts).
+model LeadIndustry {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  key             String
+  name            String
+  position        Int      @default(0)
+  search_terms    String[] @default([])
+  osm_tags        String[] @default([])
+  checks          String[] @default([])
+  priority        Int      @default(2)
+  active          Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  searches     LeadSearch[]
+  leads        Lead[]
+
+  @@unique([organization_id, key])
+  @@map("lead_industries")
+}
+
+/// One search term of an industry in one city. The worker pages through it, then marks it exhausted.
+model LeadSearch {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String     @db.Uuid
+  industry_id     String     @db.Uuid
+  city            String
+  term            String
+  source          LeadSource @default(GOOGLE_PLACES)
+  active          Boolean    @default(true)
+  page_token      String?
+  pages_fetched   Int        @default(0)
+  exhausted       Boolean    @default(false)
+  found           Int        @default(0)
+  added           Int        @default(0)
+  last_run_at     DateTime?  @db.Timestamptz(3)
+  last_error      String?
+  created_by      String?    @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  industry     LeadIndustry @relation(fields: [industry_id], references: [id], onDelete: Cascade)
+  creator      User?        @relation("LeadSearchCreator", fields: [created_by], references: [id], onDelete: SetNull)
+  leads        Lead[]
+
+  @@unique([organization_id, industry_id, city, term, source])
+  @@index([organization_id, active, exhausted, last_run_at])
+  @@map("lead_searches")
+}
+
+/// A business found by a search (or added by hand), with its audit, score and AI summary.
+model Lead {
+  id                    String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id       String             @db.Uuid
+  source                LeadSource
+  /// Google place id, "node/123" for OpenStreetMap, or a random id for manual leads.
+  external_id           String
+  industry_id           String?            @db.Uuid
+  search_id             String?            @db.Uuid
+  name                  String
+  category              String?
+  address               String?
+  city                  String?
+  phone                 String?
+  website               String?
+  email                 String?
+  maps_url              String?
+  rating                Float?
+  review_count          Int?
+  business_status       String?
+  latitude              Float?
+  longitude             Float?
+  status                LeadStatus         @default(NEW)
+  tier                  LeadTier?
+  need_score            Int?
+  fit_score             Int?
+  score_reasons         Json?
+  research_status       LeadResearchStatus @default(PENDING)
+  research_error        String?
+  researched_at         DateTime?          @db.Timestamptz(3)
+  /// Compact audit findings (see src/lib/leads/audit.ts); never raw HTML.
+  audit                 Json?
+  /// AI summary: problems, services, opener (see src/server/leads/summary.ts).
+  summary               Json?
+  summary_source        String?
+  checklist             Json?
+  notes                 String?
+  assigned_to           String?            @db.Uuid
+  audit_token           String?            @unique
+  audit_expires_at      DateTime?          @db.Timestamptz(3)
+  audit_views           Int                @default(0)
+  audit_first_viewed_at DateTime?          @db.Timestamptz(3)
+  audit_last_viewed_at  DateTime?          @db.Timestamptz(3)
+  created_at            DateTime           @default(now()) @db.Timestamptz(3)
+  updated_at            DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization  @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  industry     LeadIndustry? @relation(fields: [industry_id], references: [id], onDelete: SetNull)
+  search       LeadSearch?   @relation(fields: [search_id], references: [id], onDelete: SetNull)
+  assignee     User?         @relation("LeadAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+
+  @@unique([organization_id, source, external_id])
+  @@index([organization_id, tier, status])
+  @@index([organization_id, industry_id])
+  @@index([organization_id, research_status])
+  @@index([assigned_to])
+  @@map("leads")
+}
+
+/// Businesses that asked not to be contacted (or were removed): never imported or contacted again.
+model LeadSuppression {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  /// PLACE (source:external id), DOMAIN, EMAIL or PHONE.
+  kind            String
+  value           String
+  reason          String
+  created_at      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, kind, value])
+  @@map("lead_suppressions")
+}
+
+/// Paid-API calls per day, so the free monthly allowance is never exceeded.
+model LeadApiUsage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  day             DateTime @db.Date
+  api             String
+  calls           Int      @default(0)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, day, api])
+  @@map("lead_api_usage")
+}
+
+/// A unit of background work, claimed by the worker (POST /api/jobs/worker) with SKIP LOCKED.
+model BackgroundJob {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String?             @db.Uuid
+  type            String
+  payload         Json                @default("{}")
+  /// Optional: at most one queued/running job per key.
+  dedupe_key      String?
+  status          BackgroundJobStatus @default(QUEUED)
+  attempts        Int                 @default(0)
+  max_attempts    Int                 @default(3)
+  run_after       DateTime            @default(now()) @db.Timestamptz(3)
+  locked_at       DateTime?           @db.Timestamptz(3)
+  last_error      String?
+  created_at      DateTime            @default(now()) @db.Timestamptz(3)
+  finished_at     DateTime?           @db.Timestamptz(3)
+
+  @@index([status, run_after])
+  @@index([dedupe_key])
+  @@map("background_jobs")
 }

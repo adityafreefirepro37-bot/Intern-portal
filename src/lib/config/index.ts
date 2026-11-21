@@ -129,6 +129,9 @@ const envSchema = z.object({
 
   /** Shared secret for scheduled job endpoints (/api/jobs/*). Jobs are disabled without it. */
   CRON_SECRET: optionalString.pipe(z.string().min(24).optional()),
+
+  /** Google Cloud API key with Places API (New) and PageSpeed Insights enabled (Growth lead sourcing). */
+  GOOGLE_MAPS_API_KEY: optionalString,
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -224,6 +227,9 @@ function buildConfig(env: Env) {
     },
     jobs: {
       cronSecret: env.CRON_SECRET,
+    },
+    leads: {
+      googleApiKey: env.GOOGLE_MAPS_API_KEY,
     },
   } as const
 }

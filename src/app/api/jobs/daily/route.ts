@@ -1,8 +1,8 @@
-import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
-import { config } from '@/lib/config'
 import { jsonError, jsonSuccess } from '@/lib/http/response'
 import { aiJobs } from '@/server/ai/settings.service'
+import { cronAuthorized } from '@/server/jobs/auth'
+import { pruneJobs } from '@/server/jobs/queue'
 import { announcementJobs } from '@/server/services/announcement.service'
 import { checkinJobs } from '@/server/services/checkin.service'
 import { documentJobs } from '@/server/services/document.service'
@@ -16,18 +16,9 @@ import { workJobsService } from '@/server/services/work-jobs.service'
 
 export const dynamic = 'force-dynamic'
 
-function authorized(request: NextRequest): boolean {
-  const secret = config.jobs.cronSecret
-  const header = request.headers.get('authorization') ?? ''
-  if (!secret || !header.startsWith('Bearer ')) return false
-  const given = Buffer.from(header.slice(7))
-  const expected = Buffer.from(secret)
-  return given.length === expected.length && timingSafeEqual(given, expected)
-}
-
 /**
- * POST /api/jobs/daily — scheduled maintenance (call once a day from a cron
- * service such as Vercel Cron or GitHub Actions):
+ * POST /api/jobs/daily — scheduled maintenance, once a day (Supabase pg_cron via
+ * `npm run scheduler:setup`, or any cron service):
  *   1. ACTIVE → ENDING_SOON for internships inside the threshold
  *   2. `onboarding.item_overdue` events for items that became overdue
  *   3. task due-soon / overdue and milestone due-soon events (notifications)
@@ -38,10 +29,11 @@ function authorized(request: NextRequest): boolean {
  *   8. AI retention: old conversations and usage records, expired proposals
  *   9. Notification emails still waiting (each run sends up to 200)
  *  10. Assessments: submit attempts whose time ran out; delete recordings past retention
+ *  11. Background jobs: finished ones kept 7 days, failed ones 30
  * Every step is idempotent. Requires `Authorization: Bearer $CRON_SECRET`.
  */
 export async function POST(request: NextRequest) {
-  if (!authorized(request)) return NextResponse.json({ success: false }, { status: 404 })
+  if (!cronAuthorized(request)) return NextResponse.json({ success: false }, { status: 404 })
   try {
     const endingSoon = await internLifecycleService.markEndingSoon()
     const overdue = await internLifecycleService.emitOverdueOnboarding()
@@ -55,6 +47,7 @@ export async function POST(request: NextRequest) {
     const ai = await aiJobs.applyRetention()
     const emails = await notificationDeliveryService.flush(200)
     const assessments = await assessmentJobs.maintenance()
+    const backgroundJobs = await pruneJobs()
     return jsonSuccess({
       endingSoon: endingSoon.marked,
       overdueEvents: overdue.emitted,
@@ -69,6 +62,7 @@ export async function POST(request: NextRequest) {
       aiRetention: ai,
       notificationEmails: emails,
       assessments,
+      backgroundJobs,
     })
   } catch (error) {
     return jsonError(error, { route: 'jobs.daily' })

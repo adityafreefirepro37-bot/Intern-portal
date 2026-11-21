@@ -82,6 +82,13 @@ const EXPECTED_TABLES = [
   'assessment_answers',
   'proctor_events',
   'proctor_recordings',
+  // Growth
+  'lead_industries',
+  'lead_searches',
+  'leads',
+  'lead_suppressions',
+  'lead_api_usage',
+  'background_jobs',
   'ai_conversations',
   'ai_messages',
   'knowledge_documents',

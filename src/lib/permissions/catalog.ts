@@ -182,6 +182,11 @@ export const PERMISSION_CATALOG = {
     take: 'Take task assessments',
     review: 'Grade and waive assessments, and view proctoring recordings',
   },
+  lead: {
+    read: 'View Growth leads and their audits',
+    update: 'Review leads: notes, checklist and status',
+    manage: 'Run Growth: searches, settings, assigning leads',
+  },
   ai: { use: 'Use AYAVA AI', manage: 'Configure AYAVA AI' },
   knowledge: { read: 'View knowledge base', manage: 'Manage knowledge base documents' },
   analytics: { read: 'View analytics', export: 'Export analytics' },
@@ -569,7 +574,7 @@ export const DEFAULT_ROLE_GRANTS: Record<SystemRoleSlug, RoleGrants> = {
       'ai.use',
       'knowledge.read',
     ]),
-    ...grants('ASSIGNED', ['project.read', 'task.read', 'task.submit', 'task.comment', 'meeting.read']),
+    ...grants('ASSIGNED', ['project.read', 'task.read', 'task.submit', 'task.comment', 'meeting.read', 'lead.read', 'lead.update']),
     ...grants('OWN', [
       'intern_profile.read',
       'intern_profile.update',
