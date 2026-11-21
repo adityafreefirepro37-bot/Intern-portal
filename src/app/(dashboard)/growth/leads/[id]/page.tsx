@@ -218,7 +218,7 @@ export default async function LeadPage({ params }: PageProps<'/growth/leads/[id]
               )}
               {lead.maps_url && (
                 <a href={lead.maps_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline">
-                  <ExternalLink className="size-4 shrink-0" aria-hidden /> {lead.source === 'OPENSTREETMAP' ? 'OpenStreetMap' : 'Google Maps'} listing
+                  <ExternalLink className="size-4 shrink-0" aria-hidden /> {lead.source === 'OPENSTREETMAP' ? 'OpenStreetMap listing' : 'Google Maps'}
                 </a>
               )}
               {!lead.website && !lead.email && !lead.phone && <p className="text-muted-foreground">No contact details.</p>}
@@ -267,7 +267,7 @@ export default async function LeadPage({ params }: PageProps<'/growth/leads/[id]
               <CardTitle>Details</CardTitle>
             </CardHeader>
             <CardContent className="text-small">
-              <Fact label="Found via" value={lead.source === 'MANUAL' ? 'Added by hand' : lead.search ? `“${lead.search.term}” in ${lead.search.city}` : lead.source === 'GOOGLE_PLACES' ? 'Google Places' : 'OpenStreetMap'} />
+              <Fact label="Found via" value={lead.source === 'MANUAL' ? 'Added by hand' : lead.search ? `“${lead.search.term}” in ${lead.search.city}` : { GOOGLE_PLACES: 'Google Places', TOMTOM: 'TomTom', OPENSTREETMAP: 'OpenStreetMap' }[lead.source]} />
               <Fact label="Added" value={formatDate(lead.created_at, tz)} />
               <Fact label="Assigned to" value={lead.assignee?.name ?? '—'} />
             </CardContent>

@@ -20,20 +20,29 @@ import { generateStructured, getAIProvider } from '../ai/provider'
 import { aiSettingsService } from '../ai/settings.service'
 import { enqueueJob, type JobHandler } from '../jobs/queue'
 import { domainOf, FetchBlockedError, normaliseWebsite } from './safe-fetch'
-import { apiCalls, countApiCall, growthSettings, PAGESPEED_API, PLACES_API, type GrowthSettings } from './settings'
+import {
+  apiCalls,
+  cityPositions,
+  countApiCall,
+  growthSettings,
+  PAGESPEED_API,
+  PLACES_API,
+  TOMTOM_API,
+  type GrowthSettings,
+} from './settings'
 import { leadSources, type FoundBusiness } from './sources'
 
 /**
  * The Growth pipeline, run by the background worker:
  *
- *   scheduler tick ─► lead.search    one page of a search (Google: ≤20 businesses; OSM: all)
+ *   scheduler tick ─► lead.search    one page of a search (TomTom: ≤100 businesses; Google: ≤20; OSM: all)
  *                  ─► lead.research  homepage + contact page + sitemap → audit signals
  *                  ─► lead.speed     PageSpeed Insights (mobile)
  *                  ─► score          findings → need / fit → HOT / WARM / SKIP (+ private audit page)
  *                  ─► lead.summary   AI words the top problems (rules-based summary until then)
  *
- * Google usage is capped per day and per month (Growth settings) so it stays
- * inside the free allowance. Suppressed businesses (opted out) are never imported.
+ * TomTom and Google usage is capped per day and per month (Growth settings) so it
+ * stays inside the free allowance. Suppressed businesses (opted out) are never imported.
  */
 
 const DAY_MS = 86_400_000
@@ -62,8 +71,10 @@ export async function syncSearches(organizationId: string, settings: GrowthSetti
   for (const industry of industries) {
     if (!industry.active) continue
     for (const city of settings.cities) {
-      for (const term of industry.search_terms)
+      for (const term of industry.search_terms) {
+        wanted.push({ organization_id: organizationId, industry_id: industry.id, city, term, source: 'TOMTOM' })
         wanted.push({ organization_id: organizationId, industry_id: industry.id, city, term, source: 'GOOGLE_PLACES' })
+      }
       if (industry.osm_tags.length)
         wanted.push({
           organization_id: organizationId,
@@ -113,16 +124,20 @@ export async function scheduleLeadWork() {
       { industry: { priority: 'asc' } },
       { created_at: 'asc' },
     ]
-    if (settings.googleEnabled && leadSources().placesConfigured()) {
-      const usage = await apiCalls(organizationId, PLACES_API)
-      const left = Math.min(settings.placesDailyCap - usage.today, settings.placesMonthlyCap - usage.month)
+    for (const paged of pagedSources(settings)) {
+      if (!paged.on) continue
+      const usage = await apiCalls(organizationId, paged.api)
+      const left = Math.min(paged.dailyCap - usage.today, paged.monthlyCap - usage.month)
       if (left > 0) {
         const next = await prisma.leadSearch.findMany({
-          where: { organization_id: organizationId, source: 'GOOGLE_PLACES', active: true, exhausted: false },
+          where: { organization_id: organizationId, source: paged.source, active: true, exhausted: false },
           orderBy: order,
           take: Math.min(left, 2),
-          select: { id: true },
+          select: { id: true, city: true },
         })
+        // Geocode new cities here, one at a time, so searches running in parallel don't each do it.
+        if (paged.source === 'TOMTOM')
+          for (const city of new Set(next.map((s) => s.city))) await cityPosition(organizationId, city)
         for (const s of next)
           if (
             await enqueueJob({
@@ -156,6 +171,36 @@ export async function scheduleLeadWork() {
   return { queued }
 }
 
+/** Sources that page through results and count against a free allowance. */
+function pagedSources(settings: GrowthSettings) {
+  return [
+    {
+      source: 'TOMTOM' as const,
+      api: TOMTOM_API,
+      on: settings.tomtomEnabled && leadSources().tomtomConfigured(),
+      dailyCap: settings.tomtomDailyCap,
+      monthlyCap: settings.tomtomMonthlyCap,
+    },
+    {
+      source: 'GOOGLE_PLACES' as const,
+      api: PLACES_API,
+      on: settings.googleEnabled && leadSources().placesConfigured(),
+      dailyCap: settings.placesDailyCap,
+      monthlyCap: settings.placesMonthlyCap,
+    },
+  ]
+}
+
+/** A city's centre for TomTom (geocoded once, then cached; a city TomTom can't find is cached as null). */
+async function cityPosition(organizationId: string, city: string) {
+  const cache = await cityPositions.get(organizationId)
+  if (city in cache) return cache[city] ?? null
+  await countApiCall(organizationId, TOMTOM_API)
+  const position = await leadSources().tomtomGeocode(city)
+  await cityPositions.set(organizationId, city, position)
+  return position
+}
+
 async function leadsAddedToday(organizationId: string) {
   const start = new Date()
   start.setUTCHours(0, 0, 0, 0)
@@ -184,7 +229,7 @@ export async function importBusinesses(
   organizationId: string,
   businesses: FoundBusiness[],
   origin: {
-    source: 'GOOGLE_PLACES' | 'OPENSTREETMAP'
+    source: 'GOOGLE_PLACES' | 'TOMTOM' | 'OPENSTREETMAP'
     searchId: string | null
     industryId: string | null
     city: string | null
@@ -269,15 +314,34 @@ const runSearch: JobHandler = async (payload) => {
   const settings = await growthSettings.get(search.organization_id)
   if (!settings.enabled) return
   try {
-    if (search.source === 'GOOGLE_PLACES') {
-      const usage = await apiCalls(search.organization_id, PLACES_API)
-      if (usage.today >= settings.placesDailyCap || usage.month >= settings.placesMonthlyCap) return
-      await countApiCall(search.organization_id, PLACES_API)
-      const page = await leadSources().placesTextSearch(`${search.term} in ${search.city}`, search.page_token)
+    if (search.source === 'GOOGLE_PLACES' || search.source === 'TOMTOM') {
+      const paged = pagedSources(settings).find((x) => x.source === search.source)!
+      const usage = await apiCalls(search.organization_id, paged.api)
+      if (!paged.on || usage.today >= paged.dailyCap || usage.month >= paged.monthlyCap) return
+      let page
+      if (search.source === 'TOMTOM') {
+        const near = await cityPosition(search.organization_id, search.city)
+        if (!near) {
+          await prisma.leadSearch.update({
+            where: { id: search.id },
+            data: {
+              exhausted: true,
+              last_run_at: new Date(),
+              last_error: `TomTom couldn’t find the city “${search.city}”`,
+            },
+          })
+          return
+        }
+        await countApiCall(search.organization_id, paged.api)
+        page = await leadSources().tomtomSearch(search.term, near, search.page_token)
+      } else {
+        await countApiCall(search.organization_id, paged.api)
+        page = await leadSources().placesTextSearch(`${search.term} in ${search.city}`, search.page_token)
+      }
       const result = await importBusinesses(
         search.organization_id,
         page.businesses,
-        { source: 'GOOGLE_PLACES', searchId: search.id, industryId: search.industry_id, city: search.city },
+        { source: search.source, searchId: search.id, industryId: search.industry_id, city: search.city },
         settings.newLeadsDailyCap,
       )
       await prisma.leadSearch.update({
@@ -405,7 +469,8 @@ const runResearch: JobHandler = async (payload, job) => {
         phone: lead.phone ?? audit.site?.phones[0] ?? null,
       },
     })
-    if (audit.site && leadSources().placesConfigured()) {
+    // PageSpeed works with or without a key (keyless is rate-limited; a refusal only drops the signal).
+    if (audit.site) {
       await enqueueJob({
         type: 'lead.speed',
         organizationId: lead.organization_id,

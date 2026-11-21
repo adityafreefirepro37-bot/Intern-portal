@@ -13,7 +13,7 @@ import { enqueueJob } from '../jobs/queue'
 import { runWorker } from '../jobs/worker'
 import { leadFindings, syncSearches, type LeadSummary } from '../leads/pipeline'
 import { domainOf, normaliseWebsite } from '../leads/safe-fetch'
-import { apiCalls, growthSettings, growthSettingsSchema, PAGESPEED_API, PLACES_API } from '../leads/settings'
+import { apiCalls, growthSettings, growthSettingsSchema, PAGESPEED_API, PLACES_API, TOMTOM_API, type GrowthSettings } from '../leads/settings'
 import { leadSources } from '../leads/sources'
 import { AUDIT_ACTIONS } from './audit-actions'
 import { auditService } from './audit.service'
@@ -29,6 +29,20 @@ import { NOTIFICATION_TYPES, notificationService, usersWithPermission } from './
  */
 
 type LeadPermission = 'lead.read' | 'lead.update' | 'lead.manage'
+
+/** Which sources can run (switched on and, where needed, a key configured). */
+function sourceStatus(settings: GrowthSettings) {
+  const sources = leadSources()
+  return {
+    tomtomConfigured: sources.tomtomConfigured(),
+    googleConfigured: sources.placesConfigured(),
+    running: [
+      ...(settings.tomtomEnabled && sources.tomtomConfigured() ? (['TOMTOM'] as const) : []),
+      ...(settings.googleEnabled && sources.placesConfigured() ? (['GOOGLE_PLACES'] as const) : []),
+      ...(settings.osmEnabled ? (['OPENSTREETMAP'] as const) : []),
+    ],
+  }
+}
 
 function leadScope(ctx: RequestContext, permission: LeadPermission): Prisma.LeadWhereInput {
   const scope = authorizationService.require(ctx, permission)
@@ -97,12 +111,14 @@ export const leadService = {
     const tiers = Object.fromEntries(byTier.map((r) => [r.tier ?? 'UNSCORED', r._count._all])) as Record<string, number>
     const research = Object.fromEntries(byResearch.map((r) => [r.research_status, r._count._all])) as Record<string, number>
     if (!manage) return { total, ready, tiers, research, admin: null }
-    const [settings, places, speed, lastJob, searches] = await Promise.all([
-      growthSettings.get(ctx.organization.id),
+    const settings = await growthSettings.get(ctx.organization.id)
+    const status = sourceStatus(settings)
+    const [places, tomtom, speed, lastJob, searches] = await Promise.all([
       apiCalls(ctx.organization.id, PLACES_API),
+      apiCalls(ctx.organization.id, TOMTOM_API),
       apiCalls(ctx.organization.id, PAGESPEED_API),
       prisma.backgroundJob.findFirst({ where: { organization_id: ctx.organization.id, status: { in: ['DONE', 'FAILED'] } }, orderBy: { finished_at: 'desc' }, select: { finished_at: true } }),
-      prisma.leadSearch.groupBy({ by: ['exhausted'], where: { organization_id: ctx.organization.id, active: true }, _count: { _all: true } }),
+      prisma.leadSearch.groupBy({ by: ['exhausted'], where: { organization_id: ctx.organization.id, active: true, source: { in: [...status.running] } }, _count: { _all: true } }),
     ])
     return {
       total,
@@ -111,8 +127,11 @@ export const leadService = {
       research,
       admin: {
         enabled: settings.enabled,
-        googleConfigured: leadSources().placesConfigured(),
+        googleConfigured: status.googleConfigured,
+        tomtomConfigured: status.tomtomConfigured,
+        running: status.running as readonly string[],
         places: { ...places, dailyCap: settings.placesDailyCap, monthlyCap: settings.placesMonthlyCap },
+        tomtom: { ...tomtom, dailyCap: settings.tomtomDailyCap, monthlyCap: settings.tomtomMonthlyCap },
         pagespeedToday: speed.today,
         lastWorkerRun: lastJob?.finished_at ?? null,
         searchesOpen: searches.find((s) => !s.exhausted)?._count._all ?? 0,
@@ -330,7 +349,8 @@ export const leadService = {
         include: { _count: { select: { leads: true } } },
       }),
     ])
-    return { settings, industries, googleConfigured: leadSources().placesConfigured(), services: Object.values(AYAVA_SERVICES) }
+    const status = sourceStatus(settings)
+    return { settings, industries, googleConfigured: status.googleConfigured, tomtomConfigured: status.tomtomConfigured, services: Object.values(AYAVA_SERVICES) }
   },
 
   async saveSettings(ctx: RequestContext, input: unknown) {

@@ -163,3 +163,53 @@ describe('website address guards', () => {
     for (const ip of ['8.8.8.8', '103.21.244.1', '2606:4700::1111']) expect(isPrivateAddress(ip)).toBe(false)
   })
 })
+
+describe('TomTom source', () => {
+  const realFetch = global.fetch
+  afterEach(() => {
+    global.fetch = realFetch
+  })
+
+  function loadSources() {
+    process.env.TOMTOM_API_KEY = 'test-tomtom-key'
+    let mod: typeof import('@/server/leads/sources') | undefined
+    jest.isolateModules(() => {
+      mod = jest.requireActual<typeof import('@/server/leads/sources')>('@/server/leads/sources')
+    })
+    delete process.env.TOMTOM_API_KEY
+    return mod!.leadSources()
+  }
+
+  it('maps POI results and pages by offset until the results run out', async () => {
+    const calls: string[] = []
+    const results = Array.from({ length: 100 }, (_, i) => ({
+      id: `poi-${i}`,
+      type: 'POI',
+      poi: { name: `Cafe ${i}`, phone: '+(91)-135-2700000', url: 'www.cafe.example', categories: ['café/pub'] },
+      address: { freeformAddress: 'Rajpur Road, Dehradun' },
+      position: { lat: 30.3, lon: 78.0 },
+    }))
+    global.fetch = jest.fn(async (url: string | URL | Request) => {
+      calls.push(String(url))
+      return new Response(JSON.stringify({ summary: { numResults: 100, offset: 0, totalResults: 250 }, results }), { status: 200 })
+    }) as typeof fetch
+    const sources = loadSources()
+    expect(sources.tomtomConfigured()).toBe(true)
+    const page = await sources.tomtomSearch('cafe', { lat: 30.32, lon: 78.03 }, null)
+    expect(page.nextPageToken).toBe('100')
+    expect(page.businesses).toHaveLength(100)
+    expect(page.businesses[0]).toMatchObject({ externalId: 'poi-0', name: 'Cafe 0', phone: '+(91)-135-2700000', website: 'www.cafe.example', category: 'café/pub', address: 'Rajpur Road, Dehradun' })
+    expect(page.businesses[0]!.mapsUrl).toBe('https://www.google.com/maps/search/?api=1&query=Cafe%200%20Rajpur%20Road%2C%20Dehradun')
+    expect(calls[0]).toMatch(/^https:\/\/api\.tomtom\.com\/search\/2\/poiSearch\/cafe\.json\?/)
+    expect(calls[0]).toMatch(/countrySet=IN/)
+    expect(calls[0]).toMatch(/radius=15000/)
+    // Last page: fewer than 100 results → no next page.
+    global.fetch = jest.fn(async () => new Response(JSON.stringify({ summary: { totalResults: 250 }, results: results.slice(0, 50) }), { status: 200 })) as typeof fetch
+    expect((await sources.tomtomSearch('cafe', { lat: 30.32, lon: 78.03 }, '200')).nextPageToken).toBeNull()
+  })
+
+  it('reports TomTom errors with their message', async () => {
+    global.fetch = jest.fn(async () => new Response(JSON.stringify({ detailedError: { message: 'Invalid API key' } }), { status: 403 })) as typeof fetch
+    await expect(loadSources().tomtomGeocode('Dehradun')).rejects.toThrow('TomTom search failed (403): Invalid API key')
+  })
+})

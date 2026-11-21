@@ -11,8 +11,10 @@ Run by the background worker (`POST /api/jobs/worker`, every 5 minutes; see
 *Scheduler* below). Code: `src/server/leads/pipeline.ts`.
 
 1. **Search** (`lead.search`): one page of an *industry × city × term* search.
-   Google Places API (New) text search returns up to 20 businesses per call;
-   OpenStreetMap (Overpass) returns all matches at once. New businesses become
+   TomTom Search returns up to 100 businesses per call within 15 km of the city
+   centre (geocoded once per city and cached in `settings.key = 'growth_geo'`);
+   Google Places API (New) text search returns up to 20; OpenStreetMap (Overpass)
+   returns all matches at once. New businesses become
    leads; duplicates (same listing, website domain or phone) and opted-out
    businesses (`lead_suppressions`) are skipped. Searches are created from the
    active industries × the cities in Growth settings (`syncSearches`) and run again
@@ -22,8 +24,9 @@ Run by the background worker (`POST /api/jobs/worker`, every 5 minutes; see
    private addresses on any redirect hop, 12 s timeout, 1.5 MB limit) and read by
    `analyzeHtml()` (`src/lib/leads/audit.ts`). Only compact signals are stored,
    never the page.
-3. **Speed** (`lead.speed`): PageSpeed Insights (mobile). Optional; a failure only
-   drops that signal.
+3. **Speed** (`lead.speed`): PageSpeed Insights (mobile), with `PAGESPEED_API_KEY`
+   (or `GOOGLE_MAPS_API_KEY`), else keyless (shared, rate-limited quota). A failure
+   only drops that signal.
 4. **Score**: `findingsFor()` turns the signals, the Google rating and the
    industry's extra checks into findings, each mapped to one of Ayava's 15
    services; `scoreLead()` (`src/lib/leads/score.ts`) gives *need* (sum of
@@ -43,8 +46,9 @@ they run ads) are a checklist for the reviewer, with links (Meta Ad Library).
 
 | Source | Cost | Limit in the portal |
 | --- | --- | --- |
+| TomTom Search (free developer account, no card) | free allowance (check developer.tomtom.com/pricing) | `tomtomDailyCap` (60) and `tomtomMonthlyCap` (2,000), counted in `lead_api_usage` (geocoding included) |
 | Google Places text search (website, phone, rating = *Enterprise* SKU) | 1,000 free calls / month | `placesDailyCap` (30) and `placesMonthlyCap` (950), counted in `lead_api_usage` before each call |
-| PageSpeed Insights | free | counted for visibility |
+| PageSpeed Insights | free (an API key needs no billing account) | counted for visibility |
 | OpenStreetMap Overpass | free | one search per worker run |
 | AI summaries | your AI provider | one per Hot / Warm lead |
 
@@ -95,8 +99,12 @@ and ignores a duplicate enqueue for an open `dedupe_key`.
 
 ## Configuration
 
-- `GOOGLE_MAPS_API_KEY`: a Google Cloud key restricted to *Places API (New)* and
-  *PageSpeed Insights API*. Without it, Google is skipped and OpenStreetMap still works.
+- `TOMTOM_API_KEY`: a TomTom developer key (free, no card): the main source.
+- `GOOGLE_MAPS_API_KEY`: a Google Cloud key with *Places API (New)* (needs a billing
+  account). Optional; without it Google is skipped.
+- `PAGESPEED_API_KEY`: a Google Cloud key restricted to *PageSpeed Insights API*
+  (no billing account needed). Optional.
+- Sources without a key are skipped; OpenStreetMap needs none.
 - `CRON_SECRET`: required for the worker and daily endpoints.
 - Growth settings (`settings.key = 'growth'`): on/off, cities, sources, caps, AI
   summaries, verified proof, audit-page lifetime.

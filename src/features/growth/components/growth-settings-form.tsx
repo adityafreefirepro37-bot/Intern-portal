@@ -11,6 +11,9 @@ import { saveGrowthSettingsAction, saveIndustryAction } from '@/server/actions/l
 export interface GrowthSettingsValue {
   enabled: boolean
   cities: string[]
+  tomtomEnabled: boolean
+  tomtomDailyCap: number
+  tomtomMonthlyCap: number
   googleEnabled: boolean
   osmEnabled: boolean
   placesDailyCap: number
@@ -40,7 +43,15 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
   )
 }
 
-export function GrowthSettingsForm({ initial, googleConfigured }: { initial: GrowthSettingsValue; googleConfigured: boolean }) {
+export function GrowthSettingsForm({
+  initial,
+  googleConfigured,
+  tomtomConfigured,
+}: {
+  initial: GrowthSettingsValue
+  googleConfigured: boolean
+  tomtomConfigured: boolean
+}) {
   const router = useRouter()
   const { toast } = useToast()
   const [s, setS] = React.useState(initial)
@@ -70,12 +81,26 @@ export function GrowthSettingsForm({ initial, googleConfigured }: { initial: Gro
       </FormField>
       <div className="grid gap-3">
         <Toggle
+          label="TomTom"
+          hint={tomtomConfigured ? 'Free developer key: name, phone, website, up to 100 businesses per search.' : 'Add TOMTOM_API_KEY to the environment to use TomTom (free, no card).'}
+          checked={s.tomtomEnabled}
+          onChange={(tomtomEnabled) => set({ tomtomEnabled })}
+        />
+        <Toggle
           label="Google Places"
           hint={googleConfigured ? 'Best data (website, phone, rating). Free within the limits below.' : 'Add GOOGLE_MAPS_API_KEY to the environment to use Google.'}
           checked={s.googleEnabled}
           onChange={(googleEnabled) => set({ googleEnabled })}
         />
         <Toggle label="OpenStreetMap" hint="Completely free; fewer businesses in smaller towns." checked={s.osmEnabled} onChange={(osmEnabled) => set({ osmEnabled })} />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="TomTom searches per day" hint="Each returns up to 100 businesses">
+          <Input type="number" min={0} max={2000} value={s.tomtomDailyCap} onChange={(e) => set({ tomtomDailyCap: Number(e.target.value) })} />
+        </FormField>
+        <FormField label="TomTom searches per month" hint="Keep inside your TomTom free allowance">
+          <Input type="number" min={0} max={50000} value={s.tomtomMonthlyCap} onChange={(e) => set({ tomtomMonthlyCap: Number(e.target.value) })} />
+        </FormField>
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <FormField label="Google searches per day" hint="Each returns up to 20 businesses">

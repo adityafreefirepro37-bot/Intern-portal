@@ -15,7 +15,8 @@ export const metadata: Metadata = { title: 'Growth settings' }
 export default async function GrowthSettingsPage() {
   const ctx = await requirePageContext()
   if (authorizationService.scopeOf(ctx, 'lead.manage') !== 'ORGANIZATION') return <AccessDenied what="Growth settings" />
-  const [{ settings, industries, googleConfigured }, searches] = await Promise.all([leadService.settings(ctx), leadService.searches(ctx)])
+  const [{ settings, industries, googleConfigured, tomtomConfigured }, searches] = await Promise.all([leadService.settings(ctx), leadService.searches(ctx)])
+  const sourceLabel = { TOMTOM: 'TomTom', GOOGLE_PLACES: 'Google', OPENSTREETMAP: 'OSM', MANUAL: 'Manual' } as const
   const done = searches.filter((s) => s.exhausted).length
   const failing = searches.filter((s) => s.last_error)
 
@@ -31,11 +32,15 @@ export default async function GrowthSettingsPage() {
           <CardHeader>
             <CardTitle>Search</CardTitle>
             <CardDescription>
-              {googleConfigured ? 'Google Places is connected.' : 'Google Places isn’t connected yet (GOOGLE_MAPS_API_KEY); OpenStreetMap works without it.'}
+              {[
+                tomtomConfigured ? 'TomTom is connected.' : 'TomTom isn’t connected (TOMTOM_API_KEY).',
+                googleConfigured ? 'Google Places is connected.' : 'Google Places isn’t connected (GOOGLE_MAPS_API_KEY).',
+                'OpenStreetMap needs no key.',
+              ].join(' ')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <GrowthSettingsForm initial={settings} googleConfigured={googleConfigured} />
+            <GrowthSettingsForm initial={settings} googleConfigured={googleConfigured} tomtomConfigured={tomtomConfigured} />
           </CardContent>
         </Card>
 
@@ -96,7 +101,7 @@ export default async function GrowthSettingsPage() {
                           <td className="py-2 pr-3">
                             <span className="font-medium">{s.source === 'OPENSTREETMAP' ? s.industry.name : `“${s.term}”`}</span>{' '}
                             <span className="text-muted-foreground">in {s.city}</span>{' '}
-                            <Badge variant={s.source === 'OPENSTREETMAP' ? 'outline' : 'neutral'}>{s.source === 'OPENSTREETMAP' ? 'OSM' : 'Google'}</Badge>
+                            <Badge variant={s.source === 'OPENSTREETMAP' ? 'outline' : 'neutral'}>{sourceLabel[s.source]}</Badge>
                           </td>
                           <td className="py-2 pr-3 tabular-nums">
                             {s.found} / {s.added}

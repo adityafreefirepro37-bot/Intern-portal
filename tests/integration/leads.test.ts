@@ -21,8 +21,26 @@ const businesses: FoundBusiness[] = [
 class FakeSources implements LeadSources {
   searches: string[] = []
   pages: string[] = []
+  geocoded: string[] = []
+  tomtomOn = false
   placesConfigured() {
     return true
+  }
+  tomtomConfigured() {
+    return this.tomtomOn
+  }
+  async tomtomGeocode(city: string) {
+    this.geocoded.push(city)
+    return { lat: 30.32, lon: 78.03 }
+  }
+  async tomtomSearch(term: string, near: { lat: number; lon: number }) {
+    this.searches.push(`tomtom:${term}@${near.lat}`)
+    return {
+      nextPageToken: null,
+      businesses: [
+        { externalId: 'tt-1', name: 'Tom Bistro', category: 'restaurant', address: 'EC Road, Dehradun', phone: '+91 135 2700000', website: 'www.tom-bistro.example', email: null, mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Tom%20Bistro', rating: null, reviewCount: null, businessStatus: null, latitude: 30.32, longitude: 78.04 },
+      ],
+    }
   }
   async placesTextSearch(query: string) {
     this.searches.push(query)
@@ -103,8 +121,8 @@ afterAll(async () => {
 
 describe('Growth pipeline', () => {
   it('finds, de-duplicates, audits, scores and summarises businesses inside the Google allowance', async () => {
-    const saved = await leadService.saveSettings(admin, { enabled: true, cities: ['Dehradun'], googleEnabled: true, osmEnabled: false, placesDailyCap: 2, placesMonthlyCap: 950, newLeadsDailyCap: 300, aiSummaries: true, proof: [], auditPageDays: 90 })
-    expect(saved.searches).toBe(4) // 3 Google terms + 1 OpenStreetMap search (OSM is off, so it never runs)
+    const saved = await leadService.saveSettings(admin, { enabled: true, cities: ['Dehradun'], tomtomEnabled: true, tomtomDailyCap: 60, tomtomMonthlyCap: 2000, googleEnabled: true, osmEnabled: false, placesDailyCap: 2, placesMonthlyCap: 950, newLeadsDailyCap: 300, aiSummaries: true, proof: [], auditPageDays: 90 })
+    expect(saved.searches).toBe(7) // 3 terms × (TomTom + Google) + 1 OpenStreetMap; TomTom has no key here and OSM is off
 
     await drain()
 
@@ -198,6 +216,21 @@ describe('Growth pipeline', () => {
     await expect(leadService.update(intern, { leadId: bakery.id, status: 'READY' })).rejects.toBeInstanceOf(NotFoundError)
     await expect(leadService.settings(intern)).rejects.toBeInstanceOf(ForbiddenError)
     await expect(leadService.assign(intern, { leadIds: [bakery.id], userId: intern.actor.userId })).rejects.toBeInstanceOf(ForbiddenError)
+  })
+
+  it('TomTom: geocodes each city once, stays inside its cap and imports businesses', async () => {
+    sources.tomtomOn = true
+    sources.searches = []
+    await leadService.saveSettings(admin, { enabled: true, cities: ['Dehradun'], tomtomEnabled: true, tomtomDailyCap: 3, tomtomMonthlyCap: 2000, googleEnabled: false, osmEnabled: false, placesDailyCap: 2, placesMonthlyCap: 950, newLeadsDailyCap: 300, aiSummaries: false, proof: [], auditPageDays: 90 })
+    await drain()
+    // 3 calls allowed today: 1 geocode (cached afterwards) + 2 searches; the same business found twice is added once.
+    expect(sources.geocoded).toEqual(['Dehradun'])
+    expect(sources.searches).toEqual([expect.stringMatching(/^tomtom:.+@30.32$/), expect.stringMatching(/^tomtom:.+@30.32$/)])
+    const usage = await prisma.leadApiUsage.findFirst({ where: { organization_id: AYAVA_ORGANIZATION_ID, api: 'tomtom_search' } })
+    expect(usage?.calls).toBe(3)
+    const leads = await prisma.lead.findMany({ where: { organization_id: AYAVA_ORGANIZATION_ID, source: 'TOMTOM' } })
+    expect(leads.map((l) => [l.name, l.website, l.research_status])).toEqual([['Tom Bistro', 'https://www.tom-bistro.example/', 'DONE']])
+    sources.tomtomOn = false
   })
 
   it('manual leads are audited like the rest', async () => {

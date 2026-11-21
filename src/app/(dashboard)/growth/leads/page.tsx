@@ -76,7 +76,7 @@ export default async function LeadsPage({ searchParams }: PageProps<'/growth/lea
           <Link href="/growth/settings" className="font-medium text-primary hover:underline">
             Growth settings
           </Link>
-          {admin.googleConfigured ? '.' : ' (and add the Google API key to use Google Places; OpenStreetMap works without it).'}
+          {admin.tomtomConfigured || admin.googleConfigured ? '.' : ' (add TOMTOM_API_KEY for the best results; OpenStreetMap works without a key).'}
         </div>
       )}
 
@@ -89,10 +89,19 @@ export default async function LeadsPage({ searchParams }: PageProps<'/growth/lea
 
       {admin && (
         <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border p-4 text-small">
-          <span>
-            Google today: <strong className="tabular-nums">{admin.places.today}</strong>/{admin.places.dailyCap} · month{' '}
-            <strong className="tabular-nums">{admin.places.month}</strong>/{admin.places.monthlyCap}
-          </span>
+          {admin.running.includes('TOMTOM') && (
+            <span>
+              TomTom today: <strong className="tabular-nums">{admin.tomtom.today}</strong>/{admin.tomtom.dailyCap} · month{' '}
+              <strong className="tabular-nums">{admin.tomtom.month}</strong>/{admin.tomtom.monthlyCap}
+            </span>
+          )}
+          {admin.running.includes('GOOGLE_PLACES') && (
+            <span>
+              Google today: <strong className="tabular-nums">{admin.places.today}</strong>/{admin.places.dailyCap} · month{' '}
+              <strong className="tabular-nums">{admin.places.month}</strong>/{admin.places.monthlyCap}
+            </span>
+          )}
+          {admin.running.length === 0 && <span className="text-warning">No source is switched on</span>}
           <span>
             Searches: {admin.searchesOpen} open · {admin.searchesDone} done
           </span>
