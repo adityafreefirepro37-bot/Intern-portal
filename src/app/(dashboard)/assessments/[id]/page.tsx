@@ -414,6 +414,19 @@ async function ReviewerView({ a, tz, organizationId }: { a: View; tz: string; or
                           {e.type === 'WINDOW_FOCUS' && typeof (e.detail as { seconds?: unknown } | null)?.seconds === 'number' && (
                             <span className="text-muted-foreground"> (away {(e.detail as { seconds: number }).seconds} s)</span>
                           )}
+                          {e.type === 'UPLOAD_FAILED' && e.detail && typeof e.detail === 'object' && (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              ({[
+                                (e.detail as { stream?: string }).stream,
+                                (e.detail as { reason?: string }).reason,
+                                typeof (e.detail as { tries?: unknown }).tries === 'number' && `${(e.detail as { tries: number }).tries} tries`,
+                              ]
+                                .filter(Boolean)
+                                .join(', ')}
+                              )
+                            </span>
+                          )}
                         </span>
                       </li>
                     )

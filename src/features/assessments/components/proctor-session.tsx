@@ -33,6 +33,10 @@ interface AttemptState {
 type Phase = 'consent' | 'devices' | 'running' | 'submitting' | 'done'
 type Answer = { choice?: number | null; text?: string | null }
 
+/** How long one recording chunk keeps being retried (the server accepts chunks up to 3 minutes after submission). */
+const UPLOAD_RETRY_MS = 120_000
+/** On submit, wait at most this long for chunks still uploading (they keep trying while the page is open). */
+const SUBMIT_UPLOAD_WAIT_MS = 30_000
 const NOISE_RMS = 0.06
 const NOISE_SECONDS = 2.5
 
@@ -128,7 +132,7 @@ export function ProctorSession({
   async function stopEverything() {
     for (const r of recorders.current) if (r.state !== 'inactive') r.stop()
     await new Promise((resolve) => setTimeout(resolve, 400))
-    await Promise.allSettled(uploads.current)
+    await Promise.race([Promise.allSettled(uploads.current), new Promise((resolve) => setTimeout(resolve, SUBMIT_UPLOAD_WAIT_MS))])
     camera?.getTracks().forEach((t) => t.stop())
     screen?.getTracks().forEach((t) => t.stop())
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined)
@@ -223,7 +227,12 @@ export function ProctorSession({
     setPhase('running')
   }
 
-  /** Records one stream in 10 s chunks numbered from `base`, uploading each with retries. */
+  /**
+   * Records one stream in 10 s chunks numbered from `base`. Each chunk is retried with growing
+   * pauses (2, 4, 8… up to 20 s) for up to UPLOAD_RETRY_MS, so a slow or stalled connection
+   * doesn't lose recording; a refusal that retrying can't fix (signed out, rejected) stops at once.
+   * A chunk that is finally lost is logged with the reason, to tell the network from the server.
+   */
   function record(attemptId: string, stream: MediaStream, name: 'camera' | 'screen', base: number, bitrate: number) {
     let seq = base
     const recorder = new MediaRecorder(stream, { mimeType: pickMime(), videoBitsPerSecond: bitrate, audioBitsPerSecond: 32_000 })
@@ -231,19 +240,27 @@ export function ProctorSession({
       if (!event.data.size) return
       const sequence = seq++
       const send = async () => {
-        for (let tryNo = 0; tryNo < 3; tryNo++) {
+        const started = Date.now()
+        let reason = 'network'
+        let tries = 0
+        for (;;) {
+          tries++
           try {
             const response = await fetch(`/api/assessments/attempts/${attemptId}/chunks?stream=${name}&seq=${sequence}`, {
               method: 'POST',
               body: event.data,
             })
+            // 409: already received (a retry after a lost reply) or recording closed.
             if (response.ok || response.status === 409) return
+            reason = `HTTP ${response.status}`
+            if (response.status < 500 && response.status !== 408 && response.status !== 429) break
           } catch {
-            // retry
+            reason = 'network'
           }
-          await new Promise((r) => setTimeout(r, 1500 * (tryNo + 1)))
+          if (Date.now() - started >= UPLOAD_RETRY_MS) break
+          await new Promise((r) => setTimeout(r, Math.min(2000 * 2 ** (tries - 1), 20_000)))
         }
-        log('UPLOAD_FAILED', { stream: name, sequence })
+        log('UPLOAD_FAILED', { stream: name, sequence, reason, tries, seconds: Math.round((Date.now() - started) / 1000) })
       }
       uploads.current.push(send())
     }

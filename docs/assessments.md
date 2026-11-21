@@ -38,7 +38,9 @@ once its assessment is graded and passed, or waived.
 - Continuous recording with `MediaRecorder` in 10 s WebM chunks (camera ~180 kbps
   with audio, screen ~300 kbps at ≤5 fps), uploaded to
   `POST /api/assessments/attempts/:id/chunks`. Each recorder run (start, reopened page,
-  re-shared screen) is a separate *segment* (`SEGMENT_SIZE`) so playback works.
+  re-shared screen) is a separate *segment* (`SEGMENT_SIZE`) so playback works. Each chunk is retried with
+  growing pauses for up to 2 minutes (a stalled connection loses nothing); a chunk finally lost is logged as
+  `UPLOAD_FAILED` with the stream, the reason (network or HTTP status) and the number of tries.
 - Detected and logged (`PROCTOR_EVENT_TYPES`): leaving full screen, switching tab,
   window blur, stopped screen share / camera / microphone, more than one screen,
   sustained sound, paste / copy / right-click / developer-tools keys (blocked),
@@ -67,7 +69,7 @@ less than 80% / 50% of the attempt. ≥80 *Clean*, ≥50 *Needs a look*, otherwi
 - Deleted after `RECORDING_RETENTION_DAYS` (30) by `assessmentJobs.maintenance()` in
   the daily job; the database keeps a row marked deleted.
 - `Permissions-Policy` allows camera, microphone and display capture for the site itself only.
-- Storage: roughly 40–80 MB per 15-minute attempt.
+- Storage: roughly 20 MB per 15-minute attempt (measured).
 
 ## Permissions
 
