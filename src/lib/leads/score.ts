@@ -14,6 +14,10 @@ export interface ScoreInput {
   hasEmail: boolean
   hasPhone: boolean
   businessStatus: string | null
+  /** False while the website is unknown (the listing had none and the web search hasn't run): no tier yet. */
+  websiteSettled?: boolean
+  /** Outreach is automatic by email, so a lead without a published email can't be worked (default true). */
+  requireEmail?: boolean
 }
 
 export interface LeadScore {
@@ -59,6 +63,13 @@ export function scoreLead(input: ScoreInput): LeadScore {
   if (input.businessStatus && input.businessStatus !== 'OPERATIONAL') {
     tier = 'SKIP'
     reasons.push(`Skipped: business is ${input.businessStatus.toLowerCase().replace(/_/g, ' ')}`)
+  } else if (input.websiteSettled === false) {
+    // A website found later may publish an email: decide then.
+    tier = 'SKIP'
+    reasons.push('Waiting: website not found yet (searched again automatically)')
+  } else if ((input.requireEmail ?? true) && !input.hasEmail) {
+    tier = 'SKIP'
+    reasons.push('Skipped: no published email address to contact them')
   } else if (!input.hasEmail && !input.hasPhone) {
     tier = 'SKIP'
     reasons.push('Skipped: no email or phone to reach them')

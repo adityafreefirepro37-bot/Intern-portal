@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: 'Growth settings' }
 export default async function GrowthSettingsPage() {
   const ctx = await requirePageContext()
   if (authorizationService.scopeOf(ctx, 'lead.manage') !== 'ORGANIZATION') return <AccessDenied what="Growth settings" />
-  const [{ settings, industries, googleConfigured, tomtomConfigured }, searches] = await Promise.all([leadService.settings(ctx), leadService.searches(ctx)])
+  const [{ settings, industries, googleConfigured, tomtomConfigured, webSearchConfigured }, searches] = await Promise.all([leadService.settings(ctx), leadService.searches(ctx)])
   const sourceLabel = { TOMTOM: 'TomTom', GOOGLE_PLACES: 'Google', OPENSTREETMAP: 'OSM', MANUAL: 'Manual' } as const
   const done = searches.filter((s) => s.exhausted).length
   const failing = searches.filter((s) => s.last_error)
@@ -25,7 +25,7 @@ export default async function GrowthSettingsPage() {
       <PageHeader
         title="Growth settings"
         breadcrumbs={[{ label: 'Leads', href: '/growth/leads' }, { label: 'Settings' }]}
-        description="Where and how the portal looks for businesses. Google usage stays inside its free monthly allowance."
+        description="Where and how the portal looks for businesses. Every paid source stays inside its free allowance."
       />
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-2">
@@ -36,11 +36,12 @@ export default async function GrowthSettingsPage() {
                 tomtomConfigured ? 'TomTom is connected.' : 'TomTom isn’t connected (TOMTOM_API_KEY).',
                 googleConfigured ? 'Google Places is connected.' : 'Google Places isn’t connected (GOOGLE_MAPS_API_KEY).',
                 'OpenStreetMap needs no key.',
+                webSearchConfigured ? 'Web search (Brave) is connected.' : 'Web search isn’t connected (BRAVE_SEARCH_API_KEY).',
               ].join(' ')}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <GrowthSettingsForm initial={settings} googleConfigured={googleConfigured} tomtomConfigured={tomtomConfigured} />
+            <GrowthSettingsForm initial={settings} googleConfigured={googleConfigured} tomtomConfigured={tomtomConfigured} webSearchConfigured={webSearchConfigured} />
           </CardContent>
         </Card>
 

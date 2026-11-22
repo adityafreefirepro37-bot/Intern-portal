@@ -27,6 +27,12 @@ export const growthSettingsSchema = z.object({
   placesDailyCap: z.number().int().min(0).max(200).default(30),
   placesMonthlyCap: z.number().int().min(0).max(5000).default(950),
   newLeadsDailyCap: z.number().int().min(0).max(5000).default(300),
+  /** Brave Search: finding websites listings don't have (about 1,000 free searches a month). */
+  siteSearchEnabled: z.boolean().default(true),
+  siteSearchDailyCap: z.number().int().min(0).max(2000).default(30),
+  siteSearchMonthlyCap: z.number().int().min(0).max(50000).default(900),
+  /** Only leads with a published email address are kept (outreach is automatic, by email). */
+  requireEmail: z.boolean().default(true),
   aiSummaries: z.boolean().default(true),
   /** Verified facts about Ayava the AI may cite (results, portfolio). Nothing else is claimed. */
   proof: z.array(z.string().trim().min(3).max(300)).max(30).default([]),
@@ -89,6 +95,7 @@ export async function countApiCall(organizationId: string, api: string, now = ne
 export const PLACES_API = 'places_text_search'
 export const TOMTOM_API = 'tomtom_search'
 export const PAGESPEED_API = 'pagespeed'
+export const BRAVE_API = 'brave_search'
 
 const GEO_KEY = 'growth_geo'
 

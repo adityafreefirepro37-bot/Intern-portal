@@ -1,6 +1,7 @@
-import { analyzeHtml, findingsFor, mergeSignals, servicesFor, type LeadAudit } from '@/lib/leads/audit'
+import { analyzeHtml, findingsFor, mergeSignals, ownEmails, servicesFor, websiteSettled, type LeadAudit } from '@/lib/leads/audit'
 import { AYAVA_SERVICES, INDUSTRIES, INDUSTRY_CHECKS } from '@/lib/leads/catalog'
 import { scoreLead } from '@/lib/leads/score'
+import { distinctiveWords, domainGuesses, isDirectory, matchSite } from '@/lib/leads/site-match'
 import { isPrivateAddress, normaliseWebsite } from '@/server/leads/safe-fetch'
 
 const GOOD_SITE = `<!doctype html><html><head>
@@ -75,10 +76,20 @@ describe('website analysis', () => {
 describe('findings', () => {
   const now = new Date('2026-11-21T00:00:00Z')
 
-  it('a missing website is the one big finding', () => {
-    const f = findingsFor(auditFrom(null), { checks: ['booking'], rating: 4.6, reviewCount: 120, now })
+  const searched = { result: 'not_found' as const, guessed: true, searched: true, checkedAt: '2026-11-21T00:00:00.000Z', tried: [] }
+
+  it('"No website found" only after a web search found nothing', () => {
+    const f = findingsFor(auditFrom(null, { websiteLookup: searched }), { checks: ['booking'], rating: 4.6, reviewCount: 120, now })
     expect(f.map((x) => x.key)).toEqual(['no_website'])
+    expect(f[0]!.title).toBe('No website found')
     expect(f[0]!.service).toBe('website')
+    // A listing without a website (or only guesses tried) proves nothing: no claim, and not scored yet.
+    const unknown = auditFrom(null, { websiteLookup: { ...searched, result: 'waiting', searched: false } })
+    expect(findingsFor(unknown, { checks: [], rating: null, reviewCount: null, now })).toEqual([])
+    expect(findingsFor(auditFrom(null), { checks: [], rating: null, reviewCount: null, now })).toEqual([])
+    expect(websiteSettled(unknown)).toBe(false)
+    expect(websiteSettled(auditFrom(null, { websiteLookup: searched }))).toBe(true)
+    expect(websiteSettled(auditFrom(BAD_SITE))).toBe(true)
   })
 
   it('maps each problem to an Ayava service, serious first, with industry checks', () => {
@@ -121,16 +132,60 @@ describe('lead score', () => {
     expect(scoreLead({ ...base, businessStatus: 'CLOSED_PERMANENTLY' }).tier).toBe('SKIP')
     expect(scoreLead({ ...base, hasEmail: false, hasPhone: false }).tier).toBe('SKIP')
     expect(scoreLead({ ...base, findings: [] }).tier).toBe('SKIP')
+    // Outreach is by email: a phone alone isn't enough (unless that rule is switched off).
+    const phoneOnly = scoreLead({ ...base, hasEmail: false })
+    expect(phoneOnly.tier).toBe('SKIP')
+    expect(phoneOnly.reasons.at(-1)).toBe('Skipped: no published email address to contact them')
+    expect(scoreLead({ ...base, hasEmail: false, requireEmail: false }).tier).toBe('HOT')
+    // Website still unknown: waits rather than being judged.
+    expect(scoreLead({ ...base, websiteSettled: false }).reasons.at(-1)).toMatch(/^Waiting: website not found yet/)
   })
 
   it('a lower-priority, smaller business is warm or skipped', () => {
-    const s = scoreLead({ findings, industryPriority: 3, rating: null, reviewCount: null, hasEmail: false, hasPhone: true, businessStatus: null })
-    expect(s.fit).toBe(30)
+    const s = scoreLead({ findings, industryPriority: 3, rating: null, reviewCount: null, hasEmail: true, hasPhone: false, businessStatus: null })
+    expect(s.fit).toBe(35)
     expect(s.tier).toBe('SKIP')
-    // 20 (priority 3) + 10 (rating 3.6) + 6 (5 reviews) + 10 (phone) = 46: warm, not hot.
-    const warm = scoreLead({ findings, industryPriority: 3, rating: 3.6, reviewCount: 5, hasEmail: false, hasPhone: true, businessStatus: null })
-    expect(warm.fit).toBe(46)
+    // 20 (priority 3) + 10 (rating 3.6) + 6 (5 reviews) + 15 (email) = 51: warm, not hot.
+    const warm = scoreLead({ findings, industryPriority: 3, rating: 3.6, reviewCount: 5, hasEmail: true, hasPhone: false, businessStatus: null })
+    expect(warm.fit).toBe(51)
     expect(warm.tier).toBe('WARM')
+  })
+})
+
+const page = (body: string, title = '') =>
+  `<html><head><title>${title}</title></head><body>${body} ${'Fresh food made every day with care for our guests. '.repeat(6)}</body></html>`
+
+describe('finding a website', () => {
+  const lead = { name: 'Shree Baba Properties Pvt Ltd', city: 'Dehradun', phone: '+91 98970 12345' }
+
+  it('guesses likely addresses from the distinctive part of the name', () => {
+    expect(distinctiveWords(lead.name, lead.city)).toEqual(['baba'])
+    expect(domainGuesses(lead.name, lead.city).slice(0, 3)).toEqual([
+      'https://shreebabaproperties.com/',
+      'https://shreebabaproperties.in/',
+      'https://shreebabaproperties.co.in/',
+    ])
+    expect(domainGuesses('Property Dealer', 'Dehradun')).toEqual([]) // nothing to identify it by
+  })
+
+  it('takes a page only when it proves to be the business', () => {
+    const url = 'https://shreebabaproperties.com/'
+    expect(matchSite({ url, html: page('Shree Baba Properties, Rajpur Road. Call 98970-12345', 'Shree Baba Properties') }, lead)).toEqual({ ok: true, reason: 'name and phone number match' })
+    expect(matchSite({ url, html: page('Shree Baba Properties, Rajpur Road, Dehradun') }, lead).ok).toBe(true)
+    // The same name in another city, with another phone number: not theirs.
+    expect(matchSite({ url, html: page('Shree Baba Properties, Sector 12, Noida. Call 99999 88888') }, lead)).toMatchObject({ ok: false, reason: 'name matches but not the phone number or city' })
+    expect(matchSite({ url: 'https://other.example/', html: page('Krishna Estates, Dehradun') }, lead)).toMatchObject({ ok: false, reason: 'page is about a different business' })
+    expect(matchSite({ url, html: page('shreebabaproperties.com is for sale! Buy this domain today. Dehradun') }, lead)).toMatchObject({ ok: false, reason: 'parked or placeholder page' })
+  })
+
+  it('never takes a directory or social page as the website', () => {
+    expect(isDirectory('https://www.justdial.com/Dehradun/Shree-Baba')).toBe(true)
+    expect(isDirectory('https://www.magicbricks.com/x')).toBe(true)
+    expect(isDirectory('https://shreebabaproperties.com/')).toBe(false)
+  })
+
+  it('keeps only email addresses the business publishes for itself', () => {
+    expect(ownEmails(['info@smile.example', 'smileclinic@gmail.com', 'hello@webdesigner.example', 'noreply@smile.example'], 'https://www.smile.example/contact')).toEqual(['info@smile.example', 'smileclinic@gmail.com'])
   })
 })
 

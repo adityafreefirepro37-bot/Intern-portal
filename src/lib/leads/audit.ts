@@ -46,10 +46,31 @@ export interface SpeedResult {
   cls: number | null
 }
 
+/** Current audit format. Leads researched with an older one are researched again. */
+export const AUDIT_VERSION = 2
+
+/**
+ * The search for a website when the listing had none: likely addresses first,
+ * then a web search. `not_found` is only set after a web search ran, so "No
+ * website found" is never claimed from guesses alone; `waiting` means the web
+ * search hasn't run yet (no key, or today's allowance is used).
+ */
+export interface WebsiteLookup {
+  result: 'found' | 'not_found' | 'waiting'
+  guessed: boolean
+  searched: boolean
+  checkedAt: string
+  /** Candidate pages opened and why each was or wasn't the business's site. */
+  tried: { url: string; reason: string }[]
+}
+
 export interface LeadAudit {
-  version: 1
+  version: 1 | 2
   checkedAt: string
   website: string | null
+  /** Where the website came from: the listing, a likely address that proved to be theirs, or a web search. */
+  websiteSource?: 'listing' | 'guess' | 'search' | null
+  websiteLookup?: WebsiteLookup | null
   site: SiteSignals | null
   siteError: string | null
   speed: SpeedResult | null
@@ -294,7 +315,9 @@ export function findingsFor(audit: LeadAudit, context: FindingContext): Finding[
   }
 
   if (!audit.website) {
-    out.push(finding('no_website', 'high', 'website', 'No website', 'Customers can only find a Google listing; there is nowhere to explain services, show proof or take enquiries.'))
+    // Only claimed after a web search found nothing; a listing without a website proves nothing.
+    if (websiteKnownMissing(audit))
+      out.push(finding('no_website', 'high', 'website', 'No website found', 'We searched online and found no website of the business’s own, so customers only see directory listings: nowhere to explain services, show proof or take enquiries.'))
     return sortFindings(out)
   }
   const site = audit.site
@@ -357,6 +380,39 @@ export function findingsFor(audit: LeadAudit, context: FindingContext): Finding[
   if (!site.ogImage) out.push(finding('no_share_preview', 'low', 'smm', 'No preview when shared', 'Links shared on WhatsApp or social media show no image.'))
 
   return sortFindings(out)
+}
+
+/** True only when a web search confirmed there's no website (not just a listing without one). */
+export function websiteKnownMissing(audit: LeadAudit | null): boolean {
+  return Boolean(audit && !audit.website && audit.websiteLookup?.result === 'not_found' && audit.websiteLookup.searched)
+}
+
+/** Whether the audit can be scored: it has a website, or a search proved there is none. */
+export function websiteSettled(audit: LeadAudit | null): boolean {
+  return Boolean(audit && (audit.website || websiteKnownMissing(audit)))
+}
+
+const FREE_MAIL = /@(gmail|googlemail|yahoo|ymail|rediffmail|outlook|hotmail|live|icloud|me|aol|proton|protonmail|zoho|yandex)\.[a-z.]+$/i
+const NO_REPLY = /^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|abuse|webmaster|privacy|unsubscribe)@/i
+
+/**
+ * Addresses a business publishes for itself: on its own domain, or a free mailbox
+ * (gmail…) shown on its site. An address on another company's domain (often the
+ * web designer's, in the footer) is not the business's.
+ */
+export function ownEmails(emails: string[], siteUrl: string | null): string[] {
+  let host = ''
+  try {
+    host = siteUrl ? new URL(siteUrl).hostname.replace(/^www\./, '').toLowerCase() : ''
+  } catch {
+    host = ''
+  }
+  const base = host.split('.').slice(-3).join('.')
+  return emails.filter((e) => {
+    if (NO_REPLY.test(e)) return false
+    const domain = e.split('@')[1] ?? ''
+    return FREE_MAIL.test(e) || (host !== '' && (domain === host || host.endsWith(`.${domain}`) || domain.endsWith(`.${base}`)))
+  })
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 }

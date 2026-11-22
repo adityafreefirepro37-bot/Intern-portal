@@ -165,6 +165,33 @@ export default async function LeadPage({ params }: PageProps<'/growth/leads/[id]
             </Card>
           )}
 
+          {lead.audit?.websiteLookup && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Website search</CardTitle>
+                <CardDescription>
+                  {lead.audit.websiteLookup.result === 'found'
+                    ? `The listing had no website; this one was found ${lead.audit.websiteSource === 'search' ? 'by a web search' : 'at a likely address'} and shows the business’s details.`
+                    : lead.audit.websiteLookup.result === 'not_found'
+                      ? 'The listing had no website, and a web search found none of the business’s own.'
+                      : 'The listing had no website. Likely addresses didn’t match; the web search runs automatically when there’s allowance.'}
+                </CardDescription>
+              </CardHeader>
+              {lead.audit.websiteLookup.tried.length > 0 && (
+                <CardContent>
+                  <ul className="grid gap-1 text-small">
+                    {lead.audit.websiteLookup.tried.map((t) => (
+                      <li key={t.url} className="flex flex-wrap justify-between gap-2">
+                        <span className="break-all">{t.url}</span>
+                        <span className="text-muted-foreground">{t.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
           {lead.canUpdate && lead.status !== 'DO_NOT_CONTACT' && (
             <Card>
               <CardHeader>

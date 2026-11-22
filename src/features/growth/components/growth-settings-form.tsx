@@ -19,6 +19,10 @@ export interface GrowthSettingsValue {
   placesDailyCap: number
   placesMonthlyCap: number
   newLeadsDailyCap: number
+  siteSearchEnabled: boolean
+  siteSearchDailyCap: number
+  siteSearchMonthlyCap: number
+  requireEmail: boolean
   aiSummaries: boolean
   proof: string[]
   auditPageDays: number
@@ -47,10 +51,12 @@ export function GrowthSettingsForm({
   initial,
   googleConfigured,
   tomtomConfigured,
+  webSearchConfigured,
 }: {
   initial: GrowthSettingsValue
   googleConfigured: boolean
   tomtomConfigured: boolean
+  webSearchConfigured: boolean
 }) {
   const router = useRouter()
   const { toast } = useToast()
@@ -111,6 +117,32 @@ export function GrowthSettingsForm({
         </FormField>
         <FormField label="New leads per day" hint="Stops importing after this many">
           <Input type="number" min={0} max={5000} value={s.newLeadsDailyCap} onChange={(e) => set({ newLeadsDailyCap: Number(e.target.value) })} />
+        </FormField>
+      </div>
+      <div className="grid gap-3">
+        <Toggle
+          label="Find websites listings don’t have"
+          hint={
+            webSearchConfigured
+              ? 'Likely addresses are tried first (free), then a Brave web search. A site is used only when it shows the business’s name with its phone number or city.'
+              : 'Likely addresses are tried (free). Add BRAVE_SEARCH_API_KEY to the environment to also search the web; until then “No website found” is never claimed.'
+          }
+          checked={s.siteSearchEnabled}
+          onChange={(siteSearchEnabled) => set({ siteSearchEnabled })}
+        />
+        <Toggle
+          label="Keep only leads with a published email address"
+          hint="Outreach is automatic, by email. Only addresses the business publishes itself (on its own website or listing) are used."
+          checked={s.requireEmail}
+          onChange={(requireEmail) => set({ requireEmail })}
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="Web searches per day" hint="Brave Search, for websites listings don’t have">
+          <Input type="number" min={0} max={2000} value={s.siteSearchDailyCap} onChange={(e) => set({ siteSearchDailyCap: Number(e.target.value) })} />
+        </FormField>
+        <FormField label="Web searches per month" hint="Brave’s free monthly credit covers about 1,000 (keep below)">
+          <Input type="number" min={0} max={50000} value={s.siteSearchMonthlyCap} onChange={(e) => set({ siteSearchMonthlyCap: Number(e.target.value) })} />
         </FormField>
       </div>
       <Toggle label="AI summaries" hint="AYAVA AI words the top three problems for each Hot and Warm lead." checked={s.aiSummaries} onChange={(aiSummaries) => set({ aiSummaries })} />

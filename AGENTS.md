@@ -65,7 +65,9 @@ npm run build
   src/lib/ai/prompts.ts; writes are proposals (ai_action_requests) that run after confirmation; never add an AI action for HR decisions
 - Assessment rules live in src/server/services/assessment.service.ts; an intern submission is approvable only when its
   assessment is passed or waived (assertApprovable); recordings are reviewer-only, audited, deleted after 30 days
-- Growth rules live in src/server/leads/pipeline.ts (search → research → speed → score → summary) and lead.service.ts; external calls only via
+- Growth rules live in src/server/leads/pipeline.ts (search → find site → research → speed → score → summary) and lead.service.ts; a found
+  website must prove it's the business's (src/lib/leads/site-match.ts); only emails the business publishes itself; "No website found" only
+  after a web search; external calls only via
   src/server/leads/sources.ts (Google usage capped inside the free allowance); business pages only via safe-fetch.ts (no private addresses);
   background work goes through the job queue (src/server/jobs/queue.ts), run by POST /api/jobs/worker
 - Unbuilt features show a "Phase NN" placeholder or disabled control — no fake functionality

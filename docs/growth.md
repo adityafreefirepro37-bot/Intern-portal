@@ -18,26 +18,54 @@ Run by the background worker (`POST /api/jobs/worker`, every 5 minutes; see
    leads; duplicates (same listing, website domain or phone) and opted-out
    businesses (`lead_suppressions`) are skipped. Searches are created from the
    active industries × the cities in Growth settings (`syncSearches`) and run again
-   30 days after they finish, to pick up new businesses.
+   30 days after they finish, to pick up new businesses. Searches **rotate through
+   industries** (the one searched least recently goes next, then its least recently
+   searched city / term), and imports take an advisory lock per organization so
+   parallel searches never go over `newLeadsDailyCap`.
+2. **Finding the website** (`lead.find_site`, only when the listing has none —
+   TomTom rarely lists one in Indian towns). Fully automatic, using public pages only
+   (`src/lib/leads/site-match.ts`):
+   - *Likely addresses* (free): built from the business name
+     (`shreebabaproperties.com`, `.in`, `.co.in`, with the city…), checked in DNS,
+     then opened.
+   - *Web search* (Brave Search API, when `BRAVE_SEARCH_API_KEY` is set): the name and
+     city; directories, maps, marketplaces and social sites are ignored.
+   - A page is taken as the business's website **only when it proves it**: every
+     distinctive word of the name plus the listed phone number or the city (or the
+     phone number with part of the name). Parked and placeholder pages are rejected.
+     Every page tried, and why, is shown on the lead page.
+   - `websiteLookup.result`: `found`, `not_found` (only after a web search found
+     nothing) or `waiting` (no search key yet, or today's allowance used — the
+     scheduler searches again by itself). A lead *waiting* isn't scored yet, and
+     **"No website found" is only claimed after a web search**, never because a
+     listing lacked one.
+3. **Research** (`lead.research`): the homepage, the contact page and
 2. **Research** (`lead.research`): the homepage, the contact page and
    `sitemap.xml` / `robots.txt` are fetched (`safe-fetch.ts`: http(s) only, no
    private addresses on any redirect hop, 12 s timeout, 1.5 MB limit) and read by
    `analyzeHtml()` (`src/lib/leads/audit.ts`). Only compact signals are stored,
-   never the page.
-3. **Speed** (`lead.speed`): PageSpeed Insights (mobile), with `PAGESPEED_API_KEY`
+   never the page. The email kept is one **the business publishes itself** — on
+   its own domain, or a free mailbox (gmail…) shown on its site, never another
+   company's (often the web designer's in the footer) — whose domain has a mail
+   server (MX), and not opted out (`ownEmails`, `publishedEmail`).
+4. **Speed** (`lead.speed`): PageSpeed Insights (mobile), with `PAGESPEED_API_KEY`
    (or `GOOGLE_MAPS_API_KEY`), else keyless (shared, rate-limited quota). A failure
    only drops that signal.
-4. **Score**: `findingsFor()` turns the signals, the Google rating and the
+5. **Score**: `findingsFor()` turns the signals, the Google rating and the
    industry's extra checks into findings, each mapped to one of Ayava's 15
    services; `scoreLead()` (`src/lib/leads/score.ts`) gives *need* (sum of
    severity weights) and *fit* (industry priority, rating, reviews, reachable)
-   → **Hot / Warm / Skip**, with every point explained. Hot and Warm leads get a
-   private audit page.
-5. **Summary** (`lead.summary`): AYAVA AI words the top three problems and one
+   → **Hot / Warm / Skip**, with every point explained. Outreach is automatic and by
+   email, so with `requireEmail` (default on) a lead without a published email is
+   Skip. Hot and Warm leads get a private audit page.
+6. **Summary** (`lead.summary`): AYAVA AI words the top three problems and one
    opening line (`buildLeadSummaryMessages`). It sees only the portal's findings
    and the *verified proof* list from settings, and may not invent facts;
    invented service names are dropped. Until then (or without AI) a rules-based
    summary is used.
+
+Leads researched with an older audit format (`audit.version` 1) are researched
+again automatically, 20 per worker run.
 
 Things a browser can't check automatically (whether Instagram is active, whether
 they run ads) are a checklist for the reviewer, with links (Meta Ad Library).
@@ -49,7 +77,9 @@ they run ads) are a checklist for the reviewer, with links (Meta Ad Library).
 | TomTom Search (free developer account, no card) | free allowance (check developer.tomtom.com/pricing) | `tomtomDailyCap` (60) and `tomtomMonthlyCap` (2,000), counted in `lead_api_usage` (geocoding included) |
 | Google Places text search (website, phone, rating = *Enterprise* SKU) | 1,000 free calls / month | `placesDailyCap` (30) and `placesMonthlyCap` (950), counted in `lead_api_usage` before each call |
 | PageSpeed Insights | free (an API key needs no billing account) | counted for visibility |
-| OpenStreetMap Overpass | free | one search per worker run |
+| Brave Search API (finding websites) | about $5 of free credit a month ≈ 1,000 searches (card required) | `siteSearchDailyCap` (30) and `siteSearchMonthlyCap` (900), counted in `lead_api_usage` (`brave_search`) |
+| Likely-address checks | free (DNS + opening the page) | at most 3 pages per lead |
+| OpenStreetMap Overpass | free (public servers are often overloaded; a retry goes to another server) | one search per worker run |
 | AI summaries | your AI provider | one per Hot / Warm lead |
 
 Also set a quota or budget alert in Google Cloud as a second safety net.
@@ -104,14 +134,21 @@ and ignores a duplicate enqueue for an open `dedupe_key`.
   account). Optional; without it Google is skipped.
 - `PAGESPEED_API_KEY`: a Google Cloud key restricted to *PageSpeed Insights API*
   (no billing account needed). Optional.
+- `BRAVE_SEARCH_API_KEY`: Brave Search API key (api-dashboard.search.brave.com, free
+  monthly credit). Optional; without it only likely addresses are tried and leads
+  without a found website wait.
 - Sources without a key are skipped; OpenStreetMap needs none.
 - `CRON_SECRET`: required for the worker and daily endpoints.
-- Growth settings (`settings.key = 'growth'`): on/off, cities, sources, caps, AI
-  summaries, verified proof, audit-page lifetime.
+- Growth settings (`settings.key = 'growth'`): on/off, cities, sources, caps, web
+  search on/off and caps, require email, AI summaries, verified proof, audit-page
+  lifetime.
 
 ## Tests
 
-`tests/unit/leads.test.ts` (analysis, findings, score, catalogue, address
-guards), `tests/integration/leads.test.ts` (search → research → speed → score →
-summary with fake sources, allowance caps, de-duplication, audit page views and
-removal, intern scope, manual leads, job queue retries).
+`tests/unit/leads.test.ts` (analysis, findings, score, website matching, own
+emails, catalogue, address guards), `tests/integration/leads.test.ts` (search →
+find site → research → speed → score → summary with fake sources: a site found at a
+likely address after a parked one, one found by web search past a directory, a
+confirmed "no website", a lead waiting for search, older audits researched again,
+allowance caps, de-duplication, audit page views and removal, intern scope, manual
+leads, job queue retries).

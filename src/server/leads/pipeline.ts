@@ -1,20 +1,25 @@
 import 'server-only'
 import { randomBytes } from 'node:crypto'
-import type { Prisma } from '@prisma/client'
+import type { LeadSource, Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { buildLeadSummaryMessages } from '@/lib/ai/prompts'
 import { prisma } from '@/lib/db/client'
 import {
   analyzeHtml,
+  AUDIT_VERSION,
   findingsFor,
   mergeSignals,
+  ownEmails,
   servicesFor,
+  websiteSettled,
   type Finding,
   type LeadAudit,
   type SiteSignals,
+  type WebsiteLookup,
 } from '@/lib/leads/audit'
 import { AYAVA_SERVICES, INDUSTRY_CHECKS, type IndustryCheck } from '@/lib/leads/catalog'
 import { scoreLead } from '@/lib/leads/score'
+import { domainGuesses, isDirectory, matchSite, NAME_ONLY } from '@/lib/leads/site-match'
 import { logger } from '@/lib/logging'
 import { generateStructured, getAIProvider } from '../ai/provider'
 import { aiSettingsService } from '../ai/settings.service'
@@ -22,6 +27,7 @@ import { enqueueJob, type JobHandler } from '../jobs/queue'
 import { domainOf, FetchBlockedError, normaliseWebsite } from './safe-fetch'
 import {
   apiCalls,
+  BRAVE_API,
   cityPositions,
   countApiCall,
   growthSettings,
@@ -37,12 +43,15 @@ import { leadSources, type FoundBusiness } from './sources'
  *
  *   scheduler tick ─► lead.search    one page of a search (TomTom: ≤100 businesses; Google: ≤20; OSM: all)
  *                  ─► lead.research  homepage + contact page + sitemap → audit signals
+ *                     ↳ lead.find_site  no website listed: likely addresses, then a web search,
+ *                                       each page proven to be the business's before it's used
  *                  ─► lead.speed     PageSpeed Insights (mobile)
  *                  ─► score          findings → need / fit → HOT / WARM / SKIP (+ private audit page)
  *                  ─► lead.summary   AI words the top problems (rules-based summary until then)
  *
- * TomTom and Google usage is capped per day and per month (Growth settings) so it
- * stays inside the free allowance. Suppressed businesses (opted out) are never imported.
+ * TomTom, Google and Brave usage is capped per day and per month (Growth settings) so
+ * it stays inside the free allowance. Suppressed businesses (opted out) are never imported.
+ * Searches rotate through industries, and only addresses a business publishes itself are used.
  */
 
 const DAY_MS = 86_400_000
@@ -117,24 +126,15 @@ export async function scheduleLeadWork() {
       },
       data: { exhausted: false, page_token: null },
     })
+    queued += await queueUpgradesAndLookups(organizationId, settings)
     if ((await leadsAddedToday(organizationId)) >= settings.newLeadsDailyCap) continue
 
-    const order: Prisma.LeadSearchOrderByWithRelationInput[] = [
-      { last_run_at: { sort: 'asc', nulls: 'first' } },
-      { industry: { priority: 'asc' } },
-      { created_at: 'asc' },
-    ]
     for (const paged of pagedSources(settings)) {
       if (!paged.on) continue
       const usage = await apiCalls(organizationId, paged.api)
       const left = Math.min(paged.dailyCap - usage.today, paged.monthlyCap - usage.month)
       if (left > 0) {
-        const next = await prisma.leadSearch.findMany({
-          where: { organization_id: organizationId, source: paged.source, active: true, exhausted: false },
-          orderBy: order,
-          take: Math.min(left, 2),
-          select: { id: true, city: true },
-        })
+        const next = await nextSearches(organizationId, paged.source, Math.min(left, 2))
         // Geocode new cities here, one at a time, so searches running in parallel don't each do it.
         if (paged.source === 'TOMTOM')
           for (const city of new Set(next.map((s) => s.city))) await cityPosition(organizationId, city)
@@ -151,11 +151,7 @@ export async function scheduleLeadWork() {
       }
     }
     if (settings.osmEnabled) {
-      const next = await prisma.leadSearch.findFirst({
-        where: { organization_id: organizationId, source: 'OPENSTREETMAP', active: true, exhausted: false },
-        orderBy: order,
-        select: { id: true },
-      })
+      const [next] = await nextSearches(organizationId, 'OPENSTREETMAP', 1)
       if (
         next &&
         (await enqueueJob({
@@ -169,6 +165,112 @@ export async function scheduleLeadWork() {
     }
   }
   return { queued }
+}
+
+/**
+ * The next searches for a source, rotating through industries: the industry
+ * searched least recently goes first (never-searched ones first of all, by
+ * priority), and within it the city / term searched least recently.
+ */
+async function nextSearches(organizationId: string, source: LeadSource, take: number) {
+  if (take <= 0) return []
+  const where = { organization_id: organizationId, source, active: true }
+  const [runs, open] = await Promise.all([
+    prisma.leadSearch.groupBy({ by: ['industry_id'], where, _max: { last_run_at: true } }),
+    prisma.leadSearch.groupBy({ by: ['industry_id'], where: { ...where, exhausted: false } }),
+  ])
+  const hasOpen = new Set(open.map((r) => r.industry_id))
+  const priorities = new Map(
+    (
+      await prisma.leadIndustry.findMany({
+        where: { id: { in: [...hasOpen] } },
+        select: { id: true, priority: true },
+      })
+    ).map((i) => [i.id, i.priority]),
+  )
+  const industries = runs
+    .filter((r) => hasOpen.has(r.industry_id))
+    .sort(
+      (a, b) =>
+        (a._max.last_run_at?.getTime() ?? 0) - (b._max.last_run_at?.getTime() ?? 0) ||
+        (priorities.get(a.industry_id) ?? 9) - (priorities.get(b.industry_id) ?? 9),
+    )
+  const picked: { id: string; city: string }[] = []
+  for (const { industry_id } of industries) {
+    if (picked.length >= take) break
+    const search = await prisma.leadSearch.findFirst({
+      where: { ...where, exhausted: false, industry_id },
+      orderBy: [{ last_run_at: { sort: 'asc', nulls: 'first' } }, { created_at: 'asc' }],
+      select: { id: true, city: true },
+    })
+    if (search) picked.push(search)
+  }
+  return picked
+}
+
+/**
+ * Every run, a few leads are moved along: ones researched with an older audit
+ * format are researched again, and ones whose website is still unknown get their
+ * web search once there's allowance for it.
+ */
+async function queueUpgradesAndLookups(organizationId: string, settings: GrowthSettings) {
+  let queued = 0
+  const stale = await prisma.lead.findMany({
+    where: {
+      organization_id: organizationId,
+      status: 'NEW',
+      research_status: 'DONE',
+      audit: { path: ['version'], equals: 1 },
+    },
+    orderBy: { created_at: 'asc' },
+    take: 20,
+    select: { id: true },
+  })
+  for (const lead of stale)
+    if (
+      await enqueueJob({
+        type: 'lead.research',
+        organizationId,
+        payload: { leadId: lead.id },
+        dedupeKey: `lead.research:${lead.id}`,
+      })
+    )
+      queued++
+
+  const left = await siteSearchesLeft(organizationId, settings)
+  if (left > 0) {
+    const waiting = await prisma.lead.findMany({
+      where: {
+        organization_id: organizationId,
+        status: 'NEW',
+        research_status: 'DONE',
+        website: null,
+        audit: { path: ['websiteLookup', 'result'], equals: 'waiting' },
+      },
+      orderBy: { created_at: 'asc' },
+      take: Math.min(left, 6),
+      select: { id: true },
+    })
+    for (const lead of waiting)
+      if (
+        await enqueueJob({
+          type: 'lead.find_site',
+          organizationId,
+          payload: { leadId: lead.id, phase: 'search' },
+          dedupeKey: `lead.find_site:search:${lead.id}`,
+          maxAttempts: 2,
+        })
+      )
+        queued++
+  }
+  return queued
+}
+
+/** Web searches still allowed today (0 when there's no key or it's switched off). */
+async function siteSearchesLeft(organizationId: string, settings: GrowthSettings) {
+  if (!settings.siteSearchEnabled || !leadSources().webSearchConfigured()) return 0
+  const usage = await apiCalls(organizationId, BRAVE_API)
+  return Math.max(0, Math.min(settings.siteSearchDailyCap - usage.today, settings.siteSearchMonthlyCap - usage.month))
 }
 
 /** Sources that page through results and count against a free allowance. */
@@ -201,11 +303,15 @@ async function cityPosition(organizationId: string, city: string) {
   return position
 }
 
-async function leadsAddedToday(organizationId: string) {
+function todayStart() {
   const start = new Date()
   start.setUTCHours(0, 0, 0, 0)
+  return start
+}
+
+async function leadsAddedToday(organizationId: string) {
   return prisma.lead.count({
-    where: { organization_id: organizationId, created_at: { gte: start }, source: { not: 'MANUAL' } },
+    where: { organization_id: organizationId, created_at: { gte: todayStart() }, source: { not: 'MANUAL' } },
   })
 }
 
@@ -237,9 +343,19 @@ export async function importBusinesses(
   dailyCap: number,
 ) {
   const suppressed = await suppressionSets(organizationId)
-  let room = Math.max(0, dailyCap - (await leadsAddedToday(organizationId)))
-  let added = 0
-  for (const b of businesses) {
+  // Searches run in parallel: one import at a time per organization, so the daily cap holds.
+  const created = await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`lead-import:${organizationId}`}))`
+      let room = Math.max(
+        0,
+        dailyCap -
+          (await tx.lead.count({
+            where: { organization_id: organizationId, created_at: { gte: todayStart() }, source: { not: 'MANUAL' } },
+          })),
+      )
+      const ids: string[] = []
+      for (const b of businesses) {
     if (room <= 0) break
     const website = normaliseWebsite(b.website)
     const domain = domainOf(website)
@@ -253,7 +369,7 @@ export async function importBusinesses(
     ) {
       continue
     }
-    const duplicate = await prisma.lead.findFirst({
+    const duplicate = await tx.lead.findFirst({
       where: {
         organization_id: organizationId,
         OR: [
@@ -265,7 +381,7 @@ export async function importBusinesses(
       select: { id: true },
     })
     if (duplicate) continue
-    const lead = await prisma.lead
+    const lead = await tx.lead
       .create({
         data: {
           organization_id: organizationId,
@@ -289,25 +405,20 @@ export async function importBusinesses(
         },
         select: { id: true },
       })
-      // Two searches running at once can find the same business: the second insert loses the race.
-      .catch((error: unknown) => {
-        if ((error as { code?: string })?.code === 'P2002') return null
-        throw error
-      })
     if (!lead) continue
-    await enqueueJob({
-      type: 'lead.research',
-      organizationId,
-      payload: { leadId: lead.id },
-      dedupeKey: `lead.research:${lead.id}`,
-    })
-    added++
+    ids.push(lead.id)
     room--
   }
-  return { found: businesses.length, added }
+      return ids
+    },
+    { maxWait: 20_000, timeout: 30_000 },
+  )
+  for (const id of created)
+    await enqueueJob({ type: 'lead.research', organizationId, payload: { leadId: id }, dedupeKey: `lead.research:${id}` })
+  return { found: businesses.length, added: created.length }
 }
 
-const runSearch: JobHandler = async (payload) => {
+const runSearch: JobHandler = async (payload, job) => {
   const searchId = z.uuid().parse(payload.searchId)
   const search = await prisma.leadSearch.findUnique({ where: { id: searchId }, include: { industry: true } })
   if (!search || !search.active || search.exhausted) return
@@ -357,7 +468,7 @@ const runSearch: JobHandler = async (payload) => {
         },
       })
     } else {
-      const businesses = await leadSources().osmSearch(search.city, search.industry.osm_tags)
+      const businesses = await leadSources().osmSearch(search.city, search.industry.osm_tags, job.attempts)
       const result = await importBusinesses(
         search.organization_id,
         businesses,
@@ -417,7 +528,7 @@ async function checkSitemap(origin: string): Promise<boolean | null> {
 
 export async function auditWebsite(website: string | null): Promise<LeadAudit> {
   const audit: LeadAudit = {
-    version: 1,
+    version: AUDIT_VERSION,
     checkedAt: new Date().toISOString(),
     website,
     site: null,
@@ -451,21 +562,50 @@ export async function auditWebsite(website: string | null): Promise<LeadAudit> {
   return audit
 }
 
+/**
+ * The email to use from what the site publishes: the business's own (its domain,
+ * or a free mailbox it shows), with a working mail server, and not opted out.
+ */
+async function publishedEmail(organizationId: string, site: SiteSignals | null): Promise<string | null> {
+  if (!site) return null
+  const suppressed = (await suppressionSets(organizationId)).EMAIL
+  for (const email of ownEmails(site.emails, site.finalUrl)) {
+    if (suppressed.has(email)) continue
+    if (await leadSources().hasMailServer(email.split('@')[1]!)) return email
+  }
+  return null
+}
+
 const runResearch: JobHandler = async (payload, job) => {
   const leadId = z.uuid().parse(payload.leadId)
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
-    select: { id: true, organization_id: true, website: true, email: true, phone: true, status: true },
+    select: { id: true, organization_id: true, website: true, email: true, phone: true, status: true, audit: true },
   })
   if (!lead || lead.status === 'DO_NOT_CONTACT') return
   await prisma.lead.update({ where: { id: lead.id }, data: { research_status: 'RUNNING' } })
+  const previous = lead.audit as unknown as LeadAudit | null
+  const website = normaliseWebsite(lead.website)
+  // No website listed and none looked for yet: find it first (lead.find_site comes back here).
+  if (!website && !previous?.websiteLookup) {
+    await enqueueJob({
+      type: 'lead.find_site',
+      organizationId: lead.organization_id,
+      payload: { leadId: lead.id, phase: 'guess' },
+      dedupeKey: `lead.find_site:${lead.id}`,
+      maxAttempts: 2,
+    })
+    return
+  }
   try {
-    const audit = await auditWebsite(normaliseWebsite(lead.website))
+    const audit = await auditWebsite(website)
+    audit.websiteSource = website ? (previous?.websiteSource ?? 'listing') : null
+    audit.websiteLookup = previous?.websiteLookup ?? null
     await prisma.lead.update({
       where: { id: lead.id },
       data: {
         audit: audit as unknown as Prisma.InputJsonValue,
-        email: lead.email ?? audit.site?.emails[0] ?? null,
+        email: lead.email ?? (await publishedEmail(lead.organization_id, audit.site)),
         phone: lead.phone ?? audit.site?.phones[0] ?? null,
       },
     })
@@ -491,6 +631,154 @@ const runResearch: JobHandler = async (payload, job) => {
     })
     throw error
   }
+}
+
+// ─── Finding a website the listing doesn't have ─────────────────────────────
+
+const FIND_SITE_FETCH_MS = 6_000
+const MAX_CANDIDATES = 3
+/** Stop opening candidates after this long, so a lookup job ends inside its 45 s limit. */
+const FIND_SITE_BUDGET_MS = 26_000
+
+async function tryCandidate(
+  url: string,
+  lead: { name: string; city: string | null; phone: string | null },
+  tried: WebsiteLookup['tried'],
+): Promise<string | null> {
+  try {
+    const page = await leadSources().fetchPage(url, { timeoutMs: FIND_SITE_FETCH_MS })
+    if (page.status >= 400 || !page.text) {
+      tried.push({ url, reason: `error ${page.status}` })
+      return null
+    }
+    let match = matchSite({ url: page.url, html: page.text }, lead)
+    // Right name, but the phone number / city isn't on this page: they're usually on the contact page.
+    const contactUrl = match.reason === NAME_ONLY ? analyzeHtml(page.text, page.url).contactPageUrl : null
+    if (contactUrl && domainOf(contactUrl) === domainOf(page.url)) {
+      const contact = await leadSources()
+        .fetchPage(contactUrl, { timeoutMs: 5_000 })
+        .catch(() => null)
+      if (contact && contact.status < 400)
+        match = matchSite({ url: page.url, html: `${page.text}\n${contact.text}` }, lead)
+    }
+    tried.push({ url, reason: match.reason })
+    return match.ok ? `${new URL(page.url).origin}/` : null
+  } catch (error) {
+    tried.push({ url, reason: friendlyFetchError(error).replace(/\.$/, '').toLowerCase() })
+    return null
+  }
+}
+
+/**
+ * Looks for the business's own website. Phase `guess`: likely addresses built
+ * from the name (free, no API). Phase `search`: Brave web search, counted
+ * against its allowance. A page is used only when it proves to be the
+ * business's (see matchSite). Then the lead is researched again.
+ */
+const runFindSite: JobHandler = async (payload) => {
+  const leadId = z.uuid().parse(payload.leadId)
+  const phase = z.enum(['guess', 'search']).parse(payload.phase ?? 'guess')
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { id: true, organization_id: true, name: true, city: true, phone: true, website: true, status: true, audit: true },
+  })
+  if (!lead || lead.status === 'DO_NOT_CONTACT') return
+  const previous = lead.audit as unknown as LeadAudit | null
+  const lookup: WebsiteLookup = {
+    result: 'waiting',
+    guessed: previous?.websiteLookup?.guessed ?? false,
+    searched: previous?.websiteLookup?.searched ?? false,
+    checkedAt: new Date().toISOString(),
+    tried: [...(previous?.websiteLookup?.tried ?? [])].slice(-12),
+  }
+  const settings = await growthSettings.get(lead.organization_id)
+  const sources = leadSources()
+  const started = Date.now()
+  const inTime = () => Date.now() - started < FIND_SITE_BUDGET_MS
+  let found: string | null = null
+  let source: 'guess' | 'search' | null = null
+
+  if (!lead.website) {
+    if (phase === 'guess') {
+      const guesses = domainGuesses(lead.name, lead.city)
+      const live = await Promise.all(guesses.map((url) => sources.hostResolves(new URL(url).hostname)))
+      for (const url of guesses.filter((_, i) => live[i]).slice(0, MAX_CANDIDATES)) {
+        if (!inTime()) break
+        found = await tryCandidate(url, lead, lookup.tried)
+        if (found) break
+      }
+      lookup.guessed = true
+      if (found) source = 'guess'
+    } else if ((await siteSearchesLeft(lead.organization_id, settings)) > 0) {
+      await countApiCall(lead.organization_id, BRAVE_API)
+      try {
+        const results = await sources.webSearch(`"${lead.name}" ${lead.city ?? ''}`.trim())
+        const seen = new Set<string>()
+        const candidates: string[] = []
+        for (const r of results) {
+          const url = normaliseWebsite(r.url)
+          const domain = domainOf(url)
+          if (!url || !domain || isDirectory(url) || seen.has(domain)) continue
+          seen.add(domain)
+          candidates.push(url)
+        }
+        for (const url of candidates.slice(0, MAX_CANDIDATES)) {
+          if (!inTime()) break
+          found = await tryCandidate(url, lead, lookup.tried)
+          if (found) break
+        }
+        lookup.searched = true
+        if (found) source = 'search'
+      } catch (error) {
+        // Stays "waiting": the scheduler tries the search again on a later run.
+        logger.info('Website search skipped', { leadId, error: error instanceof Error ? error.message : String(error) })
+      }
+    }
+  }
+
+  if (found) {
+    lookup.result = 'found'
+    const domain = domainOf(found)
+    if (domain && (await suppressionSets(lead.organization_id)).DOMAIN.has(domain)) {
+      // The business opted out before (under its website): never contact it.
+      await prisma.lead.update({ where: { id: lead.id }, data: { status: 'DO_NOT_CONTACT', research_status: 'DONE' } })
+      return
+    }
+  } else if (lookup.searched) {
+    lookup.result = 'not_found'
+  } else if (phase === 'guess' && (await siteSearchesLeft(lead.organization_id, settings)) > 0) {
+    // Guesses failed: search the web next (its own job, it has its own time budget).
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { audit: { ...(previous ?? {}), websiteLookup: lookup } as unknown as Prisma.InputJsonValue },
+    })
+    await enqueueJob({
+      type: 'lead.find_site',
+      organizationId: lead.organization_id,
+      payload: { leadId: lead.id, phase: 'search' },
+      dedupeKey: `lead.find_site:search:${lead.id}`,
+      maxAttempts: 2,
+    })
+    return
+  }
+
+  await prisma.lead.update({
+    where: { id: lead.id },
+    data: {
+      ...(found ? { website: found } : {}),
+      audit: {
+        ...(previous ?? {}),
+        websiteSource: source,
+        websiteLookup: lookup,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  })
+  await enqueueJob({
+    type: 'lead.research',
+    organizationId: lead.organization_id,
+    payload: { leadId: lead.id },
+    dedupeKey: `lead.research:${lead.id}`,
+  })
 }
 
 const runSpeed: JobHandler = async (payload) => {
@@ -564,6 +852,8 @@ export async function scoreAndSummarise(leadId: string) {
     hasEmail: Boolean(lead.email),
     hasPhone: Boolean(lead.phone),
     businessStatus: lead.business_status,
+    websiteSettled: websiteSettled(lead.audit as unknown as LeadAudit | null),
+    requireEmail: settings.requireEmail,
   })
   const keep = score.tier !== 'SKIP'
   await prisma.lead.update({
@@ -662,6 +952,7 @@ const runSummary: JobHandler = async (payload) => {
 export const LEAD_JOB_HANDLERS: Record<string, JobHandler> = {
   'lead.search': runSearch,
   'lead.research': runResearch,
+  'lead.find_site': runFindSite,
   'lead.speed': runSpeed,
   'lead.summary': runSummary,
 }

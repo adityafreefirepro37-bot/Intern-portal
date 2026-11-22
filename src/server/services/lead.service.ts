@@ -36,6 +36,7 @@ function sourceStatus(settings: GrowthSettings) {
   return {
     tomtomConfigured: sources.tomtomConfigured(),
     googleConfigured: sources.placesConfigured(),
+    webSearchConfigured: sources.webSearchConfigured(),
     running: [
       ...(settings.tomtomEnabled && sources.tomtomConfigured() ? (['TOMTOM'] as const) : []),
       ...(settings.googleEnabled && sources.placesConfigured() ? (['GOOGLE_PLACES'] as const) : []),
@@ -350,7 +351,7 @@ export const leadService = {
       }),
     ])
     const status = sourceStatus(settings)
-    return { settings, industries, googleConfigured: status.googleConfigured, tomtomConfigured: status.tomtomConfigured, services: Object.values(AYAVA_SERVICES) }
+    return { settings, industries, googleConfigured: status.googleConfigured, tomtomConfigured: status.tomtomConfigured, webSearchConfigured: status.webSearchConfigured, services: Object.values(AYAVA_SERVICES) }
   },
 
   async saveSettings(ctx: RequestContext, input: unknown) {

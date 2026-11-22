@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolve4, resolve6, resolveMx } from 'node:dns/promises'
 import { z } from 'zod'
 import { config } from '@/lib/config'
 import type { SpeedResult } from '@/lib/leads/audit'
@@ -7,7 +8,8 @@ import { safeFetch, type FetchedPage } from './safe-fetch'
 /**
  * External data sources for Growth: TomTom Search (free developer key, no card),
  * Google Places API (New) text search, OpenStreetMap (Overpass, free), PageSpeed
- * Insights and the business websites themselves. Each is a small client behind an
+ * Insights, Brave Search (finding a business's own website) and the business
+ * websites themselves. Each is a small client behind an
  * interface so tests swap in fakes (setLeadSourcesForTests).
  */
 
@@ -40,7 +42,15 @@ export interface LeadSources {
   tomtomGeocode(city: string): Promise<{ lat: number; lon: number } | null>
   /** Up to 100 businesses matching `term` within ~15 km of the point; the page token is the next offset. */
   tomtomSearch(term: string, near: { lat: number; lon: number }, pageToken: string | null): Promise<SearchPage>
-  osmSearch(city: string, tags: string[]): Promise<FoundBusiness[]>
+  /** `attempt` (1, 2, 3…) picks the Overpass server, so a retry goes to another one. */
+  osmSearch(city: string, tags: string[], attempt?: number): Promise<FoundBusiness[]>
+  webSearchConfigured(): boolean
+  /** Web results for a query (Brave Search API, India). */
+  webSearch(query: string): Promise<{ url: string; title: string }[]>
+  /** Whether a host name exists in DNS (cheap check before opening a guessed address). */
+  hostResolves(host: string): Promise<boolean>
+  /** Whether a domain accepts email (has MX records): only such addresses are kept. */
+  hasMailServer(domain: string): Promise<boolean>
   pageSpeed(url: string): Promise<SpeedResult>
   /** A business web page (SSRF-safe; see safe-fetch.ts). */
   fetchPage(url: string, options?: { timeoutMs?: number; accept?: string }): Promise<FetchedPage>
@@ -139,7 +149,18 @@ function mapsSearchUrl(name: string, address: string | null) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([name, address].filter(Boolean).join(' '))}`
 }
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+/** Public Overpass servers: the main one is often overloaded, so retries move down the list. */
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+]
+
+const braveResponseSchema = z.object({
+  web: z
+    .object({ results: z.array(z.object({ url: z.string(), title: z.string().default('') })).default([]) })
+    .optional(),
+})
 
 const osmElementSchema = z.object({
   type: z.string(),
@@ -254,15 +275,16 @@ const realSources: LeadSources = {
     }
   },
 
-  async osmSearch(city, tags) {
+  async osmSearch(city, tags, attempt = 1) {
     if (!tags.length) return []
-    const response = await fetch(OVERPASS_URL, {
+    const server = OVERPASS_URLS[(Math.max(1, attempt) - 1) % OVERPASS_URLS.length]!
+    const response = await fetch(server, {
       method: 'POST',
-      signal: AbortSignal.timeout(35_000),
-      headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'site-audit/1.0' },
+      signal: AbortSignal.timeout(40_000),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'AyavaGrowth/1.0 (business directory research)' },
       body: new URLSearchParams({ data: osmQuery(city, tags) }),
     })
-    if (!response.ok) throw new Error(`OpenStreetMap search failed (${response.status})`)
+    if (!response.ok) throw new Error(`OpenStreetMap search failed (${response.status} from ${new URL(server).host})`)
     const data = z.object({ elements: z.array(osmElementSchema).default([]) }).parse(await response.json())
     return data.elements
       .filter((e) => e.tags?.name)
@@ -291,6 +313,40 @@ const realSources: LeadSources = {
           longitude: e.lon ?? e.center?.lon ?? null,
         }
       })
+  },
+
+  webSearchConfigured: () => Boolean(config.leads.braveApiKey),
+
+  async webSearch(query) {
+    const key = config.leads.braveApiKey
+    if (!key) throw new Error('BRAVE_SEARCH_API_KEY is not set')
+    const params = new URLSearchParams({ q: query, country: 'IN', count: '10', safesearch: 'moderate' })
+    const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
+      signal: AbortSignal.timeout(15_000),
+      headers: { accept: 'application/json', 'x-subscription-token': key },
+    })
+    if (!response.ok) throw new Error(`Brave search failed (${response.status})`)
+    const data = braveResponseSchema.parse(await response.json())
+    return data.web?.results ?? []
+  },
+
+  async hostResolves(host) {
+    const found = (lookup: Promise<string[]>) => lookup.then((a) => a.length > 0).catch(() => false)
+    const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 4_000))
+    return Promise.race([
+      Promise.all([found(resolve4(host)), found(resolve6(host))]).then(([v4, v6]) => v4 || v6),
+      timeout,
+    ])
+  },
+
+  async hasMailServer(domain) {
+    const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 4_000))
+    return Promise.race([
+      resolveMx(domain)
+        .then((records) => records.some((r) => r.exchange && r.exchange !== '.'))
+        .catch(() => false),
+      timeout,
+    ])
   },
 
   async pageSpeed(url) {
