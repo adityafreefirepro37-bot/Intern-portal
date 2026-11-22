@@ -30,6 +30,8 @@ const PUBLIC_PATHS = [
   // A business's private Growth audit page (unguessable link, noindex) and its view / opt-out calls.
   '/audit',
   '/api/audit',
+  // Scheduled jobs (daily, worker): no session; each endpoint checks Authorization: Bearer $CRON_SECRET itself.
+  '/api/jobs',
 ]
 const SIGNED_IN_BOUNCE = ['/login', '/forgot-password']
 
