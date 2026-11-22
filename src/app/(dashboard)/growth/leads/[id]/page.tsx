@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ActionButton } from '@/features/hr/components/action-form'
 import { LeadStatusBadge, RESEARCH_LABELS, SeverityBadge, TierBadge } from '@/features/growth/components/lead-badges'
 import { LeadReviewForm } from '@/features/growth/components/lead-forms'
+import { StopOutreachButton } from '@/features/growth/components/outreach-client'
 import { NotFoundError } from '@/lib/errors'
 import { formatDate } from '@/lib/utils'
 import { researchLeadAction } from '@/server/actions/leads'
@@ -15,6 +16,17 @@ import { requirePageContext } from '@/server/context'
 import { leadService } from '@/server/services/lead.service'
 
 export const metadata: Metadata = { title: 'Lead' }
+
+const OUTREACH_LABELS: Record<string, string> = {
+  NONE: 'Not started',
+  AWAITING_APPROVAL: 'First email waiting for approval',
+  ACTIVE: 'Emails in progress',
+  REPLIED: 'Replied: answer personally',
+  BOUNCED: 'Email bounced',
+  UNSUBSCRIBED: 'Unsubscribed',
+  COMPLETED: 'All emails sent, no reply',
+  STOPPED: 'Stopped',
+}
 
 function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -161,6 +173,43 @@ export default async function LeadPage({ params }: PageProps<'/growth/leads/[id]
                   <Fact label="Booking / ordering" value={[...site.booking, ...site.ordering].join(', ') || 'None'} />
                   <Fact label="Socials linked" value={Object.keys(site.socials).join(', ') || 'None'} />
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {(lead.route || lead.outreach_messages.length > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Review and outreach</CardTitle>
+                <CardDescription>
+                  {lead.route === 'TEAM'
+                    ? 'A serious case: the team contacts this business personally (no automatic emails).'
+                    : lead.route === 'AUTO'
+                      ? 'Gets the automatic emails: a first email and up to two follow-ups, stopped by any reply.'
+                      : 'Not contacted.'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {lead.routeReasons.length > 0 && (
+                  <ul className="list-disc pl-5 text-small text-muted-foreground">
+                    {lead.routeReasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+                <Fact label="Outreach" value={OUTREACH_LABELS[lead.outreach_status] ?? lead.outreach_status} />
+                {lead.outreach_messages.map((m) => (
+                  <Fact
+                    key={m.id}
+                    label={m.step === 1 ? 'First email' : `Follow-up ${m.step - 1}`}
+                    value={m.sent_at ? `Sent ${formatDate(m.sent_at)}${m.mailbox ? ` from ${m.mailbox}` : ''}` : m.status === 'SCHEDULED' ? `Due ${formatDate(m.scheduled_for)}` : m.status.toLowerCase().replace(/_/g, ' ')}
+                  />
+                ))}
+                {lead.canManage && ['ACTIVE', 'AWAITING_APPROVAL'].includes(lead.outreach_status) && (
+                  <div>
+                    <StopOutreachButton leadId={lead.id} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

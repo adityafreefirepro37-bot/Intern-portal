@@ -143,6 +143,40 @@ const envSchema = z.object({
   INSTAGRAM_BUSINESS_ID: optionalString,
   /** YouTube Data API key (Google Cloud, no billing account needed). */
   YOUTUBE_API_KEY: optionalString,
+
+  /**
+   * Outreach mailboxes, as JSON: [{"email":"aditya@ayavacreatives.com","password":"…","name":"Aditya"}].
+   * Passwords live only here (the hosting provider's secret settings), never in the database.
+   */
+  OUTREACH_MAILBOXES: optionalString.pipe(
+    z
+      .string()
+      .transform((raw, ctx) => {
+        try {
+          return JSON.parse(raw) as unknown
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'OUTREACH_MAILBOXES must be JSON' })
+          return z.NEVER
+        }
+      })
+      .pipe(
+        z
+          .array(
+            z.object({
+              email: z.email().transform((e) => e.toLowerCase()),
+              password: z.string().min(1),
+              name: z.string().trim().min(1).max(60).optional(),
+            }),
+          )
+          .max(50),
+      )
+      .optional(),
+  ),
+  /** Mail servers for the outreach mailboxes (defaults: Hostinger). */
+  OUTREACH_SMTP_HOST: z.string().trim().default('smtp.hostinger.com'),
+  OUTREACH_SMTP_PORT: z.coerce.number().int().default(465),
+  OUTREACH_IMAP_HOST: z.string().trim().default('imap.hostinger.com'),
+  OUTREACH_IMAP_PORT: z.coerce.number().int().default(993),
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -247,6 +281,11 @@ function buildConfig(env: Env) {
       instagramToken: env.INSTAGRAM_ACCESS_TOKEN,
       instagramBusinessId: env.INSTAGRAM_BUSINESS_ID,
       youtubeApiKey: env.YOUTUBE_API_KEY,
+    },
+    outreach: {
+      mailboxes: env.OUTREACH_MAILBOXES ?? [],
+      smtp: { host: env.OUTREACH_SMTP_HOST, port: env.OUTREACH_SMTP_PORT, secure: env.OUTREACH_SMTP_PORT === 465 },
+      imap: { host: env.OUTREACH_IMAP_HOST, port: env.OUTREACH_IMAP_PORT },
     },
   } as const
 }

@@ -62,3 +62,33 @@ export function RemoveDataButton({ token }: { token: string }) {
     </p>
   )
 }
+
+export function UnsubscribeButton({ token }: { token: string }) {
+  const [state, setState] = React.useState<'idle' | 'busy' | 'done' | 'error'>('idle')
+
+  async function unsubscribe() {
+    setState('busy')
+    try {
+      const response = await fetch(`/api/outreach/unsubscribe/${token}`, { method: 'POST' })
+      const body = (await response.json().catch(() => null)) as { data?: { ok?: boolean } } | null
+      setState(response.ok && body?.data?.ok ? 'done' : 'error')
+    } catch {
+      setState('error')
+    }
+  }
+
+  if (state === 'done') return <p className="text-small font-medium">Done. You won’t get any more emails from us.</p>
+  return (
+    <div className="grid gap-2">
+      <button
+        type="button"
+        onClick={unsubscribe}
+        disabled={state === 'busy'}
+        className="mx-auto rounded-md bg-primary px-4 py-2 text-small font-medium text-primary-foreground disabled:opacity-60"
+      >
+        {state === 'busy' ? 'Unsubscribing…' : 'Unsubscribe'}
+      </button>
+      {state === 'error' && <p className="text-small text-destructive">This link isn’t valid any more, or something went wrong. Reply to the email with “unsubscribe” and we’ll remove you.</p>}
+    </div>
+  )
+}

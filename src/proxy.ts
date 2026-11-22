@@ -30,6 +30,9 @@ const PUBLIC_PATHS = [
   // A business's private Growth audit page (unguessable link, noindex) and its view / opt-out calls.
   '/audit',
   '/api/audit',
+  // The unsubscribe link in outreach emails (page + one-click POST).
+  '/unsubscribe',
+  '/api/outreach/unsubscribe',
   // Scheduled jobs (daily, worker): no session; each endpoint checks Authorization: Bearer $CRON_SECRET itself.
   '/api/jobs',
 ]

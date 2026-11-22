@@ -31,6 +31,7 @@ import {
   Palmtree,
   Radar,
   ScrollText,
+  Send,
   SlidersHorizontal,
   ShieldCheck,
   Settings,
@@ -157,6 +158,7 @@ export const NAVIGATION: NavSection[] = [
     title: 'Growth',
     items: [
       { label: 'Leads', scopedLabel: 'My leads', href: '/growth/leads', icon: Radar, permission: 'lead.read' },
+      { label: 'Outreach', href: '/growth/outreach', icon: Send, permission: 'lead.manage', minScope: 'ORGANIZATION' },
       { label: 'Growth settings', href: '/growth/settings', icon: SlidersHorizontal, permission: 'lead.manage', minScope: 'ORGANIZATION' },
     ],
   },

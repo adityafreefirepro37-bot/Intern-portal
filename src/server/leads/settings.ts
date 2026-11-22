@@ -38,6 +38,24 @@ export const growthSettingsSchema = z.object({
   youtubeDailyCap: z.number().int().min(0).max(3000).default(300),
   /** Size signals a Hot lead needs to go to the team instead of the automatic emails. */
   bigBusinessSignals: z.number().int().min(1).max(6).default(2),
+
+  // Outreach (automatic emails; see src/server/outreach/engine.ts)
+  outreachEnabled: z.boolean().default(false),
+  senderName: z.string().trim().max(60).default(''),
+  companyName: z.string().trim().min(2).max(80).default('Ayava Creatives'),
+  companyWebsite: z.string().trim().max(200).default('https://ayavacreatives.com'),
+  /** Shown in every email's footer (who is writing and where from). Required to send. */
+  postalAddress: z.string().trim().max(200).default(''),
+  /** 1 = Monday … 7 = Sunday, in India. */
+  sendDays: z.array(z.number().int().min(1).max(7)).max(7).default([1, 2, 3, 4, 5, 6]),
+  sendFromHour: z.number().int().min(0).max(23).default(10),
+  sendUntilHour: z.number().int().min(1).max(24).default(18),
+  /** Emails per mailbox per day once warmed up (a new mailbox starts at 5 and grows by 3 a day). */
+  mailboxDailyMax: z.number().int().min(1).max(200).default(40),
+  /** Days before follow-up 1 and before follow-up 2. */
+  followUpGapDays: z.array(z.number().int().min(1).max(30)).length(2).default([3, 4]),
+  /** The first this-many emails wait for an admin's approval; after that they send on their own. */
+  approvalsRequired: z.number().int().min(0).max(1000).default(50),
   aiSummaries: z.boolean().default(true),
   /** Verified facts about Ayava the AI may cite (results, portfolio). Nothing else is claimed. */
   proof: z.array(z.string().trim().min(3).max(300)).max(30).default([]),

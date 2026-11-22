@@ -122,9 +122,11 @@ export type NotificationEntity =
   | 'certificate'
   | 'assessment'
   | 'lead'
+  | 'outreach'
 
 /** Where a notification's entity lives in the app. */
 export function notificationHref(entityType: string | null, entityId: string | null): string | null {
+  if (entityType === 'outreach') return '/growth/outreach'
   if (!entityId) return null
   if (entityType === 'task') return `/tasks/${entityId}`
   if (entityType === 'project') return `/projects/${entityId}`

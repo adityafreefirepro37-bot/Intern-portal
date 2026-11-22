@@ -203,6 +203,7 @@ export const leadService = {
         industry: { select: { id: true, name: true, checks: true, priority: true } },
         assignee: { select: { id: true, first_name: true, last_name: true } },
         search: { select: { term: true, city: true, source: true } },
+        outreach_messages: { orderBy: { step: 'asc' }, select: { id: true, step: true, status: true, subject: true, sent_at: true, scheduled_for: true, mailbox: true } },
       },
     })
     if (!lead) throw new NotFoundError('Lead')
@@ -213,6 +214,7 @@ export const leadService = {
       summary: lead.summary as unknown as LeadSummary | null,
       checklist: (lead.checklist ?? {}) as z.infer<typeof checklistSchema>,
       scoreReasons: (lead.score_reasons ?? []) as string[],
+      routeReasons: (lead.route_reasons ?? []) as string[],
       findings,
       services: servicesFor(findings),
       assignee: lead.assignee ? { id: lead.assignee.id, name: fullName(lead.assignee) } : null,

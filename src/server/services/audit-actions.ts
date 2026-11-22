@@ -196,6 +196,10 @@ export const AUDIT_ACTIONS = {
   LEAD_ASSIGNED: 'lead.assigned',
   LEAD_RESEARCH_REQUESTED: 'lead.research_requested',
   LEAD_OPTED_OUT: 'lead.opted_out',
+  LEAD_UNSUBSCRIBED: 'lead.unsubscribed',
+  OUTREACH_APPROVED: 'outreach.approved',
+  OUTREACH_REJECTED: 'outreach.rejected',
+  OUTREACH_STOPPED: 'outreach.stopped',
 } as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS]
