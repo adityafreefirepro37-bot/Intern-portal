@@ -2,13 +2,15 @@ import 'server-only'
 import { resolve4, resolve6, resolveMx } from 'node:dns/promises'
 import { z } from 'zod'
 import { config } from '@/lib/config'
-import type { SpeedResult } from '@/lib/leads/audit'
+import type { InstagramProfile, SpeedResult, YouTubeChannel } from '@/lib/leads/audit'
 import { safeFetch, type FetchedPage } from './safe-fetch'
 
 /**
  * External data sources for Growth: TomTom Search (free developer key, no card),
  * Google Places API (New) text search, OpenStreetMap (Overpass, free), PageSpeed
- * Insights, Brave Search (finding a business's own website) and the business
+ * Insights (speed + Lighthouse SEO / accessibility), Brave Search (finding a
+ * business's own website, search visibility), the Instagram Graph API and the
+ * YouTube Data API (public profiles the site links to) and the business
  * websites themselves. Each is a small client behind an
  * interface so tests swap in fakes (setLeadSourcesForTests).
  */
@@ -45,8 +47,14 @@ export interface LeadSources {
   /** `attempt` (1, 2, 3…) picks the Overpass server, so a retry goes to another one. */
   osmSearch(city: string, tags: string[], attempt?: number): Promise<FoundBusiness[]>
   webSearchConfigured(): boolean
-  /** Web results for a query (Brave Search API, India). */
-  webSearch(query: string): Promise<{ url: string; title: string }[]>
+  /** Web results for a query (Brave Search API, India; up to 20). */
+  webSearch(query: string, count?: number): Promise<{ url: string; title: string }[]>
+  instagramConfigured(): boolean
+  /** A public Instagram business / creator profile, or null when there's none under that name. */
+  instagramProfile(handle: string): Promise<InstagramProfile | null>
+  youtubeConfigured(): boolean
+  /** The channel a YouTube link points to, or null when it can't be resolved cheaply. */
+  youtubeChannel(url: string): Promise<YouTubeChannel | null>
   /** Whether a host name exists in DNS (cheap check before opening a guessed address). */
   hostResolves(host: string): Promise<boolean>
   /** Whether a domain accepts email (has MX records): only such addresses are kept. */
@@ -96,6 +104,9 @@ async function googleError(response: Response, what: string): Promise<Error> {
     `${what} failed (${response.status}${body?.error?.status ? ` ${body.error.status}` : ''}): ${body?.error?.message?.slice(0, 200) ?? response.statusText}`,
   )
 }
+
+/** Instagram Graph API version (supported for about two years after release). */
+const GRAPH_VERSION = 'v22.0'
 
 const TOMTOM_PAGE = 100
 /** TomTom serves at most 2,000 results per query (offset + limit). */
@@ -317,10 +328,10 @@ const realSources: LeadSources = {
 
   webSearchConfigured: () => Boolean(config.leads.braveApiKey),
 
-  async webSearch(query) {
+  async webSearch(query, count = 10) {
     const key = config.leads.braveApiKey
     if (!key) throw new Error('BRAVE_SEARCH_API_KEY is not set')
-    const params = new URLSearchParams({ q: query, country: 'IN', count: '10', safesearch: 'moderate' })
+    const params = new URLSearchParams({ q: query, country: 'IN', count: String(Math.min(20, count)), safesearch: 'moderate' })
     const response = await fetch(`https://api.search.brave.com/res/v1/web/search?${params}`, {
       signal: AbortSignal.timeout(15_000),
       headers: { accept: 'application/json', 'x-subscription-token': key },
@@ -328,6 +339,93 @@ const realSources: LeadSources = {
     if (!response.ok) throw new Error(`Brave search failed (${response.status})`)
     const data = braveResponseSchema.parse(await response.json())
     return data.web?.results ?? []
+  },
+
+  instagramConfigured: () => Boolean(config.leads.instagramToken && config.leads.instagramBusinessId),
+
+  async instagramProfile(handle) {
+    const { instagramToken: token, instagramBusinessId: id } = config.leads
+    if (!token || !id) throw new Error('Instagram is not configured')
+    if (!/^[A-Za-z0-9_.]{1,30}$/.test(handle)) return null
+    const fields = `business_discovery.username(${handle}){username,followers_count,media_count,media.limit(6){timestamp,like_count,comments_count}}`
+    const params = new URLSearchParams({ fields, access_token: token })
+    const response = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(id)}?${params}`, {
+      signal: AbortSignal.timeout(15_000),
+    })
+    const data = (await response.json().catch(() => null)) as {
+      business_discovery?: {
+        username?: string
+        followers_count?: number
+        media_count?: number
+        media?: { data?: { timestamp?: string; like_count?: number; comments_count?: number }[] }
+      }
+      error?: { code?: number; error_subcode?: number; message?: string }
+    } | null
+    if (!response.ok || !data?.business_discovery) {
+      // 110 / 100: no business or creator account under that name (personal accounts aren't visible).
+      if (data?.error?.code === 110 || data?.error?.code === 100) return null
+      throw new Error(`Instagram lookup failed (${response.status}): ${data?.error?.message?.slice(0, 160) ?? 'no data'}`)
+    }
+    const profile = data.business_discovery
+    const media = profile.media?.data ?? []
+    const followers = profile.followers_count ?? 0
+    const interactions = media.map((m) => (m.like_count ?? 0) + (m.comments_count ?? 0))
+    return {
+      handle: profile.username ?? handle,
+      followers,
+      posts: profile.media_count ?? 0,
+      lastPostAt: media[0]?.timestamp ?? null,
+      engagementPct:
+        followers > 0 && interactions.length
+          ? Math.round((interactions.reduce((a, b) => a + b, 0) / interactions.length / followers) * 1000) / 10
+          : null,
+    }
+  },
+
+  youtubeConfigured: () => Boolean(config.leads.youtubeApiKey),
+
+  async youtubeChannel(url) {
+    const key = config.leads.youtubeApiKey
+    if (!key) throw new Error('YOUTUBE_API_KEY is not set')
+    const handle = url.match(/youtube\.com\/@([A-Za-z0-9_.-]+)/i)?.[1]
+    const channelId = url.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{20,})/i)?.[1]
+    const user = url.match(/youtube\.com\/user\/([A-Za-z0-9_.-]+)/i)?.[1]
+    const lookup: Record<string, string> | null = handle
+      ? { forHandle: `@${handle}` }
+      : channelId
+        ? { id: channelId }
+        : user
+          ? { forUsername: user }
+          : null
+    if (!lookup) return null // /c/ custom names need a 100-unit search: skipped.
+    const get = async (path: string, params: Record<string, string>) => {
+      const response = await fetch(`https://www.googleapis.com/youtube/v3/${path}?${new URLSearchParams({ ...params, key })}`, {
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (!response.ok) throw await googleError(response, 'YouTube lookup')
+      return response.json() as Promise<{ items?: Record<string, unknown>[] }>
+    }
+    const channels = await get('channels', { part: 'statistics,contentDetails', ...lookup })
+    const channel = channels.items?.[0] as
+      | {
+          statistics?: { subscriberCount?: string; videoCount?: string; hiddenSubscriberCount?: boolean }
+          contentDetails?: { relatedPlaylists?: { uploads?: string } }
+        }
+      | undefined
+    if (!channel) return null
+    const videos = Number(channel.statistics?.videoCount ?? 0)
+    const uploads = channel.contentDetails?.relatedPlaylists?.uploads
+    let lastUploadAt: string | null = null
+    if (uploads && videos > 0) {
+      const latest = await get('playlistItems', { part: 'contentDetails', playlistId: uploads, maxResults: '1' })
+      lastUploadAt = ((latest.items?.[0] as { contentDetails?: { videoPublishedAt?: string } } | undefined)?.contentDetails?.videoPublishedAt) ?? null
+    }
+    return {
+      url,
+      subscribers: channel.statistics?.hiddenSubscriberCount ? null : Number(channel.statistics?.subscriberCount ?? 0),
+      videos,
+      lastUploadAt,
+    }
   },
 
   async hostResolves(host) {
@@ -350,7 +448,8 @@ const realSources: LeadSources = {
   },
 
   async pageSpeed(url) {
-    const params = new URLSearchParams({ url, strategy: 'mobile', category: 'performance' })
+    const params = new URLSearchParams({ url, strategy: 'mobile' })
+    for (const category of ['performance', 'seo', 'accessibility', 'best-practices']) params.append('category', category)
     // Works without a key too (shared, rate-limited quota): a refusal only drops the speed signal.
     if (config.leads.pagespeedApiKey) params.set('key', config.leads.pagespeedApiKey)
     const response = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?${params}`, {
@@ -359,15 +458,20 @@ const realSources: LeadSources = {
     if (!response.ok) throw await googleError(response, 'PageSpeed check')
     const data = (await response.json()) as {
       lighthouseResult?: {
-        categories?: { performance?: { score?: number | null } }
+        categories?: Record<'performance' | 'seo' | 'accessibility' | 'best-practices', { score?: number | null } | undefined>
         audits?: Record<string, { numericValue?: number }>
       }
     }
-    const score = data.lighthouseResult?.categories?.performance?.score
+    const categories = data.lighthouseResult?.categories
+    const score = categories?.performance?.score
     if (typeof score !== 'number') throw new Error('PageSpeed returned no score')
     const audits = data.lighthouseResult?.audits ?? {}
+    const pct = (value: number | null | undefined) => (typeof value === 'number' ? Math.round(value * 100) : null)
     return {
       performance: Math.round(score * 100),
+      seo: pct(categories?.seo?.score),
+      accessibility: pct(categories?.accessibility?.score),
+      bestPractices: pct(categories?.['best-practices']?.score),
       lcpMs: audits['largest-contentful-paint']?.numericValue
         ? Math.round(audits['largest-contentful-paint'].numericValue)
         : null,

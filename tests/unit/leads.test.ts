@@ -1,4 +1,5 @@
-import { analyzeHtml, findingsFor, mergeSignals, ownEmails, servicesFor, websiteSettled, type LeadAudit } from '@/lib/leads/audit'
+import { analyzeHtml, findingsFor, hasBusinessSchema, instagramHandle, mergeSignals, ownEmails, servicesFor, websiteSettled, type LeadAudit } from '@/lib/leads/audit'
+import { reviewLead } from '@/lib/leads/review'
 import { AYAVA_SERVICES, INDUSTRIES, INDUSTRY_CHECKS } from '@/lib/leads/catalog'
 import { scoreLead } from '@/lib/leads/score'
 import { distinctiveWords, domainGuesses, isDirectory, matchSite } from '@/lib/leads/site-match'
@@ -154,6 +155,71 @@ describe('lead score', () => {
 
 const page = (body: string, title = '') =>
   `<html><head><title>${title}</title></head><body>${body} ${'Fresh food made every day with care for our guests. '.repeat(6)}</body></html>`
+
+describe('full-service checks (audit version 3)', () => {
+  const now = new Date('2026-11-21T00:00:00Z')
+  const RICH = `<html><head><title>Hotel Doon View</title><link rel="icon" href="/f.png">
+    <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite"},{"@type":"Hotel","name":"Doon View"}]}</script>
+    <script src="https://embed.tawk.to/abc/default"></script><script>gtag('config','AW-123456789')</script></head>
+    <body><img src="/img/logo.png" alt="Doon View"><iframe src="https://www.youtube.com/embed/xyz"></iframe>
+    <h2>What our guests say</h2><form><input type="email"><button>Subscribe to offers</button></form>
+    <a href="https://play.google.com/store/apps/details?id=com.doonview">App</a><a href="tel:+919800000000">Call</a></body></html>`
+
+  it('reads ads, schema, chat, video, trust and app signals', () => {
+    const site = analyzeHtml(RICH, 'https://doonview.example/')
+    expect(site).toMatchObject({ googleAds: true, faviconLink: true, logo: true, video: true, chatWidget: ['Tawk.to'], testimonials: true, newsletter: true, appLinks: ['Google Play'], noindex: false })
+    expect(site.structuredData).toEqual(['WebSite', 'Hotel'])
+    expect(hasBusinessSchema(site.structuredData)).toBe(true)
+    expect(hasBusinessSchema(['WebSite', 'BreadcrumbList'])).toBe(false)
+    expect(analyzeHtml('<meta name="robots" content="noindex, nofollow">', 'https://x.example/').noindex).toBe(true)
+    expect(instagramHandle('https://www.instagram.com/doonview.hotel/')).toBe('doonview.hotel')
+    expect(instagramHandle('https://instagram.com/p/Cx12/')).toBeNull()
+  })
+
+  it('turns social, search, freshness and branding signals into findings for each service', () => {
+    const audit = auditFrom(BAD_SITE, {
+      version: 3,
+      speed: { performance: 60, lcpMs: null, cls: null, seo: 72, accessibility: 55, bestPractices: 80 },
+      sitemapLatest: '2024-06-01T00:00:00.000Z',
+      favicon: false,
+      search: { query: 'cafe dehradun', position: null, competitors: ['rival.example'], checkedAt: '2026-11-20T00:00:00.000Z' },
+      instagram: { handle: 'cafe', followers: 4200, posts: 80, lastPostAt: '2026-06-15T00:00:00.000Z', engagementPct: 0.4 },
+      youtube: { url: 'https://youtube.com/@cafe', subscribers: 90, videos: 4, lastUploadAt: '2025-01-10T00:00:00.000Z' },
+    })
+    const f = findingsFor(audit, { checks: [], rating: null, reviewCount: null, now })
+    const byKey = Object.fromEntries(f.map((x) => [x.key, x]))
+    expect(byKey.not_ranking).toMatchObject({ service: 'seo', severity: 'high', title: 'Not in the top 10 search results for “cafe dehradun”' })
+    expect(byKey.not_ranking!.detail).toMatch(/Sites that do appear: rival\.example\.$/)
+    expect(byKey.no_google_ads!.service).toBe('google_ads')
+    expect(byKey.lighthouse_seo!.title).toBe('Google’s SEO check scores 72/100')
+    expect(byKey.ig_inactive).toMatchObject({ service: 'smm', title: 'Instagram quiet since Jun 2026' })
+    expect(byKey.ig_engagement!.title).toBe('Low Instagram engagement (0.4%)')
+    expect(byKey.yt_inactive!.service).toBe('video')
+    expect(byKey.no_updates).toMatchObject({ service: 'content', title: 'No page updated since Jun 2024' })
+    expect(byKey.no_favicon!.service).toBe('branding')
+    expect(byKey.no_chat!.service).toBe('ai')
+    expect(byKey.no_click_to_call!.service).toBe('analytics_cro')
+    expect(byKey.no_testimonials!.service).toBe('reputation')
+    expect(byKey.accessibility!.service).toBe('website')
+    // Older audits don't have these signals: no findings invented from missing data.
+    const old = findingsFor(auditFrom(BAD_SITE), { checks: [], rating: null, reviewCount: null, now })
+    expect(old.map((x) => x.key)).not.toContain('no_chat')
+  })
+})
+
+describe('review: automatic emails or the team', () => {
+  const audit = auditFrom(BAD_SITE, { version: 3 })
+  it('sends big Hot businesses to the team and the rest to the automatic emails', () => {
+    expect(reviewLead({ tier: 'HOT', hasEmail: true, industryKey: 'fnb_qsr', reviewCount: 40, audit })).toEqual({ route: 'AUTO', reasons: ['Automatic email: Hot lead'] })
+    const big = reviewLead({ tier: 'HOT', hasEmail: true, industryKey: 'hospitality_travel', reviewCount: 320, audit })
+    expect(big.route).toBe('TEAM')
+    expect(big.reasons[0]).toBe('Team: a Hot lead that looks like a big business (320 Google reviews, high-value industry)')
+    // Warm leads are never "serious", however big.
+    expect(reviewLead({ tier: 'WARM', hasEmail: true, industryKey: 'hospitality_travel', reviewCount: 320, audit }).route).toBe('AUTO')
+    expect(reviewLead({ tier: 'WARM', hasEmail: false, industryKey: null, reviewCount: null, audit }).route).toBe('TEAM')
+    expect(reviewLead({ tier: 'SKIP', hasEmail: true, industryKey: null, reviewCount: null, audit }).route).toBeNull()
+  })
+})
 
 describe('finding a website', () => {
   const lead = { name: 'Shree Baba Properties Pvt Ltd', city: 'Dehradun', phone: '+91 98970 12345' }

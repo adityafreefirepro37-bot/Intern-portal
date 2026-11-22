@@ -11,7 +11,8 @@ import { AYAVA_ORGANIZATION_ID, contextFor, prisma } from './helpers'
 
 const NEGLECTED = `<html><head><title></title></head><body><img src="1.jpg"><img src="2.jpg"><img src="3.jpg"><img src="4.jpg">
   <p>Welcome to Cafe Mocha</p><a href="/files/menu.pdf">Menu</a><p>Copyright 2019 Cafe Mocha</p>
-  <p>Write to info@cafe-mocha.example</p><p>Site by hello@webdesigner.example</p></body></html>`
+  <p>Write to info@cafe-mocha.example</p><p>Site by hello@webdesigner.example</p>
+  <a href="https://www.instagram.com/cafemocha.doon/">Instagram</a></body></html>`
 
 const filler = 'Fresh, home-style food cooked every day for families, students and travellers. '.repeat(5)
 /** Pages that exist only on addresses the website finder guesses or searches for. */
@@ -19,7 +20,7 @@ const FOUND_PAGES: Record<string, string> = {
   'https://doondhaba.com/': `<html><body>doondhaba.com is for sale! Buy this domain. ${filler}</body></html>`,
   'https://doondhaba.in/': `<html><head><title>Doon Dhaba</title></head><body><p>Doon Dhaba, Rajpur Road. Call 98111-11111 or doondhaba@gmail.com</p><p>${filler}</p></body></html>`,
   'https://rajpurmomos.co.in/menu': `<html><head><title>Menu | Rajpur Momos Corner</title></head><body><p>Rajpur Momos Corner, Rajpur Road, Dehradun.</p><p>${filler}</p></body></html>`,
-  'https://rajpurmomos.co.in/': `<html><head><title>Rajpur Momos Corner</title></head><body><p>Rajpur Momos Corner, Dehradun. orders@rajpurmomos.co.in</p><p>${filler}</p></body></html>`,
+  'https://rajpurmomos.co.in/': `<html><head><title>Rajpur Momos Corner</title><script>fbq('init','42')</script></head><body><p>Rajpur Momos Corner, Dehradun. orders@rajpurmomos.co.in</p><p>${filler}</p></body></html>`,
   'https://hiddenbakers.example/': `<html><head><title>Hidden Bakers Studio</title></head><body><p>Hidden Bakers Studio: cakes to order. WhatsApp 98555 55555, hello@hiddenbakers.example</p><p>${filler}</p></body></html>`,
 }
 
@@ -27,7 +28,7 @@ const businesses: FoundBusiness[] = [
   { externalId: 'place-no-site', name: 'Doon Dhaba', category: 'Restaurant', address: 'Rajpur Road', phone: '+91 98111 11111', website: null, email: null, mapsUrl: 'https://maps.google.com/?cid=1', rating: 4.5, reviewCount: 60, businessStatus: 'OPERATIONAL', latitude: 30.3, longitude: 78 },
   { externalId: 'place-mocha', name: 'Cafe Mocha', category: 'Cafe', address: 'Paltan Bazaar', phone: '+91 98222 22222', website: 'http://cafe-mocha.example', email: null, mapsUrl: 'https://maps.google.com/?cid=2', rating: 3.4, reviewCount: 8, businessStatus: 'OPERATIONAL', latitude: 30.3, longitude: 78 },
   { externalId: 'place-closed', name: 'Old Bakery', category: 'Bakery', address: 'Clock Tower', phone: '+91 98333 33333', website: 'https://old-bakery.example', email: null, mapsUrl: null, rating: 4.1, reviewCount: 30, businessStatus: 'CLOSED_PERMANENTLY', latitude: null, longitude: null },
-  { externalId: 'place-momos', name: 'Rajpur Momos Corner', category: 'Restaurant', address: 'Rajpur Road', phone: '+91 98444 44444', website: null, email: null, mapsUrl: null, rating: 4.2, reviewCount: 25, businessStatus: 'OPERATIONAL', latitude: null, longitude: null },
+  { externalId: 'place-momos', name: 'Rajpur Momos Corner', category: 'Restaurant', address: 'Rajpur Road', phone: '+91 98444 44444', website: null, email: null, mapsUrl: null, rating: 4.2, reviewCount: 180, businessStatus: 'OPERATIONAL', latitude: null, longitude: null },
   { externalId: 'place-tiffin', name: 'Sunrise Tiffin Service', category: 'Restaurant', address: 'Prem Nagar', phone: '+91 98666 66666', website: null, email: null, mapsUrl: null, rating: 4.0, reviewCount: 12, businessStatus: 'OPERATIONAL', latitude: null, longitude: null },
 ]
 
@@ -84,7 +85,23 @@ class FakeSources implements LeadSources {
         { url: 'https://rajpurmomos.co.in/menu', title: 'Menu | Rajpur Momos Corner' },
       ]
     if (query.includes('Hidden Bakers')) return [{ url: 'https://hiddenbakers.example/', title: 'Hidden Bakers Studio' }]
+    if (query === 'restaurant dehradun')
+      return ['https://www.zomato.com/dehradun', 'https://doonbistro.example/', 'https://rajpurmomos.co.in/', 'https://www.tripadvisor.in/x', 'https://spicegarden.example/'].map((url) => ({ url, title: '' }))
     return []
+  }
+  instagramCalls: string[] = []
+  instagramConfigured() {
+    return true
+  }
+  async instagramProfile(handle: string) {
+    this.instagramCalls.push(handle)
+    return handle === 'cafemocha.doon' ? { handle, followers: 640, posts: 120, lastPostAt: '2026-05-02T10:00:00+0000', engagementPct: 2.1 } : null
+  }
+  youtubeConfigured() {
+    return false
+  }
+  async youtubeChannel() {
+    return null
   }
   async hostResolves(host: string) {
     return Object.keys(FOUND_PAGES).some((url) => new URL(url).hostname === host)
@@ -167,9 +184,10 @@ describe('Growth pipeline', () => {
     const usage = await prisma.leadApiUsage.findMany({ where: { organization_id: AYAVA_ORGANIZATION_ID } })
     expect(usage.find((u) => u.api === 'places_text_search')?.calls).toBe(2)
     expect(usage.find((u) => u.api === 'pagespeed')?.calls).toBe(3) // Mocha + the two websites found
-    // Only the two businesses whose website wasn't guessed were searched for.
-    expect(sources.webSearches.sort()).toEqual(['"Rajpur Momos Corner" Dehradun', '"Sunrise Tiffin Service" Dehradun'])
-    expect(usage.find((u) => u.api === 'brave_search')?.calls).toBe(2)
+    // Only the two businesses whose website wasn't guessed were searched for, plus one shared search-visibility query.
+    expect(sources.webSearches.sort()).toEqual(['"Rajpur Momos Corner" Dehradun', '"Sunrise Tiffin Service" Dehradun', 'restaurant dehradun'])
+    expect(usage.find((u) => u.api === 'brave_search')?.calls).toBe(3)
+    expect(sources.instagramCalls).toEqual(['cafemocha.doon'])
 
     const leads = await prisma.lead.findMany({ where: { organization_id: AYAVA_ORGANIZATION_ID }, orderBy: { name: 'asc' } })
     expect(leads.map((l) => l.name)).toEqual(['Cafe Mocha', 'Doon Dhaba', 'Old Bakery', 'Rajpur Momos Corner', 'Sunrise Tiffin Service'])
@@ -183,11 +201,17 @@ describe('Growth pipeline', () => {
     expect((mocha.summary as { services: string[] }).services).toEqual(['Website Design']) // invented services dropped
     expect(mocha.audit_token).toMatch(/^[A-Za-z0-9_-]{24}$/)
     expect((mocha.audit as { speed: { performance: number } }).speed.performance).toBe(28)
+    // Every service checked: search visibility, Instagram, ads, chat, trust…
+    expect(mocha.audit).toMatchObject({ version: 3, search: { query: 'restaurant dehradun', position: null, competitors: ['doonbistro.example', 'rajpurmomos.co.in', 'spicegarden.example'] }, instagram: { handle: 'cafemocha.doon', followers: 640 } })
+    const mochaFindings = (await leadService.get(admin, mocha.id)).findings
+    expect(mochaFindings.map((f) => f.key)).toEqual(expect.arrayContaining(['not_ranking', 'no_google_ads', 'ig_inactive', 'ig_small', 'no_chat', 'no_testimonials', 'no_video']))
+    expect(mochaFindings.find((f) => f.key === 'ig_inactive')!.title).toMatch(/^Instagram quiet since May 2026$/)
+    expect(mocha).toMatchObject({ route: 'AUTO' }) // Hot, but not a big business: the automatic emails
 
     // No website listed: the guessed .com was a parked page; the .in named the business with its phone number.
     expect(dhaba.website).toBe('https://doondhaba.in/')
     expect(dhaba.email).toBe('doondhaba@gmail.com')
-    expect(dhaba.audit).toMatchObject({ version: 2, websiteSource: 'guess', websiteLookup: { result: 'found', guessed: true, searched: false } })
+    expect(dhaba.audit).toMatchObject({ version: 3, websiteSource: 'guess', websiteLookup: { result: 'found', guessed: true, searched: false } })
     expect((dhaba.audit as { websiteLookup: { tried: { url: string; reason: string }[] } }).websiteLookup.tried).toEqual([
       { url: 'https://doondhaba.com/', reason: 'parked or placeholder page' },
       { url: 'https://doondhaba.in/', reason: 'name and phone number match' },
@@ -197,12 +221,20 @@ describe('Growth pipeline', () => {
     // Found by the web search (the directory result was ignored); the email is the one on its own site.
     expect(momos).toMatchObject({ website: 'https://rajpurmomos.co.in/', email: 'orders@rajpurmomos.co.in' })
     expect(momos.audit).toMatchObject({ websiteSource: 'search', websiteLookup: { result: 'found', searched: true } })
-    expect(momos.tier).not.toBe('SKIP')
+    expect(momos.tier).toBe('HOT')
+    // 180 reviews + an ad pixel: a serious case for the team, who are told.
+    expect(momos.route).toBe('TEAM')
+    expect((momos.route_reasons as string[])[0]).toMatch(/^Team: a Hot lead that looks like a big business \(180 Google reviews, already pays for ads/)
+    const told = await prisma.notification.findFirst({ where: { user_id: admin.actor.userId, type: 'LEAD_TEAM', related_entity_id: momos.id } })
+    expect(told?.title).toBe('Serious lead for the team: Rajpur Momos Corner')
+    // The search-visibility check found it in position 3.
+    expect(momos.audit).toMatchObject({ search: { position: 3 } })
 
     // Searched and nothing found: "No website found" is a fair finding, but there's no email to contact them.
     expect(tiffin.website).toBeNull()
     expect(tiffin.audit).toMatchObject({ websiteLookup: { result: 'not_found', searched: true } })
     expect(tiffin.tier).toBe('SKIP')
+    expect(tiffin.route).toBeNull()
     expect((tiffin.score_reasons as string[]).at(-1)).toBe('Skipped: no published email address to contact them')
     expect((await leadService.get(admin, tiffin.id)).findings.map((f) => f.title)).toEqual(['No website found', 'Only 12 Google reviews'])
 
@@ -304,7 +336,7 @@ describe('Growth pipeline', () => {
     await drain()
     lead = await prisma.lead.findUniqueOrThrow({ where: { id } })
     expect(lead).toMatchObject({ website: 'https://hiddenbakers.example/', email: 'hello@hiddenbakers.example', research_status: 'DONE' })
-    expect(lead.audit).toMatchObject({ version: 2, websiteSource: 'search' })
+    expect(lead.audit).toMatchObject({ version: 3, websiteSource: 'search' })
     expect(lead.tier).not.toBe('SKIP')
   })
 
@@ -313,7 +345,7 @@ describe('Growth pipeline', () => {
     await prisma.lead.update({ where: { id: tiffin.id }, data: { audit: { version: 1, checkedAt: '2026-11-01T00:00:00.000Z', website: null, site: null, siteError: null, speed: null, sitemap: null } } })
     await drain()
     const again = await prisma.lead.findUniqueOrThrow({ where: { id: tiffin.id } })
-    expect(again.audit).toMatchObject({ version: 2, websiteLookup: { result: 'not_found' } })
+    expect(again.audit).toMatchObject({ version: 3, websiteLookup: { result: 'not_found' } })
   })
 
   it('manual leads are audited like the rest', async () => {

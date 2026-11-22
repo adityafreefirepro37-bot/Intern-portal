@@ -1,9 +1,11 @@
 import { AYAVA_SERVICES, type AyavaService, type IndustryCheck } from './catalog'
 
 /**
- * Website audit for a lead: signals read from the homepage (and its contact
- * page), turned into findings that each map to an Ayava service. Pure
- * functions with no I/O — the fetching lives in src/server/leads/research.ts.
+ * Audit for a lead: signals read from the homepage (and its contact page), the
+ * sitemap, Google's PageSpeed / Lighthouse scores, a web search for the
+ * industry in the city, and the public Instagram / YouTube profiles the site
+ * links to — turned into findings that each map to an Ayava service. Pure
+ * functions with no I/O — the fetching lives in src/server/leads/pipeline.ts.
  * The stored audit is compact JSON: never the page's HTML.
  */
 
@@ -38,16 +40,60 @@ export interface SiteSignals {
   menuPage: boolean
   copyrightYear: number | null
   contactPageUrl: string | null
+  // Audit version 3 (older audits don't have these):
+  googleAds?: boolean
+  /** schema.org types in the page's JSON-LD. */
+  structuredData?: string[]
+  noindex?: boolean
+  canonical?: boolean
+  faviconLink?: boolean
+  logo?: boolean
+  video?: boolean
+  chatWidget?: string[]
+  testimonials?: boolean
+  newsletter?: boolean
+  appLinks?: string[]
 }
 
 export interface SpeedResult {
   performance: number
   lcpMs: number | null
   cls: number | null
+  /** Lighthouse category scores (0–100), from the same PageSpeed run. */
+  seo?: number | null
+  accessibility?: number | null
+  bestPractices?: number | null
+}
+
+/** Where the business appears in a web search for its trade in its city (Brave Search). */
+export interface SearchVisibility {
+  query: string
+  /** 1–10, or null when it isn't in the top 10. */
+  position: number | null
+  /** Other businesses' own sites in the top 10 (directories left out). */
+  competitors: string[]
+  checkedAt: string
+}
+
+/** Public Instagram business profile (Instagram Graph API, business discovery). */
+export interface InstagramProfile {
+  handle: string
+  followers: number
+  posts: number
+  lastPostAt: string | null
+  /** Average likes + comments on the last posts, as % of followers. */
+  engagementPct: number | null
+}
+
+export interface YouTubeChannel {
+  url: string
+  subscribers: number | null
+  videos: number
+  lastUploadAt: string | null
 }
 
 /** Current audit format. Leads researched with an older one are researched again. */
-export const AUDIT_VERSION = 2
+export const AUDIT_VERSION = 3
 
 /**
  * The search for a website when the listing had none: likely addresses first,
@@ -65,7 +111,7 @@ export interface WebsiteLookup {
 }
 
 export interface LeadAudit {
-  version: 1 | 2
+  version: 1 | 2 | 3
   checkedAt: string
   website: string | null
   /** Where the website came from: the listing, a likely address that proved to be theirs, or a web search. */
@@ -75,6 +121,15 @@ export interface LeadAudit {
   siteError: string | null
   speed: SpeedResult | null
   sitemap: boolean | null
+  // Audit version 3:
+  /** Pages listed in the sitemap, and the newest "last modified" date in it. */
+  sitemapPages?: number | null
+  sitemapLatest?: string | null
+  /** A tab icon: declared in the page or served at /favicon.ico. */
+  favicon?: boolean | null
+  search?: SearchVisibility | null
+  instagram?: InstagramProfile | null
+  youtube?: YouTubeChannel | null
 }
 
 export type Severity = 'high' | 'medium' | 'low'
@@ -135,6 +190,49 @@ const OTA: [string, RegExp][] = [
   ['Tripadvisor', /tripadvisor\.(com|in)/i],
   ['Expedia', /expedia\.(com|co\.in)/i],
 ]
+
+const CHAT_WIDGETS: [string, RegExp][] = [
+  ['Tawk.to', /embed\.tawk\.to/i],
+  ['Crisp', /client\.crisp\.chat/i],
+  ['Intercom', /widget\.intercom\.io|js\.intercomcdn\.com/i],
+  ['Tidio', /code\.tidio\.co/i],
+  ['Zoho SalesIQ', /salesiq\.zoho/i],
+  ['Freshchat', /wchat\.freshchat\.com|freshworks\.com\/live-chat/i],
+  ['LiveChat', /cdn\.livechatinc\.com/i],
+  ['Drift', /js\.driftt\.com/i],
+  ['HubSpot chat', /js\.usemessages\.com/i],
+  ['WATI', /wati\.io/i],
+  ['Interakt', /interakt\.(ai|shop)/i],
+  ['Gallabox', /gallabox\.com/i],
+  ['Chatbot', /chatbase\.co|botpress\.cloud|landbot\.io|kommunicate\.io|haptik\.ai|voiceflow\.com/i],
+]
+
+/** schema.org types that describe the business itself (not just the page). */
+const BUSINESS_TYPE = /(Organization|Business|Store|Restaurant|Cafe|Hotel|Resort|Dentist|Clinic|Physician|Hospital|Pharmacy|Agent|School|College|University|Salon|Spa|Gym|Establishment|Service|Dealer|Contractor|Attorney|Bakery|Lodging|Place|Center)$/
+
+function jsonLdTypes(html: string): string[] {
+  const types = new Set<string>()
+  const visit = (node: unknown, depth: number) => {
+    if (!node || typeof node !== 'object' || depth > 6) return
+    if (Array.isArray(node)) return node.forEach((n) => visit(n, depth + 1))
+    const record = node as Record<string, unknown>
+    const t = record['@type']
+    for (const value of Array.isArray(t) ? t : [t]) if (typeof value === 'string') types.add(value)
+    for (const key of ['@graph', 'mainEntity', 'publisher', 'author', 'organizer', 'provider']) visit(record[key], depth + 1)
+  }
+  for (const match of html.matchAll(/<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      visit(JSON.parse(match[1]!.trim()), 0)
+    } catch {
+      // Broken JSON-LD counts as none.
+    }
+  }
+  return [...types].slice(0, 12)
+}
+
+export function hasBusinessSchema(types: string[] | undefined): boolean {
+  return Boolean(types?.some((t) => BUSINESS_TYPE.test(t)))
+}
 
 const SOCIAL_PATTERNS = {
   instagram: /https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9_.]+/i,
@@ -266,7 +364,27 @@ export function analyzeHtml(html: string, pageUrl: string): SiteSignals {
     menuPage: links.some((href) => /\/menu\b|#menu|our-menu/i.test(href) && !/\.pdf/i.test(href)),
     copyrightYear: years.length ? Math.max(...years) : null,
     contactPageUrl,
+    googleAds: /AW-\d{6,}|googleadservices\.com\/pagead\/conversion|googleads\.g\.doubleclick\.net/i.test(html),
+    structuredData: jsonLdTypes(html),
+    noindex: /<meta[^>]+name\s*=\s*["']robots["'][^>]+content\s*=\s*["'][^"']*noindex/i.test(html) || /<meta[^>]+content\s*=\s*["'][^"']*noindex[^"']*["'][^>]+name\s*=\s*["']robots/i.test(html),
+    canonical: /<link[^>]+rel\s*=\s*["']canonical["']/i.test(html),
+    faviconLink: /<link[^>]+rel\s*=\s*["'][^"']*\b(icon|apple-touch-icon)\b/i.test(html),
+    logo: /<(img|svg|a|div|span)\b[^>]*\blogo/i.test(html) || /"logo"\s*:/i.test(html),
+    video: /<video\b|youtube(-nocookie)?\.com\/embed\/|player\.vimeo\.com|fast\.wistia|<iframe[^>]+facebook\.com\/plugins\/video/i.test(html),
+    chatWidget: firstMatch(CHAT_WIDGETS, html),
+    testimonials: /testimonial|what (our )?(clients|customers|patients|guests|students|parents) say|client reviews|customer reviews|google reviews|happy (clients|customers|patients)/i.test(text) || /elfsight|trustindex|embedsocial|grwapi|reviewsonmywebsite/i.test(html),
+    newsletter: forms.some((form) => /type\s*=\s*["']email["']/i.test(form) && /subscribe|newsletter|updates|offers/i.test(form)),
+    appLinks: [
+      ...(/play\.google\.com\/store\/apps\/details/i.test(linkText) ? ['Google Play'] : []),
+      ...(/apps\.apple\.com\/[a-z-]*\/?app\//i.test(linkText) ? ['App Store'] : []),
+    ],
   }
+}
+
+/** The Instagram username in a profile link, or null for posts, reels and other pages. */
+export function instagramHandle(url: string | undefined): string | null {
+  const handle = url?.match(/instagram\.com\/([A-Za-z0-9_.]{1,30})\/?/i)?.[1]
+  return handle && !['p', 'reel', 'reels', 'explore', 'accounts', 'stories', 'tv'].includes(handle.toLowerCase()) ? handle : null
 }
 
 /** Combines the homepage with the contact page (contact details, forms and booking often live there). */
@@ -287,6 +405,11 @@ export function mergeSignals(home: SiteSignals, extra: SiteSignals | null): Site
     ga4: home.ga4 || extra.ga4,
     gtm: home.gtm || extra.gtm,
     metaPixel: home.metaPixel || extra.metaPixel,
+    googleAds: Boolean(home.googleAds || extra.googleAds),
+    chatWidget: unique(home.chatWidget ?? [], extra.chatWidget ?? []),
+    testimonials: Boolean(home.testimonials || extra.testimonials),
+    newsletter: Boolean(home.newsletter || extra.newsletter),
+    video: Boolean(home.video || extra.video),
   }
 }
 
@@ -365,7 +488,7 @@ export function findingsFor(audit: LeadAudit, context: FindingContext): Finding[
 
   if (!site.ga4 && !site.gtm) out.push(finding('no_analytics', 'medium', 'analytics_cro', 'No analytics', 'There is no Google Analytics, so nobody knows where visitors come from or what they do.'))
   if (!site.metaPixel) out.push(finding('no_pixel', 'low', 'meta_ads', 'No Meta Pixel', 'Visitors can’t be retargeted on Instagram and Facebook, and ad results can’t be measured.'))
-  if (!site.emailTools.length) out.push(finding('no_email_capture', 'low', 'email_crm', 'No email marketing set up', 'There is no way to collect and follow up with interested visitors by email.'))
+  if (!site.emailTools.length && !site.newsletter) out.push(finding('no_email_capture', 'low', 'email_crm', 'No email marketing set up', 'There is no way to collect and follow up with interested visitors by email.'))
 
   if (!site.title || !site.metaDescription) out.push(finding('weak_seo_tags', 'medium', 'seo', 'Missing search titles or descriptions', 'Google shows a poor or auto-generated snippet, so fewer people click.'))
   if (!site.h1) out.push(finding('no_h1', 'low', 'seo', 'No main heading', 'Search engines can’t tell what the page is about.'))
@@ -379,7 +502,81 @@ export function findingsFor(audit: LeadAudit, context: FindingContext): Finding[
   if (!site.socials.instagram && !site.socials.facebook) out.push(finding('no_socials', 'medium', 'smm', 'No social media linked', 'The site doesn’t link to Instagram or Facebook, where customers check a business first.'))
   if (!site.ogImage) out.push(finding('no_share_preview', 'low', 'smm', 'No preview when shared', 'Links shared on WhatsApp or social media show no image.'))
 
+  if ((audit.version ?? 1) >= 3) out.push(...v3Findings(audit, site, context))
   return sortFindings(out)
+}
+
+function monthYear(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+}
+
+function daysSince(iso: string | null | undefined, now: Date): number | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  return Number.isNaN(t) ? null : Math.floor((now.getTime() - t) / 86_400_000)
+}
+
+/** The checks added in audit version 3: SEO depth, ads, social, video, content freshness, branding, chat, trust. */
+function v3Findings(audit: LeadAudit, site: SiteSignals, context: FindingContext): Finding[] {
+  const out: Finding[] = []
+  const now = context.now ?? new Date()
+
+  // SEO
+  if (site.noindex) out.push(finding('noindex', 'high', 'seo', 'Hidden from Google', 'The homepage tells search engines not to list it (a “noindex” tag), so it can’t appear in searches.'))
+  if (audit.speed?.seo != null && audit.speed.seo < 80) out.push(finding('lighthouse_seo', 'medium', 'seo', `Google’s SEO check scores ${audit.speed.seo}/100`, 'Google’s own Lighthouse test finds basic SEO problems on the homepage.'))
+  if (!hasBusinessSchema(site.structuredData)) out.push(finding('no_schema', 'low', 'seo', 'No business details for Google', 'There is no structured data (schema markup) giving Google the address, hours and services, which helps local search.'))
+  const search = audit.search
+  if (search) {
+    const rivals = search.competitors.length ? ` Sites that do appear: ${search.competitors.slice(0, 3).join(', ')}.` : ''
+    if (search.position === null) out.push(finding('not_ranking', 'high', 'seo', `Not in the top 10 search results for “${search.query}”`, `In a web search for “${search.query}” the website isn’t on the first page.${rivals}`))
+    else if (search.position > 3) out.push(finding('low_ranking', 'medium', 'seo', `Number ${search.position} in search results for “${search.query}”`, `In a web search for “${search.query}” it’s below the top three, where most clicks go.${rivals}`))
+  }
+
+  // Google Ads
+  if (!site.googleAds) {
+    if (search && search.position === null)
+      out.push(finding('no_google_ads', 'medium', 'google_ads', 'No sign of Google Ads', `The site isn’t on the first page for “${search.query}” and has no Google Ads tracking, so people searching right now find other businesses.`))
+    else out.push(finding('no_ads_tracking', 'low', 'google_ads', 'No Google Ads conversion tracking', 'If ads run, nobody can see which ones bring enquiries.'))
+  }
+
+  // Social media (Instagram)
+  const ig = audit.instagram
+  if (ig) {
+    const quiet = daysSince(ig.lastPostAt, now)
+    if (ig.posts === 0) out.push(finding('ig_empty', 'high', 'smm', 'Instagram has no posts', `@${ig.handle} is linked from the website but has never posted.`))
+    else if (quiet !== null && quiet > 60) out.push(finding('ig_inactive', 'high', 'smm', `Instagram quiet since ${monthYear(ig.lastPostAt!)}`, `@${ig.handle} hasn’t posted for ${Math.round(quiet / 30)} months; customers checking it think the business is closed or inactive.`))
+    if (ig.followers < 1000) out.push(finding('ig_small', 'medium', 'smm', `Only ${ig.followers} Instagram followers`, 'A small audience means posts reach few local customers.'))
+    else if (ig.engagementPct !== null && ig.engagementPct < 1) out.push(finding('ig_engagement', 'medium', 'smm', `Low Instagram engagement (${ig.engagementPct.toFixed(1)}%)`, `Recent posts get few likes and comments for ${ig.followers} followers.`))
+  }
+
+  // Video
+  const yt = audit.youtube
+  if (!site.video && !site.socials.youtube) out.push(finding('no_video', 'low', 'video', 'No video on the website', 'Short videos (walkthroughs, testimonials) build trust and work on Reels and YouTube too.'))
+  if (yt) {
+    const quiet = daysSince(yt.lastUploadAt, now)
+    if (yt.videos === 0) out.push(finding('yt_empty', 'medium', 'video', 'YouTube channel has no videos', 'The channel is linked from the website but empty.'))
+    else if (quiet !== null && quiet > 120) out.push(finding('yt_inactive', 'medium', 'video', `No YouTube upload since ${monthYear(yt.lastUploadAt!)}`, 'An inactive channel misses search traffic from YouTube and Google.'))
+  }
+
+  // Content freshness
+  const stale = daysSince(audit.sitemapLatest, now)
+  if (stale !== null && stale > 365) out.push(finding('no_updates', 'medium', 'content', `No page updated since ${monthYear(audit.sitemapLatest!)}`, 'The sitemap shows nothing new for over a year; fresh pages and posts keep a site ranking.'))
+
+  // Branding
+  if (audit.favicon === false) out.push(finding('no_favicon', 'low', 'branding', 'No browser tab icon', 'The site shows a blank icon in browser tabs and bookmarks, which looks unfinished.'))
+  if (site.logo === false) out.push(finding('no_logo', 'low', 'branding', 'No logo found on the homepage', 'We couldn’t find a logo image; a clear logo makes the business memorable.'))
+
+  // AI chat
+  if (!site.chatWidget?.length)
+    out.push(site.whatsapp
+      ? finding('no_chat_assistant', 'low', 'ai', 'No automated chat assistant', 'An AI assistant can answer common questions and capture enquiries at any hour, not only when someone replies on WhatsApp.')
+      : finding('no_chat', 'medium', 'ai', 'No instant chat for visitors', 'Visitors with a quick question have no chat or WhatsApp; an AI assistant could answer and capture the enquiry.'))
+
+  // Conversion & trust
+  if (!site.phones.length) out.push(finding('no_click_to_call', 'medium', 'analytics_cro', 'No tap-to-call button', 'Mobile visitors can’t call the business in one tap.'))
+  if (!site.testimonials) out.push(finding('no_testimonials', 'low', 'reputation', 'No reviews or testimonials on the website', 'Visitors see no proof from past customers before they enquire.'))
+  if (audit.speed?.accessibility != null && audit.speed.accessibility < 70) out.push(finding('accessibility', 'low', 'website', `Accessibility scores ${audit.speed.accessibility}/100`, 'Google’s Lighthouse test finds text, contrast or button problems that make the site hard to use.'))
+  return out
 }
 
 /** True only when a web search confirmed there's no website (not just a listing without one). */

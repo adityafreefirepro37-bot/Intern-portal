@@ -44,6 +44,7 @@ const PREFIXES: [string, NotificationCategory][] = [
   ['TASK_', 'tasks'],
   ['ASSESSMENT_', 'tasks'],
   ['LEAD_', 'tasks'],
+  ['OUTREACH_', 'tasks'],
   ['PROJECT_', 'projects'],
   ['MEETING_', 'meetings'],
   ['MESSAGE_', 'messages'],

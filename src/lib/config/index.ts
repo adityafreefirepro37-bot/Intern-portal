@@ -138,6 +138,11 @@ const envSchema = z.object({
   PAGESPEED_API_KEY: optionalString,
   /** Brave Search API key (free monthly credit): finds a business's own website when its listing has none. */
   BRAVE_SEARCH_API_KEY: optionalString,
+  /** Instagram Graph API (business discovery): a long-lived token and Ayava's Instagram business account id. */
+  INSTAGRAM_ACCESS_TOKEN: optionalString,
+  INSTAGRAM_BUSINESS_ID: optionalString,
+  /** YouTube Data API key (Google Cloud, no billing account needed). */
+  YOUTUBE_API_KEY: optionalString,
 })
 
 export type Env = z.infer<typeof envSchema>
@@ -239,6 +244,9 @@ function buildConfig(env: Env) {
       tomtomApiKey: env.TOMTOM_API_KEY,
       pagespeedApiKey: env.PAGESPEED_API_KEY ?? env.GOOGLE_MAPS_API_KEY,
       braveApiKey: env.BRAVE_SEARCH_API_KEY,
+      instagramToken: env.INSTAGRAM_ACCESS_TOKEN,
+      instagramBusinessId: env.INSTAGRAM_BUSINESS_ID,
+      youtubeApiKey: env.YOUTUBE_API_KEY,
     },
   } as const
 }

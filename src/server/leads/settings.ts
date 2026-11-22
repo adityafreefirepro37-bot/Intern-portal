@@ -33,6 +33,11 @@ export const growthSettingsSchema = z.object({
   siteSearchMonthlyCap: z.number().int().min(0).max(50000).default(900),
   /** Only leads with a published email address are kept (outreach is automatic, by email). */
   requireEmail: z.boolean().default(true),
+  /** Instagram Graph API allows about 200 calls an hour; YouTube 10,000 units a day (~3 per channel). */
+  instagramDailyCap: z.number().int().min(0).max(4000).default(150),
+  youtubeDailyCap: z.number().int().min(0).max(3000).default(300),
+  /** Size signals a Hot lead needs to go to the team instead of the automatic emails. */
+  bigBusinessSignals: z.number().int().min(1).max(6).default(2),
   aiSummaries: z.boolean().default(true),
   /** Verified facts about Ayava the AI may cite (results, portfolio). Nothing else is claimed. */
   proof: z.array(z.string().trim().min(3).max(300)).max(30).default([]),
@@ -96,6 +101,8 @@ export const PLACES_API = 'places_text_search'
 export const TOMTOM_API = 'tomtom_search'
 export const PAGESPEED_API = 'pagespeed'
 export const BRAVE_API = 'brave_search'
+export const INSTAGRAM_API = 'instagram'
+export const YOUTUBE_API = 'youtube'
 
 const GEO_KEY = 'growth_geo'
 

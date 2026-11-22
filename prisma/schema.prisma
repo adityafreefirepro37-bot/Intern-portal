@@ -729,11 +729,14 @@ model Organization {
   notification_deliveries  NotificationDelivery[]
   task_assessments         TaskAssessment[]
 
-  lead_industries   LeadIndustry[]
-  lead_searches     LeadSearch[]
-  leads             Lead[]
-  lead_suppressions LeadSuppression[]
-  lead_api_usage    LeadApiUsage[]
+  lead_industries    LeadIndustry[]
+  lead_searches      LeadSearch[]
+  leads              Lead[]
+  lead_suppressions  LeadSuppression[]
+  lead_api_usage     LeadApiUsage[]
+  lead_serps         LeadSerp[]
+  outreach_messages  OutreachMessage[]
+  outreach_mailboxes OutreachMailbox[]
 
   @@map("organizations")
 }
@@ -877,6 +880,7 @@ model User {
   assessments_taken             TaskAssessment[]               @relation("AssessmentIntern")
   assessment_attempts           AssessmentAttempt[]
   leads_assigned                Lead[]                         @relation("LeadAssignee")
+  outreach_approved             OutreachMessage[]              @relation("OutreachApprover")
   lead_searches_created         LeadSearch[]                   @relation("LeadSearchCreator")
 
   meeting_invitations      MeetingAttendee[]
@@ -3686,6 +3690,35 @@ enum LeadTier {
   SKIP
 }
 
+/// Who contacts a lead: the automatic email sequence, or the team personally (serious cases).
+enum LeadRoute {
+  AUTO
+  TEAM
+}
+
+enum OutreachStatus {
+  NONE
+  /// First email drafted, waiting for an admin's approval (the first N emails of a new setup).
+  AWAITING_APPROVAL
+  ACTIVE
+  REPLIED
+  BOUNCED
+  UNSUBSCRIBED
+  /// All emails of the sequence sent, no reply.
+  COMPLETED
+  /// Stopped by a person, or the lead changed (not a fit, do not contact, handed to the team).
+  STOPPED
+}
+
+enum OutreachMessageStatus {
+  AWAITING_APPROVAL
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 enum LeadResearchStatus {
   PENDING
   RUNNING
@@ -3796,20 +3829,97 @@ model Lead {
   audit_views           Int                @default(0)
   audit_first_viewed_at DateTime?          @db.Timestamptz(3)
   audit_last_viewed_at  DateTime?          @db.Timestamptz(3)
+  /// Set by the review after scoring: AUTO (email sequence) or TEAM (personal outreach).
+  route                 LeadRoute?
+  route_reasons         Json?
+  outreach_status       OutreachStatus     @default(NONE)
+  outreach_started_at   DateTime?          @db.Timestamptz(3)
+  outreach_replied_at   DateTime?          @db.Timestamptz(3)
   created_at            DateTime           @default(now()) @db.Timestamptz(3)
   updated_at            DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organization_id], references: [id], onDelete: Restrict)
-  industry     LeadIndustry? @relation(fields: [industry_id], references: [id], onDelete: SetNull)
-  search       LeadSearch?   @relation(fields: [search_id], references: [id], onDelete: SetNull)
-  assignee     User?         @relation("LeadAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+  organization      Organization      @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  industry          LeadIndustry?     @relation(fields: [industry_id], references: [id], onDelete: SetNull)
+  search            LeadSearch?       @relation(fields: [search_id], references: [id], onDelete: SetNull)
+  assignee          User?             @relation("LeadAssignee", fields: [assigned_to], references: [id], onDelete: SetNull)
+  outreach_messages OutreachMessage[]
 
   @@unique([organization_id, source, external_id])
   @@index([organization_id, tier, status])
   @@index([organization_id, industry_id])
   @@index([organization_id, research_status])
   @@index([assigned_to])
+  @@index([organization_id, outreach_status])
   @@map("leads")
+}
+
+/// Cached web search results for an industry × city query (search visibility check), refreshed monthly.
+model LeadSerp {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String   @db.Uuid
+  query           String
+  /// Result domains in order (directories included, so positions are true).
+  domains         Json
+  checked_at      DateTime @default(now()) @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, query])
+  @@map("lead_serps")
+}
+
+/// One email of a lead's outreach sequence (step 1 = first email, then follow-ups).
+model OutreachMessage {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id String                @db.Uuid
+  lead_id         String                @db.Uuid
+  step            Int
+  status          OutreachMessageStatus
+  to_email        String
+  /// Sending mailbox (from OUTREACH_MAILBOXES); chosen when it's sent.
+  mailbox         String?
+  subject         String
+  body            String
+  scheduled_for   DateTime              @db.Timestamptz(3)
+  sent_at         DateTime?             @db.Timestamptz(3)
+  /// Message-ID header, to match replies and bounces.
+  message_id      String?               @unique
+  error           String?
+  approved_by     String?               @db.Uuid
+  approved_at     DateTime?             @db.Timestamptz(3)
+  created_at      DateTime              @default(now()) @db.Timestamptz(3)
+  updated_at      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+  lead         Lead         @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  approver     User?        @relation("OutreachApprover", fields: [approved_by], references: [id], onDelete: SetNull)
+
+  @@unique([lead_id, step])
+  @@index([organization_id, status, scheduled_for])
+  @@index([mailbox, sent_at])
+  @@map("outreach_messages")
+}
+
+/// Sending state of an outreach mailbox. The address and password come from OUTREACH_MAILBOXES (never stored here).
+model OutreachMailbox {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organization_id     String    @db.Uuid
+  email               String
+  active              Boolean   @default(true)
+  /// First send: the daily limit ramps up from here (warm-up).
+  warmup_started_at   DateTime? @db.Timestamptz(3)
+  last_sent_at        DateTime? @db.Timestamptz(3)
+  last_inbox_check_at DateTime? @db.Timestamptz(3)
+  /// Highest IMAP UID already read, so each check only reads new mail.
+  last_inbox_uid      Int?
+  last_error          String?
+  created_at          DateTime  @default(now()) @db.Timestamptz(3)
+  updated_at          DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Restrict)
+
+  @@unique([organization_id, email])
+  @@map("outreach_mailboxes")
 }
 
 /// Businesses that asked not to be contacted (or were removed): never imported or contacted again.

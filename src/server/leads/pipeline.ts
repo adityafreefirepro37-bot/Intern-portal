@@ -8,21 +8,25 @@ import {
   analyzeHtml,
   AUDIT_VERSION,
   findingsFor,
+  instagramHandle,
   mergeSignals,
   ownEmails,
   servicesFor,
   websiteSettled,
   type Finding,
   type LeadAudit,
+  type SearchVisibility,
   type SiteSignals,
   type WebsiteLookup,
 } from '@/lib/leads/audit'
+import { reviewLead } from '@/lib/leads/review'
 import { AYAVA_SERVICES, INDUSTRY_CHECKS, type IndustryCheck } from '@/lib/leads/catalog'
 import { scoreLead } from '@/lib/leads/score'
 import { domainGuesses, isDirectory, matchSite, NAME_ONLY } from '@/lib/leads/site-match'
 import { logger } from '@/lib/logging'
 import { generateStructured, getAIProvider } from '../ai/provider'
 import { aiSettingsService } from '../ai/settings.service'
+import { NOTIFICATION_TYPES, notificationService, usersWithPermission } from '../services/notification.service'
 import { enqueueJob, type JobHandler } from '../jobs/queue'
 import { domainOf, FetchBlockedError, normaliseWebsite } from './safe-fetch'
 import {
@@ -31,6 +35,8 @@ import {
   cityPositions,
   countApiCall,
   growthSettings,
+  INSTAGRAM_API,
+  YOUTUBE_API,
   PAGESPEED_API,
   PLACES_API,
   TOMTOM_API,
@@ -45,8 +51,10 @@ import { leadSources, type FoundBusiness } from './sources'
  *                  ─► lead.research  homepage + contact page + sitemap → audit signals
  *                     ↳ lead.find_site  no website listed: likely addresses, then a web search,
  *                                       each page proven to be the business's before it's used
- *                  ─► lead.speed     PageSpeed Insights (mobile)
+ *                  ─► lead.speed     PageSpeed Insights (mobile): speed + Lighthouse SEO / accessibility
+ *                  ─► lead.presence  search visibility (Brave), Instagram and YouTube the site links to
  *                  ─► score          findings → need / fit → HOT / WARM / SKIP (+ private audit page)
+ *                  ─► review         AUTO (email sequence) or TEAM (serious cases, the team is told)
  *                  ─► lead.summary   AI words the top problems (rules-based summary until then)
  *
  * TomTom, Google and Brave usage is capped per day and per month (Growth settings) so
@@ -220,7 +228,7 @@ async function queueUpgradesAndLookups(organizationId: string, settings: GrowthS
       organization_id: organizationId,
       status: 'NEW',
       research_status: 'DONE',
-      audit: { path: ['version'], equals: 1 },
+      OR: Array.from({ length: AUDIT_VERSION - 1 }, (_, i) => ({ audit: { path: ['version'], equals: i + 1 } })),
     },
     orderBy: { created_at: 'asc' },
     take: 20,
@@ -511,16 +519,48 @@ function friendlyFetchError(error: unknown): string {
   return 'The website could not be opened.'
 }
 
-async function checkSitemap(origin: string): Promise<boolean | null> {
+interface SitemapInfo {
+  found: boolean | null
+  pages: number | null
+  latest: string | null
+}
+
+function readSitemap(xml: string) {
+  const locs = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1]!)
+  const dates = [...xml.matchAll(/<lastmod>\s*([^<\s]+)\s*<\/lastmod>/gi)]
+    .map((m) => new Date(m[1]!).getTime())
+    .filter((t) => !Number.isNaN(t) && t <= Date.now() + 86_400_000)
+  return { locs, latest: dates.length ? new Date(Math.max(...dates)).toISOString() : null }
+}
+
+/** Whether there is a sitemap, how many pages it lists and its newest "last modified" date. */
+async function checkSitemap(origin: string): Promise<SitemapInfo> {
   const sources = leadSources()
+  const xml = { accept: 'application/xml,text/xml,*/*' }
   try {
-    const sitemap = await sources.fetchPage(`${origin}/sitemap.xml`, {
-      timeoutMs: 6_000,
-      accept: 'application/xml,text/xml,*/*',
-    })
-    if (sitemap.status === 200 && /<(urlset|sitemapindex)\b/i.test(sitemap.text)) return true
+    const sitemap = await sources.fetchPage(`${origin}/sitemap.xml`, { timeoutMs: 6_000, ...xml })
+    if (sitemap.status === 200 && /<(urlset|sitemapindex)\b/i.test(sitemap.text)) {
+      const top = readSitemap(sitemap.text)
+      if (!/<sitemapindex\b/i.test(sitemap.text)) return { found: true, pages: top.locs.length, latest: top.latest }
+      // An index: count the first child sitemap's pages (enough to judge size).
+      const child = top.locs.find((loc) => domainOf(loc) === domainOf(origin))
+      const sub = child ? await sources.fetchPage(child, { timeoutMs: 6_000, ...xml }).catch(() => null) : null
+      const inner = sub && sub.status === 200 ? readSitemap(sub.text) : null
+      const latest = [top.latest, inner?.latest].filter(Boolean).sort().at(-1) ?? null
+      return { found: true, pages: inner ? Math.max(inner.locs.length, top.locs.length) : top.locs.length, latest }
+    }
     const robots = await sources.fetchPage(`${origin}/robots.txt`, { timeoutMs: 5_000, accept: 'text/plain,*/*' })
-    return robots.status === 200 && /^\s*sitemap\s*:/im.test(robots.text)
+    return { found: robots.status === 200 && /^\s*sitemap\s*:/im.test(robots.text), pages: null, latest: null }
+  } catch {
+    return { found: null, pages: null, latest: null }
+  }
+}
+
+async function checkFavicon(origin: string, declared: boolean | undefined): Promise<boolean | null> {
+  if (declared) return true
+  try {
+    const icon = await leadSources().fetchPage(`${origin}/favicon.ico`, { timeoutMs: 5_000, accept: 'image/*,*/*' })
+    return icon.status === 200 && /image|icon|octet-stream/i.test(icon.contentType)
   } catch {
     return null
   }
@@ -555,7 +595,12 @@ export async function auditWebsite(website: string | null): Promise<LeadAudit> {
       }
     }
     audit.site = site
-    audit.sitemap = await checkSitemap(new URL(home.url).origin)
+    const origin = new URL(home.url).origin
+    const [sitemap, favicon] = await Promise.all([checkSitemap(origin), checkFavicon(origin, site.faviconLink)])
+    audit.sitemap = sitemap.found
+    audit.sitemapPages = sitemap.pages
+    audit.sitemapLatest = sitemap.latest
+    audit.favicon = favicon
   } catch (error) {
     audit.siteError = friendlyFetchError(error)
   }
@@ -799,6 +844,113 @@ const runSpeed: JobHandler = async (payload) => {
       logger.info('PageSpeed check skipped', { leadId, error: error instanceof Error ? error.message : String(error) })
     }
   }
+  await enqueueJob({
+    type: 'lead.presence',
+    organizationId: lead.organization_id,
+    payload: { leadId: lead.id },
+    dedupeKey: `lead.presence:${lead.id}`,
+    maxAttempts: 2,
+  })
+}
+
+// ─── Online presence: search visibility, Instagram, YouTube ──────────────────
+
+const SERP_REFRESH_DAYS = 30
+
+/**
+ * Where the site appears in a web search for the industry in its city. One
+ * search per industry × city, cached for a month and shared by every lead.
+ */
+async function searchVisibility(
+  organizationId: string,
+  settings: GrowthSettings,
+  term: string | undefined,
+  city: string | null,
+  domain: string | null,
+): Promise<SearchVisibility | null> {
+  if (!term || !city || !domain) return null
+  const query = `${term} ${city}`.toLowerCase()
+  const flightKey = `${organizationId}|${query}`
+  // Leads checked at the same moment share one search.
+  let pending = serpInFlight.get(flightKey)
+  if (!pending) {
+    pending = freshSerp(organizationId, settings, query).finally(() => serpInFlight.delete(flightKey))
+    serpInFlight.set(flightKey, pending)
+  }
+  const cached = await pending
+  if (!cached) return null
+  const top = (cached.domains as string[]).slice(0, 10)
+  const ours = (d: string) => d === domain || d.endsWith(`.${domain}`) || domain.endsWith(`.${d}`)
+  const index = top.findIndex(ours)
+  return {
+    query,
+    position: index === -1 ? null : index + 1,
+    competitors: [...new Set(top.filter((d) => !ours(d) && !isDirectory(`https://${d}/`)))].slice(0, 3),
+    checkedAt: cached.checked_at.toISOString(),
+  }
+}
+
+const serpInFlight = new Map<string, Promise<{ domains: Prisma.JsonValue; checked_at: Date } | null>>()
+
+/** The cached results for a query, searched again when older than a month (and there's allowance). */
+async function freshSerp(organizationId: string, settings: GrowthSettings, query: string) {
+  const key = { organization_id_query: { organization_id: organizationId, query } }
+  const cached = await prisma.leadSerp.findUnique({ where: key })
+  if (cached && cached.checked_at.getTime() >= Date.now() - SERP_REFRESH_DAYS * DAY_MS) return cached
+  if ((await siteSearchesLeft(organizationId, settings)) <= 0) return cached
+  await countApiCall(organizationId, BRAVE_API)
+  try {
+    const results = await leadSources().webSearch(query, 20)
+    const domains = results.map((r) => domainOf(r.url)).filter((d): d is string => Boolean(d))
+    return await prisma.leadSerp.upsert({
+      where: key,
+      update: { domains, checked_at: new Date() },
+      create: { organization_id: organizationId, query, domains },
+    })
+  } catch (error) {
+    logger.info('Search visibility check skipped', { query, error: error instanceof Error ? error.message : String(error) })
+    return cached
+  }
+}
+
+async function underCap(organizationId: string, api: string, cap: number) {
+  return (await apiCalls(organizationId, api)).today < cap
+}
+
+const runPresence: JobHandler = async (payload) => {
+  const leadId = z.uuid().parse(payload.leadId)
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    select: { id: true, organization_id: true, city: true, audit: true, industry: { select: { search_terms: true } } },
+  })
+  if (!lead) return
+  const audit = lead.audit as unknown as LeadAudit | null
+  if (audit?.site) {
+    const settings = await growthSettings.get(lead.organization_id)
+    const sources = leadSources()
+    const skip = (what: string) => (error: unknown) => {
+      logger.info(`${what} check skipped`, { leadId, error: error instanceof Error ? error.message : String(error) })
+      return null
+    }
+    audit.search = await searchVisibility(
+      lead.organization_id,
+      settings,
+      lead.industry?.search_terms[0],
+      lead.city,
+      domainOf(audit.site.finalUrl),
+    ).catch(skip('Search visibility'))
+    const handle = instagramHandle(audit.site.socials.instagram)
+    if (handle && sources.instagramConfigured() && (await underCap(lead.organization_id, INSTAGRAM_API, settings.instagramDailyCap))) {
+      await countApiCall(lead.organization_id, INSTAGRAM_API)
+      audit.instagram = await sources.instagramProfile(handle).catch(skip('Instagram'))
+    }
+    const youtube = audit.site.socials.youtube
+    if (youtube && sources.youtubeConfigured() && (await underCap(lead.organization_id, YOUTUBE_API, settings.youtubeDailyCap))) {
+      await countApiCall(lead.organization_id, YOUTUBE_API)
+      audit.youtube = await sources.youtubeChannel(youtube).catch(skip('YouTube'))
+    }
+    await prisma.lead.update({ where: { id: lead.id }, data: { audit: audit as unknown as Prisma.InputJsonValue } })
+  }
   await scoreAndSummarise(lead.id)
 }
 
@@ -839,7 +991,7 @@ export function rulesSummary(findings: Finding[]): LeadSummary {
 export async function scoreAndSummarise(leadId: string) {
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
-    include: { industry: { select: { checks: true, priority: true } } },
+    include: { industry: { select: { checks: true, priority: true, key: true } } },
   })
   if (!lead) return
   const settings = await growthSettings.get(lead.organization_id)
@@ -856,6 +1008,14 @@ export async function scoreAndSummarise(leadId: string) {
     requireEmail: settings.requireEmail,
   })
   const keep = score.tier !== 'SKIP'
+  const review = reviewLead({
+    tier: score.tier,
+    hasEmail: Boolean(lead.email),
+    industryKey: lead.industry?.key ?? null,
+    reviewCount: lead.review_count,
+    audit: lead.audit as unknown as LeadAudit | null,
+    bigBusinessSignals: settings.bigBusinessSignals,
+  })
   await prisma.lead.update({
     where: { id: lead.id },
     data: {
@@ -863,6 +1023,8 @@ export async function scoreAndSummarise(leadId: string) {
       need_score: score.need,
       fit_score: score.fit,
       score_reasons: score.reasons,
+      route: review.route,
+      route_reasons: review.reasons,
       research_status: 'DONE',
       research_error: null,
       researched_at: new Date(),
@@ -873,6 +1035,22 @@ export async function scoreAndSummarise(leadId: string) {
         : {}),
     },
   })
+  // A serious case is new for the team: tell the people who manage leads (once).
+  if (review.route === 'TEAM' && lead.route !== 'TEAM' && lead.status !== 'DO_NOT_CONTACT') {
+    const recipients = lead.assigned_to ? [lead.assigned_to] : await usersWithPermission(lead.organization_id, 'lead.manage')
+    await notificationService.notify(
+      lead.organization_id,
+      recipients,
+      {
+        type: NOTIFICATION_TYPES.LEAD_TEAM,
+        title: `Serious lead for the team: ${lead.name}`,
+        body: review.reasons[0] ?? 'A Hot lead for personal outreach.',
+        entityType: 'lead',
+        entityId: lead.id,
+      },
+      null,
+    )
+  }
   if (keep && settings.aiSummaries) {
     await enqueueJob({
       type: 'lead.summary',
@@ -954,5 +1132,6 @@ export const LEAD_JOB_HANDLERS: Record<string, JobHandler> = {
   'lead.research': runResearch,
   'lead.find_site': runFindSite,
   'lead.speed': runSpeed,
+  'lead.presence': runPresence,
   'lead.summary': runSummary,
 }
