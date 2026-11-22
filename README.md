@@ -228,7 +228,7 @@ hardening headers. See [docs/security.md](docs/security.md), [docs/authenticatio
 | 08     | **Communication: calendar, meetings, messages, notification preferences & email** — done |
 | 09     | **Certificates and analytics** — done (docs/certificates.md, docs/analytics.md) |
 | 09+    | **Proctored task assessments** — done (docs/assessments.md) |
-| 09++   | **Growth phase 1: lead sourcing, auto-audit & scoring** — done (docs/growth.md); phase 2 outreach next |
+| 09++   | **Growth: lead sourcing, website finding, full-service audit, review & automatic outreach** — done (docs/growth.md) |
 | 10     | System administration: audit log tools, settings, role editor, MFA        |
 | 11     | Polish and launch                                                         |
 

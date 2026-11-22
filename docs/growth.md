@@ -1,74 +1,125 @@
-# Growth: lead sourcing, auto-audit and scoring (phase 1)
+# Growth: lead sourcing, full-service audit, review and outreach
 
-The portal finds businesses Ayava could help, audits each one automatically and
-scores it, so outreach starts from a short list of good prospects with a
-specific, useful reason to get in touch. **Nothing is sent to anyone in phase 1**:
-outreach (email sequences, replies, booking) is phase 2.
+The portal finds businesses Ayava could help, audits each one against every
+service Ayava offers, decides who should contact it, and emails the rest
+automatically: a first email built from the audit, two follow-ups, and a person
+takes over as soon as anyone replies. Serious cases (Hot leads that look like a
+big business) go to the team instead. Everything uses official APIs and public
+pages only, and every email can be unsubscribed from in one click.
 
 ## Pipeline
 
 Run by the background worker (`POST /api/jobs/worker`, every 5 minutes; see
-*Scheduler* below). Code: `src/server/leads/pipeline.ts`.
+*Scheduler* below). Code: `src/server/leads/pipeline.ts`, then
+`src/server/outreach/engine.ts`.
 
 1. **Search** (`lead.search`): one page of an *industry × city × term* search.
    TomTom Search returns up to 100 businesses per call within 15 km of the city
    centre (geocoded once per city and cached in `settings.key = 'growth_geo'`);
    Google Places API (New) text search returns up to 20; OpenStreetMap (Overpass)
-   returns all matches at once. New businesses become
-   leads; duplicates (same listing, website domain or phone) and opted-out
-   businesses (`lead_suppressions`) are skipped. Searches are created from the
-   active industries × the cities in Growth settings (`syncSearches`) and run again
-   30 days after they finish, to pick up new businesses. Searches **rotate through
-   industries** (the one searched least recently goes next, then its least recently
-   searched city / term), and imports take an advisory lock per organization so
-   parallel searches never go over `newLeadsDailyCap`.
+   returns all matches at once. New businesses become leads; duplicates (same
+   listing, website domain or phone) and opted-out businesses (`lead_suppressions`)
+   are skipped. Searches are created from the active industries × the cities in
+   Growth settings (`syncSearches`) and run again 30 days after they finish.
+   Searches **rotate through industries** (the one searched least recently goes
+   next, then its least recently searched city / term), and imports take an
+   advisory lock per organization so parallel searches never go over
+   `newLeadsDailyCap`.
 2. **Finding the website** (`lead.find_site`, only when the listing has none —
-   TomTom rarely lists one in Indian towns). Fully automatic, using public pages only
+   TomTom rarely lists one in Indian towns), using public pages only
    (`src/lib/leads/site-match.ts`):
    - *Likely addresses* (free): built from the business name
      (`shreebabaproperties.com`, `.in`, `.co.in`, with the city…), checked in DNS,
-     then opened.
+     then opened. One-word guesses (`friends.com`) are never tried.
    - *Web search* (Brave Search API, when `BRAVE_SEARCH_API_KEY` is set): the name and
      city; directories, maps, marketplaces and social sites are ignored.
    - A page is taken as the business's website **only when it proves it**: every
-     distinctive word of the name plus the listed phone number or the city (or the
-     phone number with part of the name). Parked and placeholder pages are rejected.
-     Every page tried, and why, is shown on the lead page.
+     distinctive word of the name plus the listed phone number or the city (also
+     looked for on its contact page), or the phone number with part of the name.
+     Parked and placeholder pages are rejected. Every page tried, and why, is shown
+     on the lead page.
    - `websiteLookup.result`: `found`, `not_found` (only after a web search found
      nothing) or `waiting` (no search key yet, or today's allowance used — the
      scheduler searches again by itself). A lead *waiting* isn't scored yet, and
-     **"No website found" is only claimed after a web search**, never because a
-     listing lacked one.
-3. **Research** (`lead.research`): the homepage, the contact page and
-2. **Research** (`lead.research`): the homepage, the contact page and
-   `sitemap.xml` / `robots.txt` are fetched (`safe-fetch.ts`: http(s) only, no
-   private addresses on any redirect hop, 12 s timeout, 1.5 MB limit) and read by
-   `analyzeHtml()` (`src/lib/leads/audit.ts`). Only compact signals are stored,
-   never the page. The email kept is one **the business publishes itself** — on
-   its own domain, or a free mailbox (gmail…) shown on its site, never another
-   company's (often the web designer's in the footer) — whose domain has a mail
-   server (MX), and not opted out (`ownEmails`, `publishedEmail`).
-4. **Speed** (`lead.speed`): PageSpeed Insights (mobile), with `PAGESPEED_API_KEY`
-   (or `GOOGLE_MAPS_API_KEY`), else keyless (shared, rate-limited quota). A failure
-   only drops that signal.
-5. **Score**: `findingsFor()` turns the signals, the Google rating and the
-   industry's extra checks into findings, each mapped to one of Ayava's 15
-   services; `scoreLead()` (`src/lib/leads/score.ts`) gives *need* (sum of
-   severity weights) and *fit* (industry priority, rating, reviews, reachable)
-   → **Hot / Warm / Skip**, with every point explained. Outreach is automatic and by
-   email, so with `requireEmail` (default on) a lead without a published email is
-   Skip. Hot and Warm leads get a private audit page.
-6. **Summary** (`lead.summary`): AYAVA AI words the top three problems and one
-   opening line (`buildLeadSummaryMessages`). It sees only the portal's findings
-   and the *verified proof* list from settings, and may not invent facts;
-   invented service names are dropped. Until then (or without AI) a rules-based
-   summary is used.
+     **"No website found" is only claimed after a web search**.
+3. **Research** (`lead.research`): the homepage, the contact page, the sitemap
+   (size and newest date), `robots.txt` and the favicon are fetched (`safe-fetch.ts`:
+   http(s) only, no private addresses on any redirect hop, 12 s timeout, 1.5 MB
+   limit) and read by `analyzeHtml()` (`src/lib/leads/audit.ts`): mobile, HTTPS,
+   platform, analytics, Meta Pixel, Google Ads tag, schema markup, noindex, logo,
+   video, chat widgets, testimonials, newsletter, booking / ordering / store, app
+   links, socials. Only compact signals are stored, never the page. The email kept
+   is one **the business publishes itself** — on its own domain, or a free mailbox
+   (gmail…) shown on its site, never another company's (often the web designer's in
+   the footer) — whose domain has a mail server (MX), and not opted out.
+4. **Speed** (`lead.speed`): PageSpeed Insights (mobile): performance plus the
+   Lighthouse SEO, accessibility and best-practice scores from the same run.
+5. **Presence** (`lead.presence`):
+   - *Search visibility*: where the site appears in a web search for
+     "*industry term* *city*" (Brave; one search per industry × city, cached for a
+     month in `lead_serps` and shared by every lead), and which competitors appear.
+   - *Instagram*: the public business profile the site links to (Instagram Graph API
+     business discovery: followers, posts, last post date, engagement), when
+     `INSTAGRAM_ACCESS_TOKEN` / `INSTAGRAM_BUSINESS_ID` are set.
+   - *YouTube*: subscribers, videos and last upload of the linked channel, when
+     `YOUTUBE_API_KEY` is set.
+6. **Score**: `findingsFor()` turns the signals into findings, each mapped to one
+   of Ayava's services — Website, SEO (Lighthouse SEO, noindex, schema, search
+   ranking), Google Ads, Meta Ads, Social media (Instagram activity, followers,
+   engagement), Video, Content (freshness), Branding (favicon, logo), AI (chat
+   assistant), Analytics/CRO (tap-to-call, enquiry form, tracking), Email/CRM,
+   Reputation (rating, testimonials), E-commerce. Influencer marketing and ASO
+   can't be judged automatically. `scoreLead()` gives *need* and *fit* → **Hot /
+   Warm / Skip**, with every point explained; with `requireEmail` (default on) a
+   lead without a published email is Skip. Hot and Warm leads get a private audit page.
+7. **Review** (`reviewLead()`, `src/lib/leads/review.ts`): a Hot lead with at
+   least `bigBusinessSignals` (2) signs of size — 100+ Google reviews, 5,000+
+   Instagram followers, 2,000+ YouTube subscribers, a 50+ page site, ad tracking on
+   the site, a high-value industry — goes to the **team** (people with
+   `lead.manage` are notified); other Hot and Warm leads with an email get the
+   **automatic** emails.
+8. **Summary** (`lead.summary`): AYAVA AI words the top three problems
+   (`buildLeadSummaryMessages`), from the findings and the *verified proof* list only.
+9. **Outreach** (see below).
 
-Leads researched with an older audit format (`audit.version` 1) are researched
-again automatically, 20 per worker run.
+Leads researched with an older audit format are researched again automatically,
+20 per worker run, so new checks reach existing leads.
 
-Things a browser can't check automatically (whether Instagram is active, whether
-they run ads) are a checklist for the reviewer, with links (Meta Ad Library).
+## Outreach
+
+Code: `src/server/outreach/engine.ts` (worker), `mailer.ts` (SMTP / IMAP / DNS),
+`src/lib/leads/outreach.ts` (rules), `outreach.service.ts` (Growth → Outreach page).
+
+- **Enrol**: AUTO-route Hot / Warm leads with a published email and an open audit
+  page (`outreach.draft`).
+- **Draft**: AI writes the first email from the findings
+  (`buildOutreachEmailMessages`). `draftProblem()` rejects a draft that invents a
+  number, adds links, email addresses or prices, uses spammy wording, misses the
+  audit link or doesn't name the business — the template is used instead. The
+  stored email is exactly what will be sent.
+- **Approval**: the first `approvalsRequired` (50) first emails wait in Growth →
+  Outreach for an admin (approve, edit or don't send); then they send on their own.
+- **Send** (`outreach.send`): only in the sending window (India time, Mon–Sat
+  10:00–18:00 by default), one email per mailbox per worker run (4 minutes apart),
+  and a warm-up per mailbox: 5 a day, +3 a day, up to `mailboxDailyMax` (40).
+- **Follow-ups**: two short follow-ups in the same thread (`followUpGapDays`, 3
+  and 4 days), from the same mailbox; the last says it is the last.
+- **Every email** shows the sender, company, website, postal address, why they got
+  it, and an unsubscribe link; it also carries `List-Unsubscribe` and one-click
+  (`List-Unsubscribe-Post`) headers. The footer link opens a confirm page
+  (`/unsubscribe/<token>`), so link scanners can't unsubscribe anyone.
+- **Inbox** (`outreach.inbox`, every 10 minutes per mailbox, IMAP): a reply stops
+  the sequence and notifies the lead's owner (answer it personally from that
+  mailbox); automatic replies are ignored; bounces and "unsubscribe / remove me"
+  replies suppress the address and stop everything. An SMTP refusal of the
+  address counts as a bounce.
+- **Readiness**: nothing is sent until outreach is switched on, the sender's name
+  and postal address are set, mailboxes are configured, `NEXT_PUBLIC_APP_URL` is
+  the public address, and each sending domain has an SPF record. The page also
+  shows DKIM and DMARC.
+- Leads whose status changes (not a fit, do not contact), that are handed to the
+  team or opt out on the audit page are never emailed again; scheduled emails are
+  cancelled when it's their turn.
 
 ## Free usage
 
@@ -80,7 +131,11 @@ they run ads) are a checklist for the reviewer, with links (Meta Ad Library).
 | Brave Search API (finding websites) | about $5 of free credit a month ≈ 1,000 searches (card required) | `siteSearchDailyCap` (30) and `siteSearchMonthlyCap` (900), counted in `lead_api_usage` (`brave_search`) |
 | Likely-address checks | free (DNS + opening the page) | at most 3 pages per lead |
 | OpenStreetMap Overpass | free (public servers are often overloaded; a retry goes to another server) | one search per worker run |
-| AI summaries | your AI provider | one per Hot / Warm lead |
+| Brave Search API (search visibility) | shares the allowance above | one search per industry × city per month |
+| Instagram Graph API | free (about 200 calls an hour) | `instagramDailyCap` (150) |
+| YouTube Data API | free (10,000 units a day; ~3 per channel) | `youtubeDailyCap` (300) |
+| Outreach email | your mailboxes (Hostinger) | warm-up, `mailboxDailyMax` (40) per mailbox |
+| AI summaries and first emails | your AI provider | one each per Hot / Warm lead |
 
 Also set a quota or budget alert in Google Cloud as a second safety net.
 
@@ -137,6 +192,13 @@ and ignores a duplicate enqueue for an open `dedupe_key`.
 - `BRAVE_SEARCH_API_KEY`: Brave Search API key (api-dashboard.search.brave.com, free
   monthly credit). Optional; without it only likely addresses are tried and leads
   without a found website wait.
+- `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ID`: a long-lived token from a Meta app
+  and Ayava's Instagram business account id (Instagram Graph API). Optional.
+- `YOUTUBE_API_KEY`: YouTube Data API key (Google Cloud, no billing). Optional.
+- `OUTREACH_MAILBOXES`: the sending mailboxes as JSON
+  (`[{"email":"…","password":"…","name":"…"}]`); passwords live only in the hosting
+  provider's secret settings. `OUTREACH_SMTP_HOST` / `_PORT`, `OUTREACH_IMAP_HOST` /
+  `_PORT` default to Hostinger.
 - Sources without a key are skipped; OpenStreetMap needs none.
 - `CRON_SECRET`: required for the worker and daily endpoints.
 - Growth settings (`settings.key = 'growth'`): on/off, cities, sources, caps, web
@@ -145,8 +207,11 @@ and ignores a duplicate enqueue for an open `dedupe_key`.
 
 ## Tests
 
-`tests/unit/leads.test.ts` (analysis, findings, score, website matching, own
-emails, catalogue, address guards), `tests/integration/leads.test.ts` (search →
+`tests/unit/leads.test.ts` (analysis, findings for every service, score, review,
+website matching, own emails, catalogue, address guards), `tests/unit/outreach.test.ts`
+(emails, draft checks, sending window, warm-up, reply / bounce classification),
+`tests/integration/outreach.test.ts` (drafts, approval, sending with unsubscribe
+headers, follow-ups in the thread, replies, bounces, unsubscribe, SPF gate), `tests/integration/leads.test.ts` (search →
 find site → research → speed → score → summary with fake sources: a site found at a
 likely address after a parked one, one found by web search past a directory, a
 confirmed "no website", a lead waiting for search, older audits researched again,
